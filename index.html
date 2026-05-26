@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portal de Operaciones</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f172a;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+  /* TOP BAR */
+  .topbar{
+    background:linear-gradient(135deg,#1e3a5f 0%,#1c4587 60%,#1565c0 100%);
+    padding:0 24px;display:flex;align-items:center;justify-content:space-between;
+    height:54px;flex-shrink:0;
+    box-shadow:0 2px 16px rgba(0,0,0,.4);z-index:100;
+  }
+  .topbar-left{display:flex;align-items:center;gap:14px}
+  .logo{width:36px;height:36px;border-radius:9px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:18px}
+  .topbar-title{color:#fff;font-size:15px;font-weight:700;letter-spacing:-.2px}
+  .topbar-title span{font-weight:300;opacity:.6;font-size:11px;display:block;text-transform:uppercase;letter-spacing:.08em}
+  .topbar-right{color:rgba(255,255,255,.5);font-size:11px}
+
+  /* TABS */
+  .tabs-bar{
+    background:#1e293b;display:flex;align-items:center;
+    padding:0 16px;gap:4px;height:48px;flex-shrink:0;
+    border-bottom:1px solid rgba(255,255,255,.08);
+  }
+  .tab{
+    display:flex;align-items:center;gap:7px;padding:8px 16px;border-radius:8px;
+    cursor:pointer;transition:all .18s;color:rgba(255,255,255,.5);
+    font-size:13px;font-weight:500;border:1px solid transparent;
+    user-select:none;white-space:nowrap;
+  }
+  .tab:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.8)}
+  .tab.active{background:rgba(59,130,246,.18);border-color:rgba(59,130,246,.4);color:#93c5fd}
+  .tab-icon{font-size:15px}
+  .tab-dot{width:6px;height:6px;border-radius:50%;background:#3b82f6;flex-shrink:0;display:none}
+  .tab.active .tab-dot{display:block}
+
+  /* FRAMES */
+  .frames{flex:1;position:relative;overflow:hidden}
+  .frame-wrap{position:absolute;inset:0;display:none}
+  .frame-wrap.active{display:block}
+  iframe{width:100%;height:100%;border:none;background:#fff}
+
+  /* LOADER */
+  .loader{
+    position:absolute;inset:0;background:#f1f5f9;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:14px;z-index:10;transition:opacity .4s;
+  }
+  .loader.hidden{opacity:0;pointer-events:none}
+  .spinner{width:40px;height:40px;border:3px solid #e2e8f0;border-top-color:#3b82f6;border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loader p{color:#64748b;font-size:13px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="logo">📊</div>
+    <div class="topbar-title">
+      Portal de Operaciones
+      <span>Supply Chain Dashboards</span>
+    </div>
+  </div>
+  <div class="topbar-right" id="clock"></div>
+</div>
+
+<div class="tabs-bar">
+  <div class="tab active" onclick="switchTab(0)" id="tab-0"><span class="tab-icon">📉</span>Histórico Faltantes<span class="tab-dot"></span></div>
+  <div class="tab" onclick="switchTab(1)" id="tab-1"><span class="tab-icon">📦</span>Monitor de Inventario<span class="tab-dot"></span></div>
+  <div class="tab" onclick="switchTab(2)" id="tab-2"><span class="tab-icon">🔄</span>Estatus Back Orders<span class="tab-dot"></span></div>
+  <div class="tab" onclick="switchTab(3)" id="tab-3"><span class="tab-icon">🎯</span>Inventario &amp; OTIF<span class="tab-dot"></span></div>
+</div>
+
+<div class="frames">
+
+  <!-- 0: Histórico Faltantes → GitHub Pages (data.json actualizado por Actions) -->
+  <div class="frame-wrap active" id="frame-wrap-0">
+    <div class="loader" id="loader-0"><div class="spinner"></div><p>Cargando Histórico Faltantes…</p></div>
+    <iframe id="frame-0" src="https://ftrevinor001-tr.github.io/dashboard-faltantes/" onload="hideLoader(0)"></iframe>
+  </div>
+
+  <!-- 1: Monitor de Inventario → GitHub Pages (actualizar_dashboard.py genera index.html con datos embebidos) -->
+  <div class="frame-wrap" id="frame-wrap-1">
+    <div class="loader" id="loader-1"><div class="spinner"></div><p>Cargando Monitor de Inventario…</p></div>
+    <iframe id="frame-1" onload="hideLoader(1)"></iframe>
+  </div>
+
+  <!-- 2: Estatus Back Orders → GitHub Pages (convert_to_json.py + Actions actualiza data/data.json) -->
+  <div class="frame-wrap" id="frame-wrap-2">
+    <div class="loader" id="loader-2"><div class="spinner"></div><p>Cargando Estatus Back Orders…</p></div>
+    <iframe id="frame-2" onload="hideLoader(2)"></iframe>
+  </div>
+
+  <!-- 3: Inventario & OTIF → archivo local (sin repositorio) -->
+  <div class="frame-wrap" id="frame-wrap-3">
+    <div class="loader" id="loader-3"><div class="spinner"></div><p>Cargando Inventario &amp; OTIF…</p></div>
+    <iframe id="frame-3" onload="hideLoader(3)"></iframe>
+  </div>
+
+</div>
+
+<script>
+/*
+  SRCS: URL de cada tab — todos los que tienen repo apuntan a GitHub Pages.
+  ─────────────────────────────────────────────────────────────────────────────
+  Tab 0 · Histórico Faltantes   → github.io/dashboard-faltantes/   (data.json vía Actions)
+  Tab 1 · Monitor de Inventario → github.io/monitor-inventario/    (index.html generado por Actions)
+  Tab 2 · Estatus Back Orders   → github.io/Estatus_BO/            (data/data.json vía Actions)
+  Tab 3 · Inventario & OTIF     → archivo local                    (sin repo)
+  ─────────────────────────────────────────────────────────────────────────────
+*/
+const SRCS = [
+  'https://ftrevinor001-tr.github.io/dashboard-faltantes/',   // 0 · Histórico Faltantes
+  'https://ftrevinor001-tr.github.io/monitor-inventario/',    // 1 · Monitor de Inventario
+  'https://ftrevinor001-tr.github.io/Estatus_BO/',            // 2 · Estatus Back Orders
+  'dashboard_Estatus_inventario_y_OTIF.html'                  // 3 · Inventario & OTIF (local)
+];
+
+// El tab 0 ya carga vía atributo src en el HTML; los demás se cargan lazy al primer clic.
+const loaded = [true, false, false, false];
+
+function hideLoader(i){
+  const l = document.getElementById('loader-' + i);
+  if (l) l.classList.add('hidden');
+}
+
+function switchTab(i){
+  document.querySelectorAll('.tab').forEach((t, j) => t.classList.toggle('active', j === i));
+  document.querySelectorAll('.frame-wrap').forEach((f, j) => f.classList.toggle('active', j === i));
+  if (!loaded[i]){
+    loaded[i] = true;
+    document.getElementById('frame-' + i).src = SRCS[i];
+  }
+}
+
+// Reloj
+function tick(){
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleDateString('es-MX', {weekday:'short', day:'2-digit', month:'short'}) +
+    ' · ' + now.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'});
+}
+tick();
+setInterval(tick, 30000);
+</script>
+</body>
+</html>
