@@ -603,7 +603,7 @@ let activeLvlProv='';
 let charts={urgency:null,scatter:null,boImpact:null,calendar:null};
 
 // ── OTIF state ──
-let OTIF_DATA=[], otifProv='', otifStatus='', otifMonth='';
+let OTIF_DATA=[], otifProv='', otifStatus='PROGRAMADO', otifMonth='';
 let otifOC='', otifClave='';
 let otifSortCol='oc', otifSortDir=1;
 
@@ -678,8 +678,8 @@ function parseSheet(raw){
   const tn=v=>typeof v==='number'?v:parseFloat(v)||0;
   const td=v=>{
     if(!v)return null;
-    if(v instanceof Date)return isNaN(v)?null:v;
-    if(typeof v==='number'){const d=new Date(Math.round((v-25569)*86400000));return isNaN(d)?null:d;}
+    if(v instanceof Date)return(isNaN(v)||v.getFullYear()<1900)?null:v;
+    if(typeof v==='number'){if(v<=0)return null;const d=new Date(Math.round((v-25569)*86400000));return(isNaN(d)||d.getFullYear()<1900)?null:d;}
     return null;
   };
   const classifyMi=mi=>{
@@ -692,6 +692,7 @@ function parseSheet(raw){
   for(let i=hdr+1;i<raw.length;i++){
     const row=raw[i];
     const grp=String(row[cGrp]||'').trim();if(!grp)continue;
+    const origCheck=String(row[cOrig]||'').trim();if(!origCheck)continue; // skip metadata rows (no ORIGEN)
     const isMain=(row[0]!==null&&row[0]!==undefined&&String(row[0]).trim()!=='');
     if(isMain)lastMain=i;
     const inv=tn(row[cInv]), vm=tn(row[cVm]);
@@ -906,7 +907,7 @@ function renderKPIs(data){
   const totInv=data.reduce((a,d)=>a+(d.inv||0),0);
   const totBO=data.reduce((a,d)=>a+(d.bo||0),0);
   const totFinal=data.reduce((a,d)=>a+(d.inv_final||0),0);
-  const totAsig=data.reduce((a,d)=>a+(d.asig_total||0),0);
+  const totAsig=data.filter(d=>d.fecha_pedido).reduce((a,d)=>a+(d.asig_total||0),0);
   const active=data.filter(d=>d.vm>0);
   const crit=data.filter(d=>d.lvlNow==='crit').length;
   const sinStock=data.filter(d=>d.inv===0&&d.vm>0).length;
@@ -1054,7 +1055,7 @@ function renderTable(data){
     const mainChip=(d.origen==='IMPORTACION'||d.origen==='IMPORTACIÓN')
       ?`<span class="prov-chip p-imp">${d.prov}</span>`
       :`<span class="prov-chip p-nac">${d.prov}</span>`;
-    const mainAsig=d.asig>0?`<span class="asig-val">${fmt(d.asig)}</span>`:`<span class="dash">—</span>`;
+    const mainAsig=(d.asig>0&&d.fecha_pedido)?`<span class="asig-val">${fmt(d.asig)}</span>`:`<span class="dash">—</span>`;
 
     if(hasChildren){
       // ── SHARED KEY: rowspan on merged columns, split only BACK ORDER + Proveedor + Asig
@@ -1084,7 +1085,7 @@ function renderTable(data){
         const childChip=(ch.origen==='IMPORTACION'||ch.origen==='IMPORTACIÓN')
           ?`<span class="prov-chip p-imp">${ch.prov}</span>`
           :`<span class="prov-chip p-nac">${ch.prov}</span>`;
-        const childAsig=ch.asig>0?`<span class="asig-val">${fmt(ch.asig)}</span>`:`<span class="dash">—</span>`;
+        const childAsig=(ch.asig>0&&d.fecha_pedido)?`<span class="asig-val">${fmt(ch.asig)}</span>`:`<span class="dash">—</span>`;
         const chBoCell=ch.bo>0?`<span class="bo-val">${fmt(ch.bo)}</span>`:`<span class="dash">—</span>`;
         const bb2=isLast?`border-bottom:2px solid ${gc.bar};`:'';
         html+=`<tr class="child-row" style="background:${gc.g};--gc-bar:${gc.bar}">
@@ -1139,8 +1140,8 @@ function parseOTIF(raw){
   if(hdr<0)return[];
   const toDate=v=>{
     if(!v)return null;
-    if(v instanceof Date)return isNaN(v)?null:v;
-    if(typeof v==='number'){const d=new Date(Math.round((v-25569)*86400000));return isNaN(d)?null:d;}
+    if(v instanceof Date)return(isNaN(v)||v.getFullYear()<1900)?null:v;
+    if(typeof v==='number'){if(v<=0)return null;const d=new Date(Math.round((v-25569)*86400000));return(isNaN(d)||d.getFullYear()<1900)?null:d;}
     return null;
   };
   return raw.slice(hdr+1).filter(r=>r[0]&&String(r[0]).trim()).map(r=>({
@@ -1193,6 +1194,7 @@ function updateOTIFStatusOptions(){
   const ss=document.getElementById('otif-status-sel');
   ss.innerHTML=`<option value="">Todos los estatus</option>`+stats.filter(v=>v!=='').map(v=>`<option value="${v}">${v}</option>`).join('');
   ss.value=otifStatus;
+  ss.className='msel'+(otifStatus?' msel-active':'');
   ss.onchange=()=>{otifStatus=ss.value;otifOC='';otifClave='';updateOTIFMonthOptions();renderOTIF();};
 }
 function updateOTIFMonthOptions(){
@@ -1385,7 +1387,7 @@ function renderOTIFTable(data){
   const SORT_NUM_COLS=new Set(['difDias','recibReal','qty']);
   const sorted=[...data].sort((a,b)=>{
     let va=a[otifSortCol], vb=b[otifSortCol];
-    if(SORT_NUM_COLS&&SORT_NUM_COLS.has(otifSortCol)){return otifSortDir*((a[otifSortCol]??-Infinity)-(b[otifSortCol]??-Infinity));}
+    if(SORT_NUM_COLS.has(otifSortCol)){return otifSortDir*((a[otifSortCol]??-Infinity)-(b[otifSortCol]??-Infinity));}
     if(SORT_DATE_COLS.has(otifSortCol)){
       va=va instanceof Date?va.getTime():0;
       vb=vb instanceof Date?vb.getTime():0;
@@ -1409,8 +1411,8 @@ function renderOTIFTable(data){
 
   // Cell helpers
   const pChip=d=>d.prov==='GLOBALES'?`<span class="prov-chip p-imp">${d.prov}</span>`:`<span class="prov-chip p-nac">${d.prov}</span>`;
-  const chipTarget=v=>!v?'<span class="dash">—</span>':v==='EN TIEMPO'?'<span class="chip-ok">✓ En tiempo</span>':'<span class="chip-fail">✗ Tarde</span>';
-  const chipOnTime=(v,rec)=>!rec?'<span class="dash">—</span>':v==='EN TIEMPO'?'<span class="chip-ok">✓ En tiempo</span>':'<span class="chip-fail">✗ Retrasado</span>';
+  const chipTarget=v=>v==='EN TIEMPO'?'<span class="chip-ok">✓ En tiempo</span>':v?'<span class="chip-fail">✗ Fuera de tiempo</span>':'<span class="dash">—</span>';
+  const chipOnTime=(v,rec)=>!rec?'<span class="dash">—</span>':v==='EN TIEMPO'?'<span class="chip-ok">✓ En tiempo</span>':'<span class="chip-fail">✗ Fuera de tiempo</span>';
   const chipIF=(v,rec)=>!rec?'<span class="dash">—</span>':v==='COMPLETO'?'<span class="chip-ok">✓ Completo</span>':'<span class="chip-fail">✗ Incompleto</span>';
   const difDiasCell=d=>{
     const dif=d.difDias;
@@ -1486,7 +1488,7 @@ function exportInventario(){
       d.miAfter!==null?Number(d.miAfter.toFixed(1)):'',
       fmtExport(d.hasta_antes), fmtExport(d.hasta_desp),
       fmtExport(d.fecha_pedido),
-      d.asig||'',
+      (d.asig&&d.fecha_pedido)?d.asig:'',
       'Principal'
     ]);
     // Child rows
@@ -1494,7 +1496,7 @@ function exportInventario(){
       rows.push([
         d.id, d.desc, ch.prov, ch.origen,
         '','','','','','','','','',
-        ch.asig||'',
+        (ch.asig&&d.fecha_pedido)?ch.asig:'',
         'Secundaria'
       ]);
     });
@@ -1521,17 +1523,16 @@ function exportOTIF(){
   if(!data.length){alert('No hay datos visibles para exportar.');return;}
 
   const headers=[
-    'OC','Clave','Descripción','Proveedor','Estatus','Cantidad',
-    'Fecha OC','Fecha Req.','Target de comprador',
-    'ETA Estimada','ETA Real','OTIF Entrega',
-    'Pedido','Recibido','In Full'
+    'Clave','Descripción','Proveedor','Cant. Pedida',
+    'F. OC Real','F. Requerida','Dif. días','Target Comprador',
+    'ETA Estimada','ETA Real','On Time','Cant. Recibida','In Full'
   ];
 
-  // Sort same as current OTIF table
   const SORT_DATE_COLS=new Set(['foc','freq','eta','etaR']);
+  const SORT_NUM_COLS=new Set(['difDias','recibReal','qty']);
   const sorted=[...data].sort((a,b)=>{
     let va=a[otifSortCol], vb=b[otifSortCol];
-    if(SORT_NUM_COLS&&SORT_NUM_COLS.has(otifSortCol)){return otifSortDir*((a[otifSortCol]??-Infinity)-(b[otifSortCol]??-Infinity));}
+    if(SORT_NUM_COLS.has(otifSortCol)){return otifSortDir*((a[otifSortCol]??-Infinity)-(b[otifSortCol]??-Infinity));}
     if(SORT_DATE_COLS.has(otifSortCol)){
       va=va instanceof Date?va.getTime():0;
       vb=vb instanceof Date?vb.getTime():0;
@@ -1543,25 +1544,25 @@ function exportOTIF(){
     return otifSortDir*String(va).localeCompare(String(vb),'es');
   });
 
+  const rec=d=>d.estatus==='RECIBIDO';
   const rows=[headers,...sorted.map(d=>[
-    d.oc, d.clave, d.desc, d.prov, d.estatus,
-    d.qty||'',
+    d.clave, d.desc, d.prov, d.qty||'',
     fmtExport(d.foc), fmtExport(d.freq),
-    d.otifC||'',
-    fmtExport(d.eta), fmtExport(d.etaR),
-    d.estatus==='RECIBIDO'?(d.otifE||''):'',
-    d.estatus==='RECIBIDO'?d.qty:'',
-    d.estatus==='RECIBIDO'?(d.recibReal!==null?d.recibReal:''):'',
-    d.estatus==='RECIBIDO'?(d.ifOk||''):'',
+    d.difDias!==null?d.difDias:'',
+    d.otifC==='EN TIEMPO'?'En tiempo':d.otifC?'Fuera de tiempo':'',
+    fmtExport(d.eta),
+    rec(d)?fmtExport(d.etaR):'',
+    rec(d)?(d.otifE==='EN TIEMPO'?'En tiempo':d.otifE?'Fuera de tiempo':''):'',
+    rec(d)&&d.recibReal!==null?d.recibReal:'',
+    rec(d)?(d.ifOk==='COMPLETO'?'Completo':d.ifOk?'Incompleto':''):'',
   ])];
 
   const wb=XLSX.utils.book_new();
   const ws=XLSX.utils.aoa_to_sheet(rows);
   ws['!cols']=[
-    {wch:9},{wch:9},{wch:45},{wch:12},{wch:12},{wch:9},
-    {wch:12},{wch:12},{wch:15},
-    {wch:12},{wch:12},{wch:15},
-    {wch:9},{wch:9},{wch:12}
+    {wch:9},{wch:45},{wch:12},{wch:10},
+    {wch:14},{wch:14},{wch:10},{wch:14},
+    {wch:14},{wch:14},{wch:12},{wch:14},{wch:12}
   ];
 
   XLSX.utils.book_append_sheet(wb, ws, 'OTIF Pedidos');
