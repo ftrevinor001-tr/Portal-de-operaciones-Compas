@@ -304,6 +304,10 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
 .kpi-section-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .kpi-section .kpi{border-radius:8px;border:1px solid var(--brd)}
 
+/* Directriz chips */
+.dir-ok{background:#e4f2e9;color:#145a38;font-weight:700;font-size:9px;padding:2px 7px;border-radius:5px;display:inline-block;white-space:normal;line-height:1.3;text-align:center}
+.dir-warn{background:#fef3d6;color:#7a4f00;font-weight:700;font-size:9px;padding:2px 7px;border-radius:5px;display:inline-block;white-space:normal;line-height:1.3;text-align:center}
+.dir-na{color:var(--tx3);font-size:9px}
 </style>
 </head>
 <body>
@@ -412,7 +416,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
               <th colspan="4" style="background:#145a38">INVENTARIO ACTUAL</th>
               <th colspan="2" style="background:#8b1a1a">BACK ORDER</th>
               <th colspan="2" style="background:#0e4d72">DESPUÉS DEL BO</th>
-              <th colspan="2" style="background:#5c3a9a">PRÓXIMO PEDIDO</th>
+              <th colspan="3" style="background:#5c3a9a">PRÓXIMO PEDIDO</th>
             </tr>
             <tr class="col-hdr">
               <th data-col="id"             style="width:60px">Clave<span class="arr">↕</span></th>
@@ -427,6 +431,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
               <th data-col="miAfter" class="num" style="width:58px">M. c/BO<span class="arr">↕</span></th>
               <th data-col="hasta_desp"  class="ctr" style="width:90px">Agota con BO<span class="arr">↕</span></th>
               <th data-col="fecha_pedido" class="ctr" style="width:90px">Próx. Pedido<span class="arr">↕</span></th>
+              <th data-col="directriz" style="width:95px">Directriz<span class="arr">↕</span></th>
               <th data-col="asig" class="num" style="width:65px">Asig.<span class="arr">↕</span></th>
             </tr>
           </thead>
@@ -672,6 +677,7 @@ function parseSheet(raw){
   const allH=headers.reduce((acc,h,i)=>{if(h.includes('INVENTARIO HASTA'))acc.push(i);return acc;},[]);
   const cHA=allH[0]??-1, cHD=allH[1]??-1;
   const cFP=ci('LEVANTAR PEDIDO');
+  const cDir=ci('DIRECTRIZ');
   const cProxEnt=ci('PROXIMA');
   const cAsig=ciLast('ASIGNACION'); // LAST occurrence = actual qty (not % fraction)
 
@@ -710,6 +716,7 @@ function parseSheet(raw){
       hasta_antes:isMain?td(row[cHA]):null,
       hasta_desp:isMain?td(row[cHD]):null,
       fecha_pedido:isMain?td(row[cFP]):null,
+      directriz:isMain?String(row[cDir]||'').trim():null,
       proxima_entrada:td(row[cProxEnt]),  // ETA date for this provider's OC
       asig:tn(row[cAsig]),
       isMain,
@@ -732,7 +739,7 @@ function buildGroups(){
   const map=new Map();
   ALL.forEach(d=>{
     if(d.isMain){
-      map.set(d.id,{...d,children:[],asig_total:d.asig,provList:[{prov:d.prov,origen:d.origen,asig:d.asig}]});
+      map.set(d.id,{...d,children:[],asig_total:d.asig,provList:[{prov:d.prov,origen:d.origen,asig:d.asig}]});  // directriz already in ...d
     }
   });
   ALL.forEach(d=>{
@@ -1019,7 +1026,7 @@ function updateSortArrows(){
 
 // ── Table (grouped by clave, Excel-style flat rows) ──────────────────
 function renderTable(data){
-  const SDIR={mi:1,miAfter:1,hasta_antes:1,hasta_desp:1,fecha_pedido:1,proxima_entrada:1,asig:-1,asig_total:-1,bo:-1,desc:1,vm:-1,inv:-1,prov:1};
+  const SDIR={mi:1,miAfter:1,hasta_antes:1,hasta_desp:1,fecha_pedido:1,proxima_entrada:1,asig:-1,asig_total:-1,bo:-1,desc:1,vm:-1,inv:-1,prov:1,directriz:1};
   const dir=sortDir*(SDIR[sortCol]??1);
   const sorted=[...data].sort((a,b)=>{
     let va=a[sortCol],vb=b[sortCol];
@@ -1033,8 +1040,14 @@ function renderTable(data){
   document.getElementById('row-count').textContent=sorted.length+' claves';
   document.getElementById('footer-txt').textContent=`${sorted.length} claves visibles · Hoja: Asignacion2`;
 
+  const dirChip=v=>{
+    if(!v)return'<span class="dir-na">—</span>';
+    if(v==='LEVANTAR PEDIDO')return'<span class="dir-ok">✔ Levantar pedido</span>';
+    if(v==='REVISAR CON GERENCIA')return'<span class="dir-warn">⚠ Revisar c/gerencia</span>';
+    return`<span class="dir-warn">${v}</span>`;
+  };
   if(!sorted.length){
-    document.getElementById('tbody').innerHTML='<tr><td colspan="13" class="no-data">Sin resultados para los filtros aplicados.</td></tr>';
+    document.getElementById('tbody').innerHTML='<tr><td colspan="14" class="no-data">Sin resultados para los filtros aplicados.</td></tr>';
     return;
   }
 
@@ -1076,6 +1089,7 @@ function renderTable(data){
         <td ${rs} class="num" style="${bb}">${miCell(d.miAfter,d.vm)}</td>
         <td ${rs} class="ctr" style="white-space:normal;line-height:1.3;${bb}">${dateCell(d.hasta_desp)}</td>
         <td ${rs} class="ctr" style="white-space:normal;line-height:1.3;${bb}">${dateCell(d.fecha_pedido)}</td>
+        <td ${rs} style="white-space:normal;vertical-align:middle;text-align:center;${bb}">${dirChip(d.directriz)}</td>
         <td class="num">${mainAsig}</td>
       </tr>`;
 
@@ -1111,6 +1125,7 @@ function renderTable(data){
         <td class="num">${miCell(d.miAfter,d.vm)}</td>
         <td class="ctr" style="white-space:normal;line-height:1.3">${dateCell(d.hasta_desp)}</td>
         <td class="ctr" style="white-space:normal;line-height:1.3">${dateCell(d.fecha_pedido)}</td>
+        <td style="white-space:normal;vertical-align:middle;text-align:center">${dirChip(d.directriz)}</td>
         <td class="num">${mainAsig}</td>
       </tr>`;
     }
@@ -1405,7 +1420,7 @@ function renderOTIFTable(data){
   updateOTIFSortArrows();
 
   if(!sorted.length){
-    document.getElementById('otif-tbody').innerHTML='<tr><td colspan="13" class="no-data">Sin resultados para los filtros aplicados.</td></tr>';
+    document.getElementById('otif-tbody').innerHTML='<tr><td colspan="14" class="no-data">Sin resultados para los filtros aplicados.</td></tr>';
     return;
   }
 
@@ -1460,13 +1475,13 @@ function exportInventario(){
     'Clave','Descripción','Proveedor','Origen',
     'Ventas/mes','Inv. Actual','Meses Inv.','BO Tránsito',
     'Inv. con BO','Meses con BO','Agota sin BO','Agota con BO',
-    'Levantar Pedido','Asignación','Tipo Fila'
+    'Levantar Pedido','Directriz de Pedido','Asignación','Tipo Fila'
   ];
 
   const rows=[headers];
 
   // Sort same as current table
-  const SDIR={mi:1,miAfter:1,hasta_antes:1,hasta_desp:1,fecha_pedido:1,proxima_entrada:1,asig:-1,asig_total:-1,bo:-1,desc:1,vm:-1,inv:-1,prov:1};
+  const SDIR={mi:1,miAfter:1,hasta_antes:1,hasta_desp:1,fecha_pedido:1,proxima_entrada:1,asig:-1,asig_total:-1,bo:-1,desc:1,vm:-1,inv:-1,prov:1,directriz:1};
   const dir=sortDir*(SDIR[sortCol]??1);
   const sorted=[...data].sort((a,b)=>{
     let va=a[sortCol],vb=b[sortCol];
@@ -1488,6 +1503,7 @@ function exportInventario(){
       d.miAfter!==null?Number(d.miAfter.toFixed(1)):'',
       fmtExport(d.hasta_antes), fmtExport(d.hasta_desp),
       fmtExport(d.fecha_pedido),
+      d.directriz||'',
       (d.asig&&d.fecha_pedido)?d.asig:'',
       'Principal'
     ]);
@@ -1510,7 +1526,7 @@ function exportInventario(){
     {wch:9},{wch:45},{wch:12},{wch:13},
     {wch:10},{wch:12},{wch:10},{wch:12},
     {wch:12},{wch:10},{wch:14},{wch:14},
-    {wch:14},{wch:12},{wch:10}
+    {wch:14},{wch:22},{wch:12},{wch:10}
   ];
 
   XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
