@@ -138,38 +138,38 @@ main{max-width:1700px;margin:0 auto;padding:20px 20px 60px}
 .tbl-card>.filter-bar{border-radius:0}
 .tbl-top{padding:11px 16px;border-bottom:1px solid var(--brd);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .tbl-top h3{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx2)}
-#row-count{font-size:11px;color:var(--tx3)}
+#row-count{font-size:13px;color:var(--tx3)}
 .sort-row{display:flex;align-items:center;gap:6px;margin-left:auto;font-size:11px;color:var(--tx3)}
 select#sort-sel{font-size:11px;border:1px solid var(--brd);border-radius:5px;padding:2px 6px;background:var(--surface);color:var(--tx);cursor:pointer}
 
 /* Frozen header table */
 .tbl-scroll{overflow-x:hidden;overflow-y:auto;max-height:calc(100vh - 100px);min-height:400px;border-radius:0 0 10px 10px}
 .tbl-scroll table thead{position:sticky;top:0;z-index:50}
-table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}
-thead tr.sec-hdr th{background:var(--navy);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#fff;padding:5px 6px;text-align:center;white-space:nowrap;border-right:1px solid rgba(255,255,255,.25)}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+thead tr.sec-hdr th{background:var(--navy);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#fff;padding:5px 6px;text-align:center;white-space:nowrap;border-right:1px solid rgba(255,255,255,.25)}
 thead tr.sec-hdr th:last-child{border-right:none}
-thead tr.col-hdr th{background:#f0efe9;font-size:10px;font-weight:600;color:var(--tx2);padding:5px 6px;border-bottom:2px solid var(--brd2);white-space:nowrap;cursor:pointer;user-select:none;overflow:hidden;text-overflow:ellipsis;transition:background .15s,color .15s}
+thead tr.col-hdr th{background:#f0efe9;font-size:12px;font-weight:600;color:var(--tx2);padding:5px 6px;border-bottom:2px solid var(--brd2);white-space:nowrap;cursor:pointer;user-select:none;overflow:hidden;text-overflow:ellipsis;transition:background .15s,color .15s}
 thead tr.col-hdr th:hover{background:var(--navy-bg);color:var(--navy)}
 thead tr.col-hdr th.sorted{background:var(--navy-bg);color:var(--navy2);border-bottom:2px solid var(--navy2)}
-.arr{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:3px;font-size:9px;margin-left:3px;opacity:.35;vertical-align:middle;transition:opacity .15s,background .15s}
+.arr{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;font-size:11px;margin-left:3px;opacity:.35;vertical-align:middle;transition:opacity .15s,background .15s}
 th[data-col]:hover .arr{opacity:.8;background:rgba(28,69,135,.1)}
 th[data-col].sorted .arr{opacity:1;background:var(--navy2);color:#fff;border-radius:3px}
 
-td{padding:5px 6px;border-bottom:.5px solid var(--brd);vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+td{padding:6px 7px;border-bottom:.5px solid var(--brd);vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 tr:last-child td{border-bottom:none}
 
 /* Group separator */
 tr.grp-sep td{padding:0;border:none}
-.grp-bar{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#fff;padding:5px 14px}
+.grp-bar{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#fff;padding:5px 14px}
 
 /* Parent row */
 tr.parent-row{cursor:pointer}
 tr.parent-row:hover td{background-image:linear-gradient(rgba(0,0,0,.03),rgba(0,0,0,.03))}
-tr.parent-row td{background:inherit}
+tr.parent-row td{background:var(--row-bg,transparent)}
 tr.parent-row td:first-child{border-left:3px solid var(--gc-bar,#aaa)}
 
 /* Child row — always visible, same structure as Excel secondary row */
-tr.child-row td{font-size:10.5px;border-bottom:.5px solid var(--brd);background:inherit;vertical-align:middle}
+tr.child-row td{font-size:13px;border-bottom:.5px solid var(--brd);background:var(--row-bg,transparent);vertical-align:middle}
 tr.child-row{background-image:none}
 tr.child-row td:first-child{border-left:3px solid var(--gc-bar,#aaa)}
 tr.child-row:hover{background-image:repeating-linear-gradient(135deg,rgba(0,0,0,.04) 0px,rgba(0,0,0,.04) 1px,transparent 1px,transparent 6px)}
@@ -181,37 +181,37 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
 .ctr{text-align:center}
 .id-c{font-family:monospace;font-size:10px;color:var(--tx3);font-weight:600}
 .desc-main{font-weight:600;font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis;display:block}
-.prov-chip{font-size:8px;padding:1px 5px;border-radius:6px;font-weight:600;display:inline-block;white-space:nowrap}
+.prov-chip{font-size:10px;padding:2px 6px;border-radius:6px;font-weight:600;display:inline-block;white-space:nowrap}
 .p-imp{background:var(--navy-bg);color:var(--navy)}
 .p-nac{background:var(--green-bg);color:var(--green)}
-.grp-mini{font-size:9px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grp-mini{font-size:11px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dash{color:var(--tx3)}
 
 /* Meses badge */
-.mi-crit{background:#ff4d4d;color:#7b0000;font-weight:700;padding:1px 5px;border-radius:4px;display:inline-block;font-size:9.5px}
-.mi-low{background:#ffcc00;color:#7b4500;font-weight:700;padding:1px 5px;border-radius:4px;display:inline-block;font-size:9.5px}
-.mi-opt{background:#92d050;color:#1e5c10;font-weight:700;padding:1px 5px;border-radius:4px;display:inline-block;font-size:9.5px}
-.mi-over{background:#7aadd8;color:#1c3557;font-weight:700;padding:1px 5px;border-radius:4px;display:inline-block;font-size:9.5px}
-.mi-na{color:var(--tx3)}
-.bo-val{color:var(--red);font-weight:700}
-.gain-chip{font-size:8px;background:var(--green-bg);color:var(--green);padding:1px 4px;border-radius:5px;font-weight:600;display:block;margin-top:1px}
+.mi-crit{background:#ff4d4d;color:#7b0000;font-weight:700;padding:2px 6px;border-radius:4px;display:inline-block;font-size:11.5px}
+.mi-low{background:#ffcc00;color:#7b4500;font-weight:700;padding:2px 6px;border-radius:4px;display:inline-block;font-size:11.5px}
+.mi-opt{background:#92d050;color:#1e5c10;font-weight:700;padding:2px 6px;border-radius:4px;display:inline-block;font-size:11.5px}
+.mi-over{background:#7aadd8;color:#1c3557;font-weight:700;padding:2px 6px;border-radius:4px;display:inline-block;font-size:11.5px}
+.mi-na{color:var(--tx3);font-size:11px}
+.bo-val{color:var(--red);font-weight:700;font-size:12px}
+.gain-chip{font-size:10px;background:var(--green-bg);color:var(--green);padding:2px 5px;border-radius:5px;font-weight:600;display:block;margin-top:1px}
 
 /* Date cells */
-.date-past{color:var(--red);font-weight:700;text-decoration:underline dotted}
+.date-past{color:var(--red);font-weight:700;text-decoration:underline dotted;font-size:12px}
 .date-crit{color:var(--red);font-weight:600}
 .date-warn{color:var(--amber);font-weight:600}
 .date-ok{color:var(--green);font-weight:500}
 .date-na{color:var(--tx3)}
-.diff-chip{font-size:9px;padding:1px 5px;border-radius:5px;margin-left:3px;font-weight:600}
+.diff-chip{font-size:11px;padding:2px 6px;border-radius:5px;margin-left:3px;font-weight:600}
 .dc-past{background:var(--red-bg);color:var(--red)}
 .dc-crit{background:var(--red-bg);color:var(--red)}
 .dc-warn{background:var(--amber-bg);color:var(--amber)}
 .dc-ok{background:var(--green-bg);color:var(--green)}
 
-.asig-val{font-weight:700;color:var(--purple);background:var(--purple-bg);padding:1px 6px;border-radius:5px;display:inline-block;font-size:9.5px}
+.asig-val{font-weight:700;color:var(--purple);background:var(--purple-bg);padding:2px 7px;border-radius:5px;display:inline-block;font-size:11.5px}
 .asig-tot{font-weight:700;color:var(--purple);font-size:9.5px}
-.id-c{font-family:monospace;font-size:9.5px;color:var(--tx3);font-weight:600}
-.desc-main{font-weight:600;font-size:10px;display:block;white-space:normal;line-height:1.35;word-break:break-word}
+.id-c{font-family:monospace;font-size:11.5px;color:var(--tx3);font-weight:600}
+.desc-main{font-weight:600;font-size:12px;display:block;white-space:normal;line-height:1.35;word-break:break-word}
 
 /* Legend strip */
 .export-btn{
@@ -268,7 +268,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
 .chip-ok{background:var(--green-bg);color:var(--green);font-size:9px;padding:2px 6px;border-radius:6px;font-weight:600}
 .chip-fail{background:var(--red-bg);color:var(--red);font-size:9px;padding:2px 6px;border-radius:6px;font-weight:600}
 .chip-pend{background:var(--sf2);color:var(--tx3);font-size:9px;padding:2px 6px;border-radius:6px}
-.legend-strip{display:flex;gap:12px;flex-wrap:wrap;padding:8px 16px;background:var(--sf2);border-top:1px solid var(--brd);font-size:10px;color:var(--tx2)}
+.legend-strip{display:flex;gap:12px;flex-wrap:wrap;padding:8px 16px;background:var(--sf2);border-top:1px solid var(--brd);font-size:12px;color:var(--tx2)}
 .ls-i{display:flex;align-items:center;gap:4px}
 .ls-d{width:9px;height:9px;border-radius:2px;flex-shrink:0}
 .ls-sep{width:1px;background:var(--brd2);align-self:stretch;margin:0 4px}
@@ -305,9 +305,9 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
 .kpi-section .kpi{border-radius:8px;border:1px solid var(--brd)}
 
 /* Directriz chips */
-.dir-ok{background:#e4f2e9;color:#145a38;font-weight:700;font-size:9px;padding:2px 7px;border-radius:5px;display:inline-block;white-space:normal;line-height:1.3;text-align:center}
-.dir-warn{background:#fef3d6;color:#7a4f00;font-weight:700;font-size:9px;padding:2px 7px;border-radius:5px;display:inline-block;white-space:normal;line-height:1.3;text-align:center}
-.dir-na{color:var(--tx3);font-size:9px}
+.dir-ok{background:#e4f2e9;color:#145a38;font-weight:700;font-size:11px;padding:2px 7px;border-radius:5px;display:inline-block;white-space:normal;line-height:1.3;text-align:center}
+.dir-warn{background:#fef3d6;color:#7a4f00;font-weight:700;font-size:11px;padding:2px 7px;border-radius:5px;display:inline-block;white-space:normal;line-height:1.3;text-align:center}
+.dir-na{color:var(--tx3);font-size:11px}
 </style>
 </head>
 <body>
@@ -1057,7 +1057,7 @@ function renderTable(data){
     const gc=GP_C[d.grupo]||{bar:'#888',g:'#f0f0f0',a:'#e2e2e2'};
     // Group separator bar
     if(d.grupo!==prevGrupo){
-      html+=`<tr class="grp-sep"><td colspan="13"><div class="grp-bar" style="background:${gc.bar}">${d.grupo}</div></td></tr>`;
+      html+=`<tr class="grp-sep"><td colspan="14"><div class="grp-bar" style="background:${gc.bar}">${d.grupo}</div></td></tr>`;
       prevGrupo=d.grupo;
     }
 
@@ -1076,7 +1076,7 @@ function renderTable(data){
       const rs=`rowspan="${totalRows}"`;
       const bb=`border-bottom:2px solid ${gc.bar};`;  // forces bottom separator via rowspan
 
-      html+=`<tr class="parent-row" style="background:${gc.g};--gc-bar:${gc.bar}" title="${d.grupo}">
+      html+=`<tr class="parent-row" style="background:${gc.g};--gc-bar:${gc.bar};--row-bg:${gc.g}" title="${d.grupo}">
         <td ${rs} style="${bb}"><span class="id-c">${d.id}</span></td>
         <td ${rs} style="white-space:normal;${bb}"><span class="desc-main">${d.desc}</span></td>
         <td style="padding-left:4px">${mainChip}</td>
@@ -1102,7 +1102,7 @@ function renderTable(data){
         const childAsig=(ch.asig>0&&d.fecha_pedido)?`<span class="asig-val">${fmt(ch.asig)}</span>`:`<span class="dash">—</span>`;
         const chBoCell=ch.bo>0?`<span class="bo-val">${fmt(ch.bo)}</span>`:`<span class="dash">—</span>`;
         const bb2=isLast?`border-bottom:2px solid ${gc.bar};`:'';
-        html+=`<tr class="child-row" style="background:${gc.g};--gc-bar:${gc.bar}">
+        html+=`<tr class="child-row" style="background:${gc.g};--gc-bar:${gc.bar};--row-bg:${gc.g}">
           <td style="border-left:3px solid ${gc.bar};${bb2}padding-left:8px">${childChip}</td>
           <td class="num" style="${bb2}">${chBoCell}</td>
           <td class="ctr" style="white-space:normal;line-height:1.3;${bb2}">${dateCell(ch.proxima_entrada)}</td>
@@ -1112,7 +1112,7 @@ function renderTable(data){
 
     } else {
       // ── SINGLE PROVIDER: normal row, no rowspan
-      html+=`<tr class="parent-row grp-end" style="background:${gc.g};--gc-bar:${gc.bar}" title="${d.grupo}">
+      html+=`<tr class="parent-row grp-end" style="background:${gc.g};--gc-bar:${gc.bar};--row-bg:${gc.g}" title="${d.grupo}">
         <td><span class="id-c">${d.id}</span></td>
         <td style="white-space:normal"><span class="desc-main">${d.desc}</span></td>
         <td>${mainChip}</td>
