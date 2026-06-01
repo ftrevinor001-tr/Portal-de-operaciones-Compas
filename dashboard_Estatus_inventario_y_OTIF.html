@@ -70,6 +70,7 @@ main{max-width:1700px;margin:0 auto;padding:20px 20px 60px}
 .pfbtn:hover{border-color:var(--navy2);color:var(--navy2)}
 .pfbtn.on{background:var(--navy);border-color:var(--navy);color:#fff}
 .lvl-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+#lvl-body{transition:none}
 @media(max-width:900px){.lvl-grid{grid-template-columns:repeat(2,1fr)}}
 .lvl-card{border-radius:10px;border:1px solid;overflow:hidden}
 .lvl-card.crit{border-color:var(--crit-brd);--lc:var(--crit);--lcbg:var(--crit-bg);--lhdr:#8b1a1a}
@@ -352,15 +353,23 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
     <!-- LEVEL CARDS -->
     <div class="lvl-section">
       <div class="lvl-header">
-        <span class="lvl-title">📊 Niveles de Inventario — Actual vs. Con Back Order</span>
-        <div class="lvl-pf">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="lvl-title">📊 Niveles de Inventario — Actual vs. Con Back Order</span>
+          <button id="lvl-toggle-btn" onclick="toggleLevelCards()"
+            style="font-size:11px;padding:3px 12px;border:1px solid var(--brd2);border-radius:6px;background:var(--sf2);cursor:pointer;color:var(--tx2);white-space:nowrap">
+            ▼ Ocultar
+          </button>
+        </div>
+        <div class="lvl-pf" id="lvl-pf-wrap">
           <span class="lvl-pf-lbl">Proveedor:</span>
           <select class="msel" id="lvl-prov-sel" onchange="activeLvlProv=this.value;renderLevelCards()">
-            <option value="TODOS">Todos</option>
+            <option value="">Todos</option>
           </select>
         </div>
       </div>
-      <div class="lvl-grid" id="lvl-grid"></div>
+      <div id="lvl-body">
+        <div class="lvl-grid" id="lvl-grid"></div>
+      </div>
     </div>
 
     <!-- FILTERS (cascading) -->
@@ -605,6 +614,7 @@ let activeGroup='', activeProv='';
 let activeTermMonth='', activePedMonth='';
 let searchText='', sortCol='mi', sortDir=1;
 let activeLvlProv='';
+let lvlVisible=true;
 let charts={urgency:null,scatter:null,boImpact:null,calendar:null};
 
 // ── OTIF state ──
@@ -860,6 +870,7 @@ function buildFilters(){
   const lps=document.getElementById('lvl-prov-sel');
   const lpProvs=['',...new Set(GROUPED.map(d=>d.prov).filter(Boolean))];
   lps.innerHTML=lpProvs.map(p=>`<option value="${p}">${p===''?'Todos':p}</option>`).join('');
+  if(!lpProvs.includes(activeLvlProv))activeLvlProv='';
   lps.value=activeLvlProv||'';
 
   document.getElementById('term-filter').addEventListener('change',e=>{activeTermMonth=e.target.value;updateCascadeOptions();renderAll();});
@@ -928,8 +939,18 @@ function renderKPIs(data){
 }
 
 // ── Level Cards ───────────────────────────────────────────────────
+function toggleLevelCards(){
+  lvlVisible=!lvlVisible;
+  const body=document.getElementById('lvl-body');
+  const pf=document.getElementById('lvl-pf-wrap');
+  const btn=document.getElementById('lvl-toggle-btn');
+  if(body){body.style.display=lvlVisible?'':'none';}
+  if(pf){pf.style.display=lvlVisible?'':'none';}
+  if(btn){btn.textContent=lvlVisible?'▼ Ocultar':'▶ Mostrar';}
+}
 function renderLevelCards(){
-  const main=GROUPED.filter(d=>d.vm>0&&(!activeLvlProv||d.prov===activeLvlProv));
+  const base=filteredFull();
+  const main=base.filter(d=>d.vm>0&&(!activeLvlProv||d.prov===activeLvlProv));
   const total=main.length||1;
   document.getElementById('lvl-grid').innerHTML=LEVELS.map(lv=>{
     const now=main.filter(d=>d.lvlNow===lv.key);
