@@ -309,6 +309,34 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
 .dir-ok{background:#e4f2e9;color:#145a38;font-weight:700;font-size:11px;padding:2px 7px;border-radius:5px;display:inline-block;white-space:normal;line-height:1.3;text-align:center}
 .dir-warn{background:#fef3d6;color:#7a4f00;font-weight:700;font-size:11px;padding:2px 7px;border-radius:5px;display:inline-block;white-space:normal;line-height:1.3;text-align:center}
 .dir-na{color:var(--tx3);font-size:11px}
+/* ── Trend analysis ── */
+.trend-section{background:var(--surface);border:1px solid var(--brd);border-radius:12px;margin-bottom:16px;overflow:hidden}
+.trend-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--brd)}
+.trend-hdr-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx2)}
+.trend-toggle{font-size:11px;padding:3px 12px;border:1px solid var(--brd2);border-radius:6px;background:var(--sf2);cursor:pointer;color:var(--tx2)}
+.trend-body{padding:16px 18px}
+.trend-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.trend-kpi{background:var(--sf2);border:1px solid var(--brd);border-radius:8px;padding:10px 14px}
+.trend-kpi-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:var(--tx3);margin-bottom:4px}
+.trend-kpi-val{font-size:20px;font-weight:800;line-height:1}
+.trend-kpi-sub{font-size:10px;color:var(--tx2);margin-top:3px}
+.trend-charts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.trend-panel{background:var(--sf2);border:1px solid var(--brd);border-radius:8px;padding:12px}
+.trend-panel-title{font-size:10px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+.trend-table{width:100%;border-collapse:collapse;font-size:11px}
+.trend-table th{background:var(--navy);color:#fff;padding:6px 10px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.04em}
+.trend-table td{padding:6px 10px;border-bottom:.5px solid var(--brd);vertical-align:middle}
+.trend-table tr:hover td{background:var(--sf2)}
+.trend-table tr.oc-fail td{background:#fff5f5}
+.trend-table tr.oc-ok td{background:#f5faf5}
+.cause-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.cause-card{background:var(--sf2);border-left:4px solid var(--brd2);border-radius:6px;padding:10px 14px}
+.cause-card.red{border-left-color:var(--red)}
+.cause-card.green{border-left-color:var(--green)}
+.cause-card.amber{border-left-color:var(--amber)}
+.cause-tag{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3);margin-bottom:4px}
+.cause-val{font-size:22px;font-weight:800}
+.cause-txt{font-size:11px;color:var(--tx2);margin-top:4px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -491,10 +519,44 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
       </div>
     </div>
 
+
+    <!-- ── TREND ANALYSIS SECTION ── -->
+    <div class="trend-section" id="target-trend-section">
+      <div class="trend-hdr">
+        <span class="trend-hdr-title">📈 Tendencia del Target de Comprador — por OC y Proveedor</span>
+        <button class="trend-toggle" id="trend-tog-btn" onclick="toggleTargetTrend()">▶ Mostrar</button>
+      </div>
+      <div class="trend-body" id="trend-body" style="display:none">
+        <!-- KPI mini-cards -->
+        <div class="trend-kpis" id="trend-kpis"></div>
+        <!-- Charts + Root cause side by side -->
+        <div class="trend-charts">
+          <div class="trend-panel">
+            <div class="trend-panel-title">📅 Cumplimiento por mes de alarma</div>
+            <div style="position:relative;height:200px"><canvas id="trend-month-chart"></canvas></div>
+          </div>
+          <div id="trend-root-causes"></div>
+        </div>
+        <div style="margin-top:14px">
+          <div class="trend-panel-title" style="margin-bottom:8px">📋 Detalle por Orden de Compra</div>
+          <div style="overflow-x:auto">
+            <table class="trend-table" id="trend-oc-table">
+              <thead><tr>
+                <th>OC</th><th>Proveedor</th><th>Mes alarma</th><th>Líneas</th>
+                <th style="text-align:center">En tiempo</th><th style="text-align:center">% Target</th>
+                <th style="text-align:center">Dif. prom.</th><th>Estado</th><th>Diagnóstico</th>
+              </tr></thead>
+              <tbody id="trend-oc-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- OC cards (PROGRAMADO only) -->
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
       <span style="font-size:11px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.06em">OC's Vigentes</span>
-      <button id="oc-toggle-btn" onclick="(function(){const g=document.getElementById('oc-cards');const btn=document.getElementById('oc-toggle-btn');const vis=g.style.display!=='none';g.style.display=vis?'none':'grid';btn.textContent=vis?'▶ Mostrar':'▼ Ocultar';})()" style="font-size:11px;padding:3px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--sf2);cursor:pointer;color:var(--tx2)">▼ Ocultar</button>
+      <button id="oc-toggle-btn" onclick="toggleOCCards()" style="font-size:11px;padding:3px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--sf2);cursor:pointer;color:var(--tx2)">▶ Mostrar</button>
     </div>
     <div class="oc-grid" id="oc-cards"></div>
 
@@ -521,6 +583,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
           <option value="otifC">Target de Comprador</option>
           <option value="otifE">OTIF On Time</option>
           <option value="ifOk">In Full</option>
+          <option value="obs">Observaciones</option>
         </select>
         <button class="clear-btn" id="otif-clear-detail">✕ Limpiar</button>
         <span id="otif-detail-count" style="margin-left:auto;font-size:11px;color:var(--tx3)"></span>
@@ -531,7 +594,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
             <tr class="sec-hdr">
               <th colspan="4" style="background:#1c3557">IDENTIFICACIÓN</th>
               <th colspan="4" style="background:#8b1a1a">TARGET DE COMPRADOR</th>
-              <th colspan="5" style="background:#0e4d72">OTIF DE PROVEEDOR</th>
+              <th colspan="6" style="background:#0e4d72">OTIF DE PROVEEDOR</th>
             </tr>
             <tr>
               <th data-ocol="clave"   style="width:62px">Clave<span class="sarr">↕</span></th>
@@ -547,6 +610,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
               <th data-ocol="otifE"   class="ctr" style="width:90px">On Time<span class="sarr">↕</span></th>
               <th data-ocol="recibReal" class="num" style="width:80px">Cant. Recibida<span class="sarr">↕</span></th>
               <th data-ocol="ifOk"    class="ctr" style="width:88px">In Full<span class="sarr">↕</span></th>
+              <th data-ocol="obs"     style="min-width:130px">Observaciones<span class="sarr">↕</span></th>
             </tr>
           </thead>
           <tbody id="otif-tbody"></tbody>
@@ -560,9 +624,9 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
         <div>
           <div style="font-weight:700;color:var(--navy);margin-bottom:4px">🎯 Target de Comprador — por Orden de Compra</div>
-          <p>Mide si la OC fue colocada a tiempo respecto a la fecha requerida. Se agrupa por OC: una orden <b>cumple</b> si el ≥ 95 % de sus líneas tienen fecha de colocación ≤ fecha requerida (<em>OTIF Comprador = EN TIEMPO</em>).</p>
-          <p style="margin-top:6px"><b>Indicador:</b> % de OCs que cumplen / total de OCs del período filtrado.<br>
-          <b>Período:</b> se filtra por el mes en que se colocó la OC (Fecha OC Real).</p>
+          <p>Mide si el comprador colocó la OC dentro de los <b>5 días naturales</b> posteriores a que la alarma disparó (Fecha Requerida). Se agrupa por OC: una orden <b>cumple</b> si ≥ 95 % de sus líneas cumplen: <em>Fecha OC Real ∈ [Fecha Requerida, Fecha Requerida + 5 días]</em>.</p>
+          <p style="margin-top:4px">Colocar la OC <b>antes</b> de que la alarma dispare también cuenta como <b>Fuera de tiempo</b> (datos no actualizados). El campo <em>Dif. días</em> muestra: negativo = antes de alarma, 0–5 = en tiempo, &gt;5 = tarde.</p>
+          <p style="margin-top:6px"><b>Indicador:</b> % de OCs que cumplen / total de OCs del período.<br><b>Período:</b> se filtra por el mes de la Fecha Requerida.</p>
         </div>
         <div>
           <div style="font-weight:700;color:var(--navy);margin-bottom:4px">📦 OTIF de Proveedor — métricas de entrega</div>
@@ -614,11 +678,14 @@ let activeGroup='', activeProv='';
 let activeTermMonth='', activePedMonth='';
 let searchText='', sortCol='mi', sortDir=1;
 let activeLvlProv='';
-let lvlVisible=true;
+let lvlVisible=false;
 let charts={urgency:null,scatter:null,boImpact:null,calendar:null};
 
 // ── OTIF state ──
 let OTIF_DATA=[], otifProv='', otifStatus='PROGRAMADO', otifMonth='';
+let trendCharts={month:null,prov:null};
+let trendVisible=false;
+let ocVisible=false;
 let otifOC='', otifClave='';
 let otifSortCol='oc', otifSortDir=1;
 
@@ -887,6 +954,7 @@ function buildFilters(){
   });
 
   updateCascadeOptions();
+  if(!lvlVisible){const b=document.getElementById('lvl-body');const pf=document.getElementById('lvl-pf-wrap');const btn=document.getElementById('lvl-toggle-btn');if(b)b.style.display='none';if(pf)pf.style.display='none';if(btn)btn.textContent='▶ Mostrar';}
 }
 
 function clearFilters(){
@@ -1187,6 +1255,7 @@ function parseOTIF(raw){
     eta:toDate(r[16]), etaR:toDate(r[17]), otifE:String(r[18]||'').trim(),
     recibReal:typeof r[19]==='number'?r[19]:null,
     ifOk:String(r[20]||'').trim(),
+    obs:String(r[21]||'').trim(),
     get difDias(){const f=this.foc,q=this.freq;return(f&&q)?Math.round((f.getTime()-q.getTime())/86400000):null;},
   }));
 }
@@ -1265,9 +1334,154 @@ function updateOTIFDetailCascade(){
   claveSel.className='msel'+(otifClave?' msel-active':'');
 }
 
+
+function toggleOCCards(){
+  ocVisible=!ocVisible;
+  const g=document.getElementById('oc-cards');
+  const btn=document.getElementById('oc-toggle-btn');
+  if(g) g.style.display=ocVisible?'grid':'none';
+  if(btn) btn.textContent=ocVisible?'▼ Ocultar':'▶ Mostrar';
+}
+function toggleTargetTrend(){
+  trendVisible=!trendVisible;
+  const b=document.getElementById('trend-body');
+  const btn=document.getElementById('trend-tog-btn');
+  if(b) b.style.display=trendVisible?'':'none';
+  if(btn) btn.textContent=trendVisible?'▼ Ocultar':'▶ Mostrar';
+}
+
+function renderTargetTrend(){
+  if(!OTIF_DATA.length)return;
+  // Use shared filter (prov + status) — month not applied so trend shows full history
+  const base=otifByProvStatus();
+
+  // Build OC-level results
+  const ocMap=new Map();
+  base.forEach(d=>{
+    if(!ocMap.has(d.oc))ocMap.set(d.oc,{oc:d.oc,prov:d.prov,freq:d.freq,lines:[],difs:[]});
+    const o=ocMap.get(d.oc);
+    o.lines.push(d.otifC);
+    if(d.difDias!==null)o.difs.push(d.difDias);
+  });
+
+  const ocResults=[...ocMap.values()].map(o=>{
+    const total=o.lines.length;
+    const ok=o.lines.filter(v=>v==='EN TIEMPO').length;
+    const pct=total>0?ok/total:0;
+    const compliant=pct>=0.95;
+    const avgDif=o.difs.length>0?Math.round(o.difs.reduce((a,b)=>a+b,0)/o.difs.length):null;
+    const month=o.freq instanceof Date&&!isNaN(o.freq)?mKey(o.freq):null;
+    return{...o,total,ok,pct,compliant,avgDif,month};
+  }).sort((a,b)=>(a.month||'').localeCompare(b.month||''));
+
+  const totalOCs=ocResults.length;
+  const okOCs=ocResults.filter(r=>r.compliant).length;
+  const failOCs=totalOCs-okOCs;
+  const globalPct=totalOCs>0?Math.round(okOCs/totalOCs*100):0;
+
+  // Group by month
+  const byMonth=new Map();
+  ocResults.forEach(r=>{
+    if(!r.month)return;
+    if(!byMonth.has(r.month))byMonth.set(r.month,{ok:0,total:0});
+    const m=byMonth.get(r.month);m.total++;if(r.compliant)m.ok++;
+  });
+  const months=[...byMonth.keys()].sort();
+  const monthLabels=months.map(k=>mLabel(k));
+  const monthPcts=months.map(k=>{const m=byMonth.get(k);return m.total>0?Math.round(m.ok/m.total*100):0;});
+  const monthTotals=months.map(k=>byMonth.get(k).total);
+
+  // Trend direction
+  let tendencia='—',tendCls='var(--tx2)';
+  if(monthPcts.length>=2){
+    const last=monthPcts[monthPcts.length-1],prev=monthPcts[monthPcts.length-2];
+    if(last>prev){tendencia='↑ Mejorando';tendCls='var(--green)';}
+    else if(last<prev){tendencia='↓ Bajando';tendCls='var(--red)';}
+    else{tendencia='→ Estable';tendCls='var(--amber)';}
+  }
+
+  // KPI cards
+  const kpiCol=(n,d,g,w)=>{const p=d>0?n/d*100:0;return p>=g?'var(--green)':p>=w?'var(--amber)':'var(--red)';};
+  document.getElementById('trend-kpis').innerHTML=[
+    {l:'OCs medidas',v:totalOCs,s:'en el período',c:'var(--navy)'},
+    {l:'OCs en tiempo',v:okOCs,s:globalPct+'% cumplimiento',c:kpiCol(okOCs,totalOCs,80,50)},
+    {l:'OCs fuera de tiempo',v:failOCs,s:failOCs>0?'Requieren atención':'Sin incumplimientos',c:failOCs>0?'var(--red)':'var(--green)'},
+    {l:'Tendencia',v:tendencia,s:'vs. mes anterior',c:tendCls},
+  ].map(k=>`<div class="trend-kpi" style="border-left:4px solid ${k.c}"><div class="trend-kpi-lbl">${k.l}</div><div class="trend-kpi-val" style="color:${k.c}">${k.v}</div><div class="trend-kpi-sub">${k.s}</div></div>`).join('');
+
+  // Month trend chart
+  if(trendCharts.month)trendCharts.month.destroy();
+  const COLORS_PCT=p=>p>=95?'rgba(20,90,56,.75)':p>=70?'rgba(184,110,0,.75)':'rgba(139,26,26,.75)';
+  trendCharts.month=new Chart(document.getElementById('trend-month-chart'),{type:'bar',
+    data:{labels:monthLabels,datasets:[
+      {label:'% Target',data:monthPcts,backgroundColor:monthPcts.map(COLORS_PCT),borderRadius:5,borderSkipped:false,yAxisID:'y'},
+      {label:'N° OCs',data:monthTotals,type:'line',borderColor:'#1c4587',backgroundColor:'rgba(28,69,135,.1)',
+       pointBackgroundColor:'#1c4587',pointRadius:5,yAxisID:'y2',tension:.3,fill:true},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{font:{size:10}}},
+        tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>ctx.dataset.yAxisID==='y'?` ${ctx.parsed.y}% en tiempo`:` ${ctx.parsed.y} OCs`}}},
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:10}}},
+        y:{min:0,max:100,position:'left',grid:{color:'#e8e6e0'},ticks:{font:{size:10},callback:v=>v+'%'},title:{display:true,text:'% Target',font:{size:9}}},
+        y2:{min:0,position:'right',grid:{display:false},ticks:{font:{size:10},stepSize:1},title:{display:true,text:'N° OCs',font:{size:9}}}
+      }}
+  });
+
+  // Root cause analysis (right column)
+  const fails=ocResults.filter(r=>!r.compliant);
+  const earlyFails=fails.filter(r=>r.avgDif!==null&&r.avgDif<-5);
+  const lateFails=fails.filter(r=>r.avgDif!==null&&r.avgDif>5);
+
+  const rootHtml=fails.length===0
+    ?'<div style="background:var(--green-bg);border:1px solid var(--opt-brd);border-radius:8px;padding:14px 16px;font-size:12px;color:var(--green);font-weight:600">✅ Sin OCs fuera de tiempo. Cumplimiento 100%.</div>'
+    :'<div class="cause-grid"><div class="cause-card '+(earlyFails.length>0?'red':'green')+'">'
+      +'<div class="cause-tag">📅 Pedido anticipado (antes de alarma)</div>'
+      +'<div class="cause-val" style="color:'+(earlyFails.length>0?'var(--red)':'var(--green)')+'">'+earlyFails.length+' OC'+(earlyFails.length!==1?'s':'')+'</div>'
+      +'<div class="cause-txt">'+(earlyFails.length>0
+        ?'Colocado antes de la alarma (datos desactualizados). OCs: '+earlyFails.map(r=>r.oc).join(', ')+'.'
+        :'No hay pedidos anticipados fuera de rango.')
+      +'</div></div>'
+      +'<div class="cause-card '+(lateFails.length>0?'red':'green')+'">'
+      +'<div class="cause-tag">⏰ Pedido tardío (después del plazo)</div>'
+      +'<div class="cause-val" style="color:'+(lateFails.length>0?'var(--red)':'var(--green)')+'">'+lateFails.length+' OC'+(lateFails.length!==1?'s':'')+'</div>'
+      +'<div class="cause-txt">'+(lateFails.length>0
+        ?'Colocado más de 5 días después de la alarma. OCs: '+lateFails.map(r=>r.oc).join(', ')+'.'
+        :'Ningún pedido tardío detectado.')
+      +'</div></div></div>'
+      +(fails.length>0?'<div style="margin-top:10px;padding:10px 12px;background:var(--sf2);border-radius:6px;font-size:11px;color:var(--tx2);line-height:1.6">'
+        +'<b>Diagnóstico:</b> '+fails.map(r=>'OC '+r.oc+' ('+r.prov+(r.avgDif!==null?', '+r.avgDif+'d':'')+'): '+(r.avgDif!==null&&r.avgDif<-5?'Anticipada '+Math.abs(r.avgDif)+'d antes de alarma':r.avgDif!==null&&r.avgDif>5?'Tardía '+r.avgDif+'d después de plazo':'Revisar datos')).join(' · ')+'</div>':'');
+
+  document.getElementById('trend-root-causes').innerHTML=
+    '<div class="trend-panel" style="height:100%"><div class="trend-panel-title">🔍 Análisis de Causas Raíz</div>'+rootHtml+'</div>';
+
+  // OC detail table
+  const colPct=p=>p>=95?'var(--green)':p>=70?'var(--amber)':'var(--red)';
+  const colDif=d=>d===null?'var(--tx3)':d>=-5&&d<=0?'var(--green)':'var(--red)';
+  const diagText=r=>{
+    if(r.avgDif===null)return'Sin datos de fecha';
+    if(r.avgDif>=-5&&r.avgDif<=0)return'Dentro del plazo ('+r.avgDif+'d)';
+    if(r.avgDif<-5)return'Anticipada '+Math.abs(r.avgDif)+'d antes de alarma';
+    return'Tardía '+r.avgDif+'d después del plazo';
+  };
+  document.getElementById('trend-oc-tbody').innerHTML=ocResults.map(r=>`
+    <tr class="${r.compliant?'oc-ok':'oc-fail'}">
+      <td style="font-family:monospace;font-weight:700">${r.oc}</td>
+      <td>${r.prov==='GLOBALES'?'<span class="prov-chip p-imp">GLOBALES</span>':'<span class="prov-chip p-nac">'+r.prov+'</span>'}</td>
+      <td>${r.month?mLabel(r.month):'—'}</td>
+      <td style="text-align:center">${r.total}</td>
+      <td style="text-align:center">${r.ok}/${r.total}</td>
+      <td style="text-align:center;font-weight:800;color:${colPct(r.pct*100)}">${Math.round(r.pct*100)}%</td>
+      <td style="text-align:center;font-weight:700;color:${colDif(r.avgDif)}">${r.avgDif!==null?r.avgDif+'d':'—'}</td>
+      <td>${r.compliant?'<span class="chip-ok">✓ En tiempo</span>':'<span class="chip-fail">✗ Fuera de tiempo</span>'}</td>
+      <td style="font-size:11px;color:var(--tx2)">${diagText(r)}</td>
+    </tr>`).join('');
+}
 function renderOTIF(){
   renderOTIFKPIs();
-  renderOCCards(otifByProvStatus().filter(d=>d.estatus==='PROGRAMADO'));
+  renderTargetTrend();
+  renderOCCards(otifByProvStatus());
+  if(!ocVisible){const g=document.getElementById('oc-cards');if(g)g.style.display='none';}
   updateOTIFMonthOptions();
   updateOTIFDetailCascade();
   renderOTIFTable(filteredOTIF());
@@ -1388,7 +1602,7 @@ function renderOCCards(data){
     if(!ocMap.has(d.oc))ocMap.set(d.oc,{oc:d.oc,prov:d.prov,estatus:d.estatus,lines:[],foc:d.foc,eta:d.eta,etaR:d.etaR});
     ocMap.get(d.oc).lines.push(d);
   });
-  document.getElementById('oc-cards').innerHTML=[...ocMap.values()].filter(oc=>oc.estatus!=='RECIBIDO').sort((a,b)=>String(a.oc).localeCompare(b.oc)).map(oc=>{
+  document.getElementById('oc-cards').innerHTML=[...ocMap.values()].sort((a,b)=>String(a.oc).localeCompare(b.oc)).map(oc=>{
     const ls=oc.lines,tot=ls.length;
     const r=ls.filter(l=>l.estatus==='RECIBIDO'),nR=r.length;
     const cOk=ls.filter(l=>l.otifC==='EN TIEMPO').length;
@@ -1448,17 +1662,19 @@ function renderOTIFTable(data){
   // Cell helpers
   const pChip=d=>d.prov==='GLOBALES'?`<span class="prov-chip p-imp">${d.prov}</span>`:`<span class="prov-chip p-nac">${d.prov}</span>`;
   const chipTarget=v=>v==='EN TIEMPO'?'<span class="chip-ok">✓ En tiempo</span>':v?'<span class="chip-fail">✗ Fuera de tiempo</span>':'<span class="dash">—</span>';
-  const chipOnTime=(v,rec)=>!rec?'<span class="dash">—</span>':v==='EN TIEMPO'?'<span class="chip-ok">✓ En tiempo</span>':'<span class="chip-fail">✗ Fuera de tiempo</span>';
-  const chipIF=(v,rec)=>!rec?'<span class="dash">—</span>':v==='COMPLETO'?'<span class="chip-ok">✓ Completo</span>':'<span class="chip-fail">✗ Incompleto</span>';
+  const chipOnTime=(v,rec)=>!v?'<span class="dash">—</span>':v==='EN TIEMPO'?'<span class="chip-ok">✓ En tiempo</span>':'<span class="chip-fail">✗ Fuera de tiempo</span>';
+  const chipIF=(v,rec)=>!v?'<span class="dash">—</span>':v==='COMPLETO'?'<span class="chip-ok">✓ Completo</span>':'<span class="chip-fail">✗ Incompleto</span>';
   const difDiasCell=d=>{
     const dif=d.difDias;
     if(dif===null)return'<span class="dash">—</span>';
-    if(dif===0)return`<span style="color:var(--green);font-weight:600">0 días</span>`;
-    if(dif>0)return`<span style="color:var(--red);font-weight:700">+${dif} días</span>`;
-    return`<span style="color:var(--green);font-weight:600">${dif} días</span>`;
+    // Rule: alarm fires on freq, buyer has 5 days to place OC
+    // diff = foc - freq: negative=before alarm(bad), 0-5=on time(good), >5=too late(bad)
+    if(dif>=0&&dif<=5)return`<span style="color:var(--green);font-weight:700">+${dif}d ✓</span>`;
+    if(dif<0)return`<span style="color:var(--red);font-weight:700">${dif}d (antes)</span>`;
+    return`<span style="color:var(--red);font-weight:700">+${dif}d (tarde)</span>`;
   };
-  const etaRealCell=d=>d.estatus==='RECIBIDO'?(fmtDate(d.etaR)||'—'):'<span class="dash">—</span>';
-  const cantRecibCell=d=>d.estatus==='RECIBIDO'&&d.recibReal!==null?`<b>${fmt(d.recibReal)}</b>`:'<span class="dash">—</span>';
+  const etaRealCell=d=>d.etaR?(fmtDate(d.etaR)||'—'):'<span class="dash">—</span>';
+  const cantRecibCell=d=>d.recibReal!==null&&d.recibReal>0?`<b>${fmt(d.recibReal)}</b>`:'<span class="dash">—</span>';
 
   document.getElementById('otif-tbody').innerHTML=sorted.map(d=>{
     const rec=d.estatus==='RECIBIDO';
@@ -1476,6 +1692,7 @@ function renderOTIFTable(data){
       <td class="ctr">${chipOnTime(d.otifE,rec)}</td>
       <td class="num">${cantRecibCell(d)}</td>
       <td class="ctr">${chipIF(d.ifOk,rec)}</td>
+      <td style="white-space:normal;word-break:break-word;font-size:11px;color:var(--tx2)">${d.obs||'—'}</td>
     </tr>`;
   }).join('');
 }
@@ -1562,7 +1779,7 @@ function exportOTIF(){
   const headers=[
     'Clave','Descripción','Proveedor','Cant. Pedida',
     'F. OC Real','F. Requerida','Dif. días','Target Comprador',
-    'ETA Estimada','ETA Real','On Time','Cant. Recibida','In Full'
+    'ETA Estimada','ETA Real','On Time','Cant. Recibida','In Full','Observaciones'
   ];
 
   const SORT_DATE_COLS=new Set(['foc','freq','eta','etaR']);
@@ -1592,6 +1809,7 @@ function exportOTIF(){
     rec(d)?(d.otifE==='EN TIEMPO'?'En tiempo':d.otifE?'Fuera de tiempo':''):'',
     rec(d)&&d.recibReal!==null?d.recibReal:'',
     rec(d)?(d.ifOk==='COMPLETO'?'Completo':d.ifOk?'Incompleto':''):'',
+    d.obs||'',
   ])];
 
   const wb=XLSX.utils.book_new();
