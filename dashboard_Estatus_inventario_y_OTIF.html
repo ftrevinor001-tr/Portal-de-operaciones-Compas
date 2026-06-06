@@ -594,7 +594,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
             <tr class="sec-hdr">
               <th colspan="4" style="background:#1c3557">IDENTIFICACIÓN</th>
               <th colspan="4" style="background:#8b1a1a">TARGET DE COMPRADOR</th>
-              <th colspan="6" style="background:#0e4d72">OTIF DE PROVEEDOR</th>
+              <th colspan="8" style="background:#0e4d72">OTIF DE PROVEEDOR</th>
             </tr>
             <tr>
               <th data-ocol="clave"   style="width:62px">Clave<span class="sarr">↕</span></th>
@@ -605,8 +605,10 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
               <th data-ocol="freq"    class="ctr" style="width:90px">F. Requerida<span class="sarr">↕</span></th>
               <th data-ocol="difDias" class="num" style="width:72px">Dif. días<span class="sarr">↕</span></th>
               <th data-ocol="otifC"   class="ctr" style="width:110px">Target<span class="sarr">↕</span></th>
-              <th data-ocol="eta"     class="ctr" style="width:88px">ETA Est.<span class="sarr">↕</span></th>
+              <th data-ocol="entregaSol" class="ctr" style="width:96px">Entrega Sol.<span class="sarr">↕</span></th>
+              <th data-ocol="eta"     class="ctr" style="width:90px">ETA Estimada<span class="sarr">↕</span></th>
               <th data-ocol="etaR"    class="ctr" style="width:88px">ETA Real<span class="sarr">↕</span></th>
+              <th data-ocol="difEntrega" class="num" style="width:76px">Dif. días<span class="sarr">↕</span></th>
               <th data-ocol="otifE"   class="ctr" style="width:90px">On Time<span class="sarr">↕</span></th>
               <th data-ocol="recibReal" class="num" style="width:80px">Cant. Recibida<span class="sarr">↕</span></th>
               <th data-ocol="ifOk"    class="ctr" style="width:88px">In Full<span class="sarr">↕</span></th>
@@ -1136,7 +1138,7 @@ function renderTable(data){
     return`<span class="dir-warn">${v}</span>`;
   };
   if(!sorted.length){
-    document.getElementById('tbody').innerHTML='<tr><td colspan="14" class="no-data">Sin resultados para los filtros aplicados.</td></tr>';
+    document.getElementById('tbody').innerHTML='<tr><td colspan="16" class="no-data">Sin resultados para los filtros aplicados.</td></tr>';
     return;
   }
 
@@ -1252,11 +1254,13 @@ function parseOTIF(raw){
     estatus:String(r[0]||'').trim(), clave:String(r[1]||'').trim(), desc:String(r[2]||'').trim(),
     qty:typeof r[8]==='number'?r[8]:0, oc:String(r[11]||'').trim(), prov:String(r[12]||'').trim(),
     foc:toDate(r[13]), freq:toDate(r[14]), otifC:String(r[15]||'').trim(),
-    eta:toDate(r[16]), etaR:toDate(r[17]), otifE:String(r[18]||'').trim(),
-    recibReal:typeof r[19]==='number'?r[19]:null,
-    ifOk:String(r[20]||'').trim(),
-    obs:String(r[21]||'').trim(),
+    entregaSol:toDate(r[16]),
+    eta:toDate(r[17]), etaR:toDate(r[18]), otifE:String(r[19]||'').trim(),
+    recibReal:typeof r[20]==='number'?r[20]:null,
+    ifOk:String(r[21]||'').trim(),
+    obs:String(r[22]||'').trim(),
     get difDias(){const f=this.foc,q=this.freq;return(f&&q)?Math.round((f.getTime()-q.getTime())/86400000):null;},
+    get difEntrega(){const r=this.etaR,s=this.entregaSol;return(r&&s)?Math.round((r.getTime()-s.getTime())/86400000):null;},
   }));
 }
 
@@ -1599,7 +1603,7 @@ function renderOTIFKPIs(){
 function renderOCCards(data){
   const ocMap=new Map();
   data.forEach(d=>{
-    if(!ocMap.has(d.oc))ocMap.set(d.oc,{oc:d.oc,prov:d.prov,estatus:d.estatus,lines:[],foc:d.foc,eta:d.eta,etaR:d.etaR});
+    if(!ocMap.has(d.oc))ocMap.set(d.oc,{oc:d.oc,prov:d.prov,estatus:d.estatus,lines:[],foc:d.foc,entregaSol:d.entregaSol,eta:d.eta,etaR:d.etaR});
     ocMap.get(d.oc).lines.push(d);
   });
   document.getElementById('oc-cards').innerHTML=[...ocMap.values()].sort((a,b)=>String(a.oc).localeCompare(b.oc)).map(oc=>{
@@ -1616,7 +1620,7 @@ function renderOCCards(data){
     return`<div class="oc-card">
       <div class="oc-card-hdr"><span class="oc-num">OC ${oc.oc}</span>${sChip}</div>
       <div class="oc-card-body">
-        <div class="oc-meta">${pChip}<span><b>${tot}</b> líneas · <b>${fmt(qty)}</b> uds</span>${oc.foc?`<span>OC: ${fmtDate(oc.foc)}</span>`:''}${oc.eta?`<span>ETA: ${fmtDate(oc.eta)}</span>`:''}${oc.etaR?`<span>Real: ${fmtDate(oc.etaR)}</span>`:''}</div>
+        <div class="oc-meta">${pChip}<span><b>${tot}</b> líneas · <b>${fmt(qty)}</b> uds</span>${oc.foc?`<span>OC: ${fmtDate(oc.foc)}</span>`:''}${oc.entregaSol?`<span>Ent. Sol.: ${fmtDate(oc.entregaSol)}</span>`:''}${oc.eta?`<span>ETA: ${fmtDate(oc.eta)}</span>`:''}${oc.etaR?`<span>Real: ${fmtDate(oc.etaR)}</span>`:''}</div>
         <div class="oc-metrics">${mVal(cOk,tot,'Comprador')}${mVal(eOk,nR,'Entrega')}${mVal(fOk,nR,'In Full')}</div>
       </div></div>`;
   }).join('')||'<div class="no-data">Sin OCs para los filtros seleccionados.</div>';
@@ -1633,8 +1637,8 @@ function updateOTIFSortArrows(){
 
 function renderOTIFTable(data){
   // Sort
-  const SORT_DATE_COLS=new Set(['foc','freq','eta','etaR']);
-  const SORT_NUM_COLS=new Set(['difDias','recibReal','qty']);
+  const SORT_DATE_COLS=new Set(['foc','freq','eta','etaR','entregaSol']);
+  const SORT_NUM_COLS=new Set(['difDias','difEntrega','recibReal','qty']);
   const sorted=[...data].sort((a,b)=>{
     let va=a[otifSortCol], vb=b[otifSortCol];
     if(SORT_NUM_COLS.has(otifSortCol)){return otifSortDir*((a[otifSortCol]??-Infinity)-(b[otifSortCol]??-Infinity));}
@@ -1655,7 +1659,7 @@ function renderOTIFTable(data){
   updateOTIFSortArrows();
 
   if(!sorted.length){
-    document.getElementById('otif-tbody').innerHTML='<tr><td colspan="14" class="no-data">Sin resultados para los filtros aplicados.</td></tr>';
+    document.getElementById('otif-tbody').innerHTML='<tr><td colspan="16" class="no-data">Sin resultados para los filtros aplicados.</td></tr>';
     return;
   }
 
@@ -1674,6 +1678,13 @@ function renderOTIFTable(data){
     return`<span style="color:var(--red);font-weight:700">+${dif}d (tarde)</span>`;
   };
   const etaRealCell=d=>d.etaR?(fmtDate(d.etaR)||'—'):'<span class="dash">—</span>';
+  const difEntregaCell=d=>{
+    const dif=d.difEntrega;
+    if(dif===null)return'<span class="dash">—</span>';
+    if(dif===0)return'<span style="color:var(--green);font-weight:700">0d ✓</span>';
+    if(dif<0)return`<span style="color:var(--green);font-weight:700">${dif}d adelanto</span>`;
+    return`<span style="color:var(--red);font-weight:700">+${dif}d retraso</span>`;
+  };
   const cantRecibCell=d=>d.recibReal!==null&&d.recibReal>0?`<b>${fmt(d.recibReal)}</b>`:'<span class="dash">—</span>';
 
   document.getElementById('otif-tbody').innerHTML=sorted.map(d=>{
@@ -1687,8 +1698,10 @@ function renderOTIFTable(data){
       <td class="ctr" style="font-size:10px">${fmtDate(d.freq)||'—'}</td>
       <td class="num">${difDiasCell(d)}</td>
       <td class="ctr">${chipTarget(d.otifC)}</td>
-      <td class="ctr" style="font-size:10px">${fmtDate(d.eta)||'—'}</td>
+      <td class="ctr" style="font-size:10px">${fmtDate(d.entregaSol)||'—'}</td>
+      <td class="ctr" style="font-size:10px">${d.eta?fmtDate(d.eta):'—'}</td>
       <td class="ctr" style="font-size:10px">${etaRealCell(d)}</td>
+      <td class="num">${difEntregaCell(d)}</td>
       <td class="ctr">${chipOnTime(d.otifE,rec)}</td>
       <td class="num">${cantRecibCell(d)}</td>
       <td class="ctr">${chipIF(d.ifOk,rec)}</td>
@@ -1779,11 +1792,11 @@ function exportOTIF(){
   const headers=[
     'Clave','Descripción','Proveedor','Cant. Pedida',
     'F. OC Real','F. Requerida','Dif. días','Target Comprador',
-    'ETA Estimada','ETA Real','On Time','Cant. Recibida','In Full','Observaciones'
+    'Entrega Sol.','ETA Estimada','ETA Real','Dif. días entrega','On Time','Cant. Recibida','In Full','Observaciones'
   ];
 
-  const SORT_DATE_COLS=new Set(['foc','freq','eta','etaR']);
-  const SORT_NUM_COLS=new Set(['difDias','recibReal','qty']);
+  const SORT_DATE_COLS=new Set(['foc','freq','eta','etaR','entregaSol']);
+  const SORT_NUM_COLS=new Set(['difDias','difEntrega','recibReal','qty']);
   const sorted=[...data].sort((a,b)=>{
     let va=a[otifSortCol], vb=b[otifSortCol];
     if(SORT_NUM_COLS.has(otifSortCol)){return otifSortDir*((a[otifSortCol]??-Infinity)-(b[otifSortCol]??-Infinity));}
@@ -1804,8 +1817,10 @@ function exportOTIF(){
     fmtExport(d.foc), fmtExport(d.freq),
     d.difDias!==null?d.difDias:'',
     d.otifC==='EN TIEMPO'?'En tiempo':d.otifC?'Fuera de tiempo':'',
+    fmtExport(d.entregaSol),
     fmtExport(d.eta),
     rec(d)?fmtExport(d.etaR):'',
+    rec(d)&&d.difEntrega!==null?d.difEntrega:'',
     rec(d)?(d.otifE==='EN TIEMPO'?'En tiempo':d.otifE?'Fuera de tiempo':''):'',
     rec(d)&&d.recibReal!==null?d.recibReal:'',
     rec(d)?(d.ifOk==='COMPLETO'?'Completo':d.ifOk?'Incompleto':''):'',
