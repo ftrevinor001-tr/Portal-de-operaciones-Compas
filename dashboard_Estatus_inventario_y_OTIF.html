@@ -341,14 +341,20 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
 </head>
 <body>
 
-<!-- DROP -->
+<!-- DROP / AUTO-LOAD -->
 <div id="drop-screen">
   <div class="drop-logo">Control de Inventario</div>
-  <div class="drop-title">Dashboard · Pedidos &amp; Back Orders</div>
-  <div class="drop-sub">Carga tu Excel para visualizar inventario agrupado por clave, impacto del BO, fechas y asignaciones por proveedor.</div>
-  <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
-    <div class="drop-icon">📂</div>
-    <p><strong>Haz clic aquí</strong> o arrastra tu archivo<br><strong>Libro2.xlsx</strong> a esta ventana</p>
+  <div class="drop-title">Estatus del inventario e indicadores</div>
+  <div id="auto-load-status" style="font-size:14px;color:#2d5a8e;display:none;text-align:center">
+    <div style="font-size:32px;margin-bottom:10px">⏳</div>
+    <div id="auto-load-msg">Cargando datos actualizados…</div>
+  </div>
+  <div id="manual-drop-area">
+    <div class="drop-sub">Carga tu Excel para visualizar inventario, pedidos y OTIF.</div>
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <div class="drop-icon">📂</div>
+      <p><strong>Haz clic aquí</strong> o arrastra tu archivo Excel a esta ventana</p>
+    </div>
   </div>
   <input type="file" id="file-input" accept=".xlsx,.xls">
   <div class="err" id="err-msg"></div>
@@ -652,6 +658,12 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
 
 <script>
 // ══════════════════════════════════════════════════════════════
+// AUTO-LOAD CONFIG — Change filename to match your Excel in the repo
+// ══════════════════════════════════════════════════════════════
+const AUTO_LOAD_FILE = 'datos.xlsx';   // Excel file in the same repo folder
+const AUTO_LOAD_ENABLED = true;        // Set false to always show drop zone
+
+// ══════════════════════════════════════════════════════════════
 // CONSTANTS
 // ══════════════════════════════════════════════════════════════
 const LEVELS=[
@@ -707,33 +719,75 @@ document.getElementById('reload-btn').addEventListener('click',()=>{
 });
 function showErr(m){const el=document.getElementById('err-msg');el.textContent=m;el.style.display='block';}
 
+
+// ══════════════════════════════════════════════════════════════
+// AUTO-LOAD FROM REPOSITORY
+// ══════════════════════════════════════════════════════════════
+async function autoLoadFromRepo(){
+  if(!AUTO_LOAD_ENABLED) return;
+  const statusEl=document.getElementById('auto-load-status');
+  const manualEl=document.getElementById('manual-drop-area');
+  const msgEl=document.getElementById('auto-load-msg');
+  statusEl.style.display='block';
+  manualEl.style.display='none';
+  try{
+    msgEl.textContent='Conectando con el repositorio…';
+    const response=await fetch(AUTO_LOAD_FILE+'?t='+Date.now()); // cache-bust
+    if(!response.ok) throw new Error('Archivo no encontrado ('+response.status+')');
+    msgEl.textContent='Descargando datos…';
+    const buffer=await response.arrayBuffer();
+    msgEl.textContent='Procesando Excel…';
+    const wb=XLSX.read(buffer,{type:'array',cellDates:true});
+    processWorkbook(wb, AUTO_LOAD_FILE);
+  }catch(err){
+    statusEl.style.display='none';
+    manualEl.style.display='block';
+    if(err.message.includes('404')||err.message.includes('no encontrado')){
+      showErr('No se encontró "'+AUTO_LOAD_FILE+'" en el repositorio. Carga el archivo manualmente.');
+    } else {
+      showErr('Auto-carga falló: '+err.message+'. Puedes cargar el archivo manualmente.');
+    }
+  }
+}
+
+function processWorkbook(wb, filename){
+  try{
+    const sn=wb.SheetNames.find(s=>s.toLowerCase().includes('asign'))||wb.SheetNames[0];
+    const ws=wb.Sheets[sn];
+    if(!ws)throw new Error('Hoja no encontrada.');
+    const raw=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,cellDates:true});
+    ALL=parseSheet(raw);
+    if(!ALL.length)throw new Error('Sin datos válidos en hoja Asignacion.');
+    const pedSheetName=wb.SheetNames.find(s=>s.toUpperCase().includes('PEDIDO'))||null;
+    if(pedSheetName){
+      const wsPed=wb.Sheets[pedSheetName];
+      const rawPed=XLSX.utils.sheet_to_json(wsPed,{header:1,raw:true,cellDates:true});
+      OTIF_DATA=parseOTIF(rawPed);
+    }else{OTIF_DATA=[];}
+    GROUPED=buildGroups();
+    document.getElementById('file-tag').textContent=filename+' · '+sn;
+    document.getElementById('drop-screen').style.display='none';
+    document.getElementById('app').style.display='block';
+    activeGroup='';activeProv='';activeTermMonth='';activePedMonth='';
+    activeLvlProv='';searchText='';sortCol='mi';sortDir=1;
+    buildFilters();renderAll();
+  }catch(err){
+    showErr('Error al procesar: '+err.message);
+    document.getElementById('auto-load-status').style.display='none';
+    document.getElementById('manual-drop-area').style.display='block';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  autoLoadFromRepo();
+});
+
 function loadFile(file){
   document.getElementById('err-msg').style.display='none';
   const reader=new FileReader();
   reader.onload=e=>{
-    try{
-      const wb=XLSX.read(e.target.result,{type:'binary',cellDates:true});
-      const sn=wb.SheetNames.find(s=>s.toLowerCase().includes('asign'))||wb.SheetNames[0];
-      const ws=wb.Sheets[sn];
-      if(!ws)throw new Error('Hoja no encontrada.');
-      const raw=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,cellDates:true});
-      ALL=parseSheet(raw);
-      if(!ALL.length)throw new Error('Sin datos válidos en hoja Asignacion.');
-      // Parse PEDIDOS/OTIF sheet
-      const pedSheetName=wb.SheetNames.find(s=>s.toUpperCase().includes('PEDIDO'))||null;
-      if(pedSheetName){
-        const wsPed=wb.Sheets[pedSheetName];
-        const rawPed=XLSX.utils.sheet_to_json(wsPed,{header:1,raw:true,cellDates:true});
-        OTIF_DATA=parseOTIF(rawPed);
-      }else{OTIF_DATA=[];}
-      GROUPED=buildGroups();
-      document.getElementById('file-tag').textContent=file.name+' · '+sn;
-      document.getElementById('drop-screen').style.display='none';
-      document.getElementById('app').style.display='block';
-      activeGroup='';activeProv='';activeTermMonth='';activePedMonth='';
-      activeLvlProv='';searchText='';sortCol='mi';sortDir=1;
-      buildFilters();renderAll();
-    }catch(err){showErr('Error: '+err.message);}
+    const wb=XLSX.read(e.target.result,{type:'binary',cellDates:true});
+    processWorkbook(wb, file.name);
   };
   reader.readAsBinaryString(file);
 }
