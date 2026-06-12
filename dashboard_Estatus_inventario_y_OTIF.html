@@ -426,6 +426,9 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
         <select class="msel" id="ped-filter"><option value="">Todos los meses</option></select>
         <div class="filter-sep"></div>
         <input class="search" id="search" type="text" placeholder="Buscar ID o descripción…">
+        <div class="filter-sep"></div>
+        <span class="tb-lbl">Directriz:</span>
+        <select class="msel" id="dir-filter"><option value="">Todas</option></select>
         <button class="clear-btn" id="clear-filters">✕ Limpiar filtros</button>
         <span class="filter-count" id="filter-count"></span>
       </div>
@@ -690,7 +693,7 @@ const MES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Di
 // ══════════════════════════════════════════════════════════════
 let ALL=[], GROUPED=[];
 let activeGroup='', activeProv='';
-let activeTermMonth='', activePedMonth='';
+let activeTermMonth='', activePedMonth='', activeDirectriz='';
 let searchText='', sortCol='mi', sortDir=1;
 let activeLvlProv='';
 let lvlVisible=false;
@@ -924,11 +927,12 @@ function step2(){return step1().filter(d=>!activeProv||d.prov===activeProv);}
 // Step 3: + termMonth
 function step3(){return step2().filter(d=>!activeTermMonth||mKey(d.hasta_desp)===activeTermMonth);}
 // Step 4: + pedMonth
-function step4(){return step3().filter(d=>!activePedMonth||(d.asig>0&&mKey(d.fecha_pedido)===activePedMonth));}
+function step4(){return step3().filter(d=>!activePedMonth||((d.asig>0||d.directriz==='REVISAR CON GERENCIA')&&mKey(d.fecha_pedido)===activePedMonth));}
+function step5(){return step4().filter(d=>!activeDirectriz||(d.directriz||'')===(activeDirectriz==='(Sin directriz)'?'':activeDirectriz)||(activeDirectriz==='(Sin directriz)'&&!d.directriz));}
 // Full: + search
 function filteredFull(){
   const q=searchText.toLowerCase();
-  return step4().filter(d=>!q||d.desc.toLowerCase().includes(q)||d.id.includes(q));
+  return step5().filter(d=>!q||d.desc.toLowerCase().includes(q)||d.id.includes(q));
 }
 
 function updateCascadeOptions(){
@@ -951,7 +955,7 @@ function updateCascadeOptions(){
 
   // After grupo+prov+term → update pedMonth options
   const s3=step3();
-  const pedKeys=[...new Set(s3.filter(d=>d.asig>0).map(d=>mKey(d.fecha_pedido)).filter(Boolean))].sort();
+  const pedKeys=[...new Set(s3.filter(d=>d.asig>0||d.directriz==='REVISAR CON GERENCIA').map(d=>mKey(d.fecha_pedido)).filter(Boolean))].sort();
   if(activePedMonth&&!pedKeys.includes(activePedMonth))activePedMonth='';
   fillMonthSelect('ped-filter',pedKeys,activePedMonth);
 
@@ -999,6 +1003,13 @@ function buildFilters(){
 
   document.getElementById('term-filter').addEventListener('change',e=>{activeTermMonth=e.target.value;updateCascadeOptions();renderAll();});
   document.getElementById('ped-filter').addEventListener('change',e=>{activePedMonth=e.target.value;updateCascadeOptions();renderAll();});
+  // Directriz filter
+  const allDirs=[...new Set(GROUPED.map(d=>d.directriz||'').filter(v=>v))].sort();
+  const dirSel=document.getElementById('dir-filter');
+  dirSel.innerHTML='<option value="">Todas</option>'
+    +'<option value="(Sin directriz)">(Sin directriz)</option>'
+    +allDirs.map(v=>`<option value="${v}">${v==='LEVANTAR PEDIDO'?'✔ Levantar pedido':v==='REVISAR CON GERENCIA'?'⚠ Revisar c/gerencia':v}</option>`).join('');
+  dirSel.addEventListener('change',e=>{activeDirectriz=e.target.value;dirSel.className='msel'+(activeDirectriz?' msel-active':'');renderAll();});
   document.getElementById('search').addEventListener('input',e=>{searchText=e.target.value.toLowerCase();renderAll();});
   document.getElementById('clear-filters').addEventListener('click',clearFilters);
   document.getElementById('sort-sel').addEventListener('change',e=>{sortCol=e.target.value;sortDir=1;renderAll();});
@@ -1009,10 +1020,11 @@ function buildFilters(){
 }
 
 function clearFilters(){
-  activeGroup='';activeProv='';activeTermMonth='';activePedMonth='';searchText='';
+  activeGroup='';activeProv='';activeTermMonth='';activePedMonth='';activeDirectriz='';searchText='';
   const gs=document.getElementById('grupo-sel'); if(gs)gs.value='';
   const ps=document.getElementById('prov-sel'); if(ps)ps.value='';
   document.getElementById('search').value='';
+  const df=document.getElementById('dir-filter');if(df){df.value='';df.className='msel';}
   updateCascadeOptions();renderAll();
 }
 
