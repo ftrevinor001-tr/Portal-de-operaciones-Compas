@@ -4,23 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Estatus del inventario e indicadores</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
-// ── Global header sort handler (called via onclick on th) ──────
-function headerSort(col){
-  if(!GROUPED.length) return;
-  if(sortCol===col) sortDir*=-1; else{sortCol=col;sortDir=1;}
-  updateSortArrows();
-  renderAll();
-}
-</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js">
-// ── Global header sort handler (called via onclick on th) ──────
-function headerSort(col){
-  if(!GROUPED.length) return;
-  if(sortCol===col) sortDir*=-1; else{sortCol=col;sortDir=1;}
-  updateSortArrows();
-  renderAll();
-}
 </script>
 <style>
 :root{
@@ -1176,7 +1161,6 @@ function updateSortArrows(){
     const isActive=(col===sortCol);
     th.classList.toggle('sorted',isActive);
     if(arrow) arrow.textContent=isActive?(sortDir===1?'↑':'↓'):'↕';
-    th.onclick=function(){headerSort(col);};
   });
 }
 
@@ -1185,8 +1169,14 @@ function renderTable(data){
   const DATE_COLS=new Set(['hasta_antes','hasta_desp','fecha_pedido','proxima_entrada']);
   const SDIR={mi:1,miAfter:1,hasta_antes:1,hasta_desp:1,fecha_pedido:1,proxima_entrada:1,asig:-1,asig_total:-1,bo:-1,desc:1,vm:-1,inv:-1,prov:1,directriz:1};
   const dir=sortDir*(SDIR[sortCol]??1);
+  // Effective value: use null when display shows "—" so blanks sort to end
+  const effVal=(d,col)=>{
+    if(col==='fecha_pedido'&&!d.asig&&d.directriz!=='REVISAR CON GERENCIA') return null;
+    if(col==='asig'&&d.directriz==='REVISAR CON GERENCIA') return 0;
+    return d[col];
+  };
   const sorted=[...data].sort((a,b)=>{
-    let va=a[sortCol],vb=b[sortCol];
+    let va=effVal(a,sortCol),vb=effVal(b,sortCol);
     if(DATE_COLS.has(sortCol)){
       const ta=va instanceof Date&&!isNaN(va)?va.getTime():null;
       const tb=vb instanceof Date&&!isNaN(vb)?vb.getTime():null;
@@ -1236,7 +1226,7 @@ function renderTable(data){
     const mainChip=(d.origen==='IMPORTACION'||d.origen==='IMPORTACIÓN')
       ?`<span class="prov-chip p-imp">${d.prov}</span>`
       :`<span class="prov-chip p-nac">${d.prov}</span>`;
-    const mainAsig=(d.asig>0&&d.fecha_pedido)?`<span class="asig-val">${fmt(d.asig)}</span>`:`<span class="dash">—</span>`;
+    const mainAsig=(d.asig>0&&d.fecha_pedido&&d.directriz!=='REVISAR CON GERENCIA')?`<span class="asig-val">${fmt(d.asig)}</span>`:`<span class="dash">—</span>`;
 
     if(hasChildren){
       // ── SHARED KEY: rowspan on merged columns, split only BACK ORDER + Proveedor + Asig
@@ -1256,8 +1246,8 @@ function renderTable(data){
         <td class="ctr" style="white-space:normal;line-height:1.3">${dateCell(d.proxima_entrada)}</td>
         <td ${rs} class="num" style="${bb}">${miCell(d.miAfter,d.vm)}</td>
         <td ${rs} class="ctr" style="white-space:normal;line-height:1.3;${bb}">${dateCell(d.hasta_desp)}</td>
-        <td ${rs} class="ctr" style="white-space:normal;line-height:1.3;${bb}">${d.asig>0?dateCell(d.fecha_pedido):'<span class="date-na">—</span>'}</td>
-        <td ${rs} style="white-space:normal;vertical-align:middle;text-align:center;${bb}">${d.asig>0?dirChip(d.directriz):'<span class="dir-na">—</span>'}</td>
+        <td ${rs} class="ctr" style="white-space:normal;line-height:1.3;${bb}">${(d.asig>0||d.directriz==='REVISAR CON GERENCIA')?dateCell(d.fecha_pedido):'<span class="date-na">—</span>'}</td>
+        <td ${rs} style="white-space:normal;vertical-align:middle;text-align:center;${bb}">${(d.directriz==='LEVANTAR PEDIDO'&&!d.asig)?'<span class="dir-na">—</span>':dirChip(d.directriz)}</td>
         <td class="num">${mainAsig}</td>
       </tr>`;
 
@@ -1267,7 +1257,7 @@ function renderTable(data){
         const childChip=(ch.origen==='IMPORTACION'||ch.origen==='IMPORTACIÓN')
           ?`<span class="prov-chip p-imp">${ch.prov}</span>`
           :`<span class="prov-chip p-nac">${ch.prov}</span>`;
-        const childAsig=(ch.asig>0&&d.fecha_pedido)?`<span class="asig-val">${fmt(ch.asig)}</span>`:`<span class="dash">—</span>`;
+        const childAsig=(ch.asig>0&&d.fecha_pedido&&d.directriz!=='REVISAR CON GERENCIA')?`<span class="asig-val">${fmt(ch.asig)}</span>`:`<span class="dash">—</span>`;
         const chBoCell=ch.bo>0?`<span class="bo-val">${fmt(ch.bo)}</span>`:`<span class="dash">—</span>`;
         const bb2=isLast?`border-bottom:2px solid ${gc.bar};`:'';
         html+=`<tr class="child-row" style="background:${gc.g};--gc-bar:${gc.bar};--row-bg:${gc.g}">
@@ -1292,8 +1282,8 @@ function renderTable(data){
         <td class="ctr" style="white-space:normal;line-height:1.3">${dateCell(d.proxima_entrada)}</td>
         <td class="num">${miCell(d.miAfter,d.vm)}</td>
         <td class="ctr" style="white-space:normal;line-height:1.3">${dateCell(d.hasta_desp)}</td>
-        <td class="ctr" style="white-space:normal;line-height:1.3">${d.asig>0?dateCell(d.fecha_pedido):'<span class="date-na">—</span>'}</td>
-        <td style="white-space:normal;vertical-align:middle;text-align:center">${d.asig>0?dirChip(d.directriz):'<span class="dir-na">—</span>'}</td>
+        <td class="ctr" style="white-space:normal;line-height:1.3">${(d.asig>0||d.directriz==='REVISAR CON GERENCIA')?dateCell(d.fecha_pedido):'<span class="date-na">—</span>'}</td>
+        <td style="white-space:normal;vertical-align:middle;text-align:center">${(d.directriz==='LEVANTAR PEDIDO'&&!d.asig)?'<span class="dir-na">—</span>':dirChip(d.directriz)}</td>
         <td class="num">${mainAsig}</td>
       </tr>`;
     }
@@ -1917,13 +1907,21 @@ function exportOTIF(){
   XLSX.writeFile(wb, `OTIF_Pedidos_${ts}.xlsx`);
 }
 
-// ── Global header sort handler (called via onclick on th) ──────
-function headerSort(col){
-  if(!GROUPED.length) return;
-  if(sortCol===col) sortDir*=-1; else{sortCol=col;sortDir=1;}
+
+// ══ Column header sort ═══════════════════════════════════════
+document.addEventListener('click', function(e){
+  var th = e.target.closest && e.target.closest('th[data-col]');
+  if(!th || !th.dataset || !th.dataset.col) return;
+  var col = th.dataset.col;
+  if(sortCol === col){
+    sortDir = (sortDir === 1) ? -1 : 1;
+  } else {
+    sortCol = col;
+    sortDir = 1;
+  }
   updateSortArrows();
   renderAll();
-}
+});
 </script>
 </body>
 </html>
