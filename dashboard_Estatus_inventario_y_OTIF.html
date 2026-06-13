@@ -602,11 +602,12 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
         <table>
           <thead>
             <tr class="sec-hdr">
-              <th colspan="4" style="background:#1c3557">IDENTIFICACIÓN</th>
+              <th colspan="5" style="background:#1c3557">IDENTIFICACIÓN</th>
               <th colspan="4" style="background:#8b1a1a">TARGET DE COMPRADOR</th>
               <th colspan="8" style="background:#0e4d72">OTIF DE PROVEEDOR</th>
             </tr>
             <tr>
+              <th data-ocol="oc"      style="width:72px">OC<span class="sarr">↕</span></th>
               <th data-ocol="clave"   style="width:62px">Clave<span class="sarr">↕</span></th>
               <th data-ocol="desc"    style="min-width:175px">Descripción<span class="sarr">↕</span></th>
               <th data-ocol="prov"    style="width:80px">Proveedor<span class="sarr">↕</span></th>
@@ -1214,7 +1215,7 @@ function renderTable(data){
     return`<span class="dir-warn">${v}</span>`;
   };
   if(!sorted.length){
-    document.getElementById('tbody').innerHTML='<tr><td colspan="16" class="no-data">Sin resultados para los filtros aplicados.</td></tr>';
+    document.getElementById('tbody').innerHTML='<tr><td colspan="17" class="no-data">Sin resultados para los filtros aplicados.</td></tr>';
     return;
   }
 
@@ -1563,7 +1564,13 @@ function renderTargetTrend(){
 function renderOTIF(){
   renderOTIFKPIs();
   renderTargetTrend();
-  renderOCCards(otifByProvStatus());
+  // OC cards: filter by prov + status + month of foc
+  renderOCCards(OTIF_DATA.filter(d=>{
+    if(otifProv&&d.prov!==otifProv)return false;
+    if(otifStatus&&d.estatus!==otifStatus)return false;
+    if(otifMonth&&mKey(d.foc)!==otifMonth)return false;
+    return true;
+  }));
   if(!ocVisible){const g=document.getElementById('oc-cards');if(g)g.style.display='none';}
   updateOTIFMonthOptions();
   updateOTIFDetailCascade();
@@ -1738,7 +1745,7 @@ function renderOTIFTable(data){
   updateOTIFSortArrows();
 
   if(!sorted.length){
-    document.getElementById('otif-tbody').innerHTML='<tr><td colspan="16" class="no-data">Sin resultados para los filtros aplicados.</td></tr>';
+    document.getElementById('otif-tbody').innerHTML='<tr><td colspan="17" class="no-data">Sin resultados para los filtros aplicados.</td></tr>';
     return;
   }
 
@@ -1769,6 +1776,7 @@ function renderOTIFTable(data){
   document.getElementById('otif-tbody').innerHTML=sorted.map(d=>{
     const rec=d.estatus==='RECIBIDO';
     return`<tr>
+      <td class="id-c">${d.oc}</td>
       <td class="id-c">${d.clave}</td>
       <td style="white-space:normal;word-break:break-word;max-width:200px;font-size:10px">${d.desc}</td>
       <td>${pChip(d)}</td>
@@ -1869,7 +1877,7 @@ function exportOTIF(){
   if(!data.length){alert('No hay datos visibles para exportar.');return;}
 
   const headers=[
-    'Clave','Descripción','Proveedor','Cant. Pedida',
+    'OC','Clave','Descripción','Proveedor','Cant. Pedida',
     'F. OC Real','F. Requerida','Dif. días','Target Comprador',
     'Entrega Sol.','ETA Estimada','ETA Real','Dif. días entrega','On Time','Cant. Recibida','In Full','Observaciones'
   ];
@@ -1892,7 +1900,7 @@ function exportOTIF(){
 
   const rec=d=>d.estatus==='RECIBIDO';
   const rows=[headers,...sorted.map(d=>[
-    d.clave, d.desc, d.prov, d.qty||'',
+    d.oc, d.clave, d.desc, d.prov, d.qty||'',
     fmtExport(d.foc), fmtExport(d.freq),
     d.difDias!==null?d.difDias:'',
     d.otifC==='EN TIEMPO'?'En tiempo':d.otifC?'Fuera de tiempo':'',
