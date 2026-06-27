@@ -338,6 +338,35 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
 .cause-tag{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3);margin-bottom:4px}
 .cause-val{font-size:22px;font-weight:800}
 .cause-txt{font-size:11px;color:var(--tx2);margin-top:4px;line-height:1.5}
+/* ── Precisión del Pedido Propuesto ── */
+.prec-section{background:var(--surface);border:1px solid var(--brd);border-radius:12px;margin-bottom:16px;overflow:hidden}
+.prec-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--brd)}
+.prec-hdr-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx2)}
+.prec-body{padding:16px 18px}
+.prec-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
+.prec-kpi{background:var(--sf2);border:1px solid var(--brd);border-radius:8px;padding:10px 14px}
+.prec-kpi-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:var(--tx3);margin-bottom:4px}
+.prec-kpi-val{font-size:20px;font-weight:800;line-height:1}
+.prec-kpi-sub{font-size:10px;color:var(--tx2);margin-top:3px}
+.prec-charts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.prec-panel{background:var(--sf2);border:1px solid var(--brd);border-radius:8px;padding:12px}
+.prec-panel-title{font-size:10px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+.prec-resp-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.prec-resp-card{background:var(--surface);border-radius:6px;padding:8px 10px;text-align:center;border:1px solid var(--brd)}
+.prec-resp-val{font-size:18px;font-weight:800}
+.prec-resp-lbl{font-size:9px;color:var(--tx2);margin-top:2px;line-height:1.3}
+.prec-table{width:100%;border-collapse:collapse;font-size:11px}
+.prec-table th{background:var(--navy);color:#fff;padding:6px 10px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.04em}
+.prec-table td{padding:6px 10px;border-bottom:.5px solid var(--brd);vertical-align:middle}
+.prec-table tr:hover td{background:var(--sf2)}
+.prec-table tr.row-fail td{background:#fff5f5}
+.prec-table tr.row-ok td{background:#f5faf5}
+.prec-table tr.row-none td{background:#fafafa}
+.chip-acertada{background:var(--green-bg);color:var(--green);font-size:9px;padding:2px 7px;border-radius:6px;font-weight:700}
+.chip-desviada{background:var(--amber-bg);color:var(--amber);font-size:9px;padding:2px 7px;border-radius:6px;font-weight:700}
+.chip-nocolocada{background:var(--red-bg);color:var(--red);font-size:9px;padding:2px 7px;border-radius:6px;font-weight:700}
+.chip-sindato{background:#f0eeea;color:var(--tx3);font-size:9px;padding:2px 7px;border-radius:6px;font-weight:600}
+.chip-pendiente{background:var(--purple-bg);color:var(--purple);font-size:9px;padding:2px 7px;border-radius:6px;font-weight:700}
 </style>
 </head>
 <body>
@@ -377,6 +406,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
   <div class="main-tabs">
     <button class="main-tab on" id="tab-btn-inv" onclick="switchMainTab('inv')">Estatus del inventario</button>
     <button class="main-tab" id="tab-btn-otif" onclick="switchMainTab('otif')">OTIF y Target</button>
+    <button class="main-tab" id="tab-btn-prec" onclick="switchMainTab('prec')">Precisión de Pedido</button>
   </div>
 
   <main>
@@ -563,6 +593,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
       </div>
     </div>
 
+
     <!-- OC cards (PROGRAMADO only) -->
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
       <span style="font-size:11px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.06em">OC's Vigentes</span>
@@ -655,8 +686,86 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
       <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--brd);color:var(--tx3);font-size:10px">
         ⚠️ El umbral del 95 % permite que una línea menor con error no penalice la OC completa. Una OC con 20 líneas necesita que al menos 19 cumplan para contarse como exitosa.
       </div>
+      <div style="margin-top:14px;padding-top:12px;border-top:2px solid var(--brd)">
+        <div style="font-weight:700;color:var(--purple);margin-bottom:4px">🎯 Precisión del Pedido Propuesto — Cálculo vs. Real</div>
+        <p>Compara la <b>cantidad que el sistema proponía</b> al momento de levantar la OC (capturada manualmente) contra la <b>cantidad real</b> con que se colocó. Requiere llenar 2 columnas nuevas en la hoja <em>OTIF PEDIDOS</em> del Excel, después de Observaciones:</p>
+        <ul style="margin:6px 0 6px 18px;padding:0">
+          <li><b>Cantidad Propuesta</b> (columna X) — valor de "Asignación" que mostraba el sistema el día que se generó la OC.</li>
+          <li><b>Motivo</b> (columna Y) — obligatorio si Real = 0 o si la desviación supera ±15%. Usar uno de: <em>ERROR DE CALCULO, NO CUMPLE CANTIDAD MINIMA, VARIACION DE PRECIO, DECISION DE GERENCIA, OTRO</em>.</li>
+        </ul>
+        <p><b>Clasificación:</b> Real = 0 → <em>No colocada</em> · desviación ≤ ±15% → <em>Acertada</em> · desviación &gt; ±15% → <em>Desviada</em>. Cada motivo se traduce automáticamente a un responsable (Planeación, Proveedor, Compras o Gerencia).</p>
+      </div>
     </div>
   </div><!-- /tab-otif -->
+
+  <!-- ══ TAB: PRECISIÓN DE PEDIDO ══ -->
+  <div id="tab-prec" style="display:none">
+
+    <!-- Filters -->
+    <div class="filter-section" style="margin-bottom:16px">
+      <div class="filter-row">
+        <span class="tb-lbl">Proveedor:</span>
+        <select class="msel" id="prec-prov-sel"><option value="">Todos</option></select>
+        <div class="filter-sep"></div>
+        <span class="tb-lbl">Resultado:</span>
+        <select class="msel" id="prec-result-sel">
+          <option value="">Todos</option>
+          <option value="pendiente">Pendiente de levantar</option>
+          <option value="acertada">Acertada</option>
+          <option value="desviada">Desviada</option>
+          <option value="no_colocada">No colocada</option>
+          <option value="sin_dato">Sin dato</option>
+        </select>
+        <button class="clear-btn" id="prec-clear-btn" style="margin-left:8px">✕ Limpiar</button>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="prec-kpis" id="prec-kpis"></div>
+
+    <!-- Charts + Responsibility -->
+    <div class="prec-charts">
+      <div class="prec-panel">
+        <div class="prec-panel-title">📊 Distribución de resultados</div>
+        <div style="position:relative;height:200px"><canvas id="prec-status-chart"></canvas></div>
+      </div>
+      <div class="prec-panel">
+        <div class="prec-panel-title">🧭 Responsabilidad de las desviaciones</div>
+        <div class="prec-resp-grid" id="prec-resp-grid" style="margin-top:10px"></div>
+        <div style="margin-top:12px;font-size:10px;color:var(--tx3);line-height:1.6">
+          Tolerancia de aceptación: <b>±15%</b> entre cantidad propuesta y cantidad real colocada.
+          Si la cantidad real es 0, se clasifica como <b>No colocada</b>.
+        </div>
+      </div>
+    </div>
+
+    <!-- OC-level detail table with EDITABLE Motivo -->
+    <div class="tbl-card">
+      <div class="tbl-top">
+        <h3>Detalle por Orden de Compra — Propuesta vs. Real</h3>
+        <span id="prec-row-count"></span>
+        <button class="export-btn" onclick="exportPrecision()" style="margin-left:auto">⬇ Exportar Excel</button>
+      </div>
+      <div style="padding:8px 16px;background:var(--sf2);border-bottom:1px solid var(--brd);font-size:10.5px;color:var(--tx2)">
+        💡 El campo <b>Motivo</b> es editable: selecciona una opción y se guarda automáticamente en este navegador.
+        Para que el cambio quede en tu archivo fuente, usa <b>⬇ Exportar Excel</b> y sube ese archivo a tu repositorio.
+      </div>
+      <div class="tbl-scroll" style="max-height:calc(100vh - 560px);min-height:300px">
+        <table class="prec-table" style="width:100%">
+          <thead><tr>
+            <th>OC</th><th>Clave</th><th>Descripción</th><th>Proveedor</th><th>Fecha Propuesta</th>
+            <th style="text-align:right">Propuesta</th><th style="text-align:right">Real</th>
+            <th style="text-align:center">Desv. %</th><th>Resultado</th>
+            <th style="min-width:180px">Motivo</th><th>Responsable</th>
+          </tr></thead>
+          <tbody id="prec-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="footer" id="prec-footer"></div>
+
+  </div><!-- /tab-prec -->
+
 
   </main>
 </div>
@@ -688,6 +797,14 @@ const GP_PALETTE=[
 ];
 let GP_C={};  // built dynamically from data groups
 const MES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const MOTIVO_RESP={
+  'ERROR DE CALCULO':'Planeación',
+  'NO CUMPLE CANTIDAD MINIMA':'Proveedor',
+  'VARIACION DE PRECIO':'Compras',
+  'DECISION DE GERENCIA':'Gerencia',
+  'OTRO':'Sin clasificar',
+};
+const TOLERANCIA_PCT=15;
 
 // ══════════════════════════════════════════════════════════════
 // STATE
@@ -1308,13 +1425,212 @@ function renderTable(data){
 // ══════════════════════════════════════════════════════════════
 // MAIN TAB SWITCH
 // ══════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════
+// PRECISIÓN DE PEDIDO — estado, persistencia y agregación por OC
+// ══════════════════════════════════════════════════════════════
+let precChart=null;
+let precProvFilter='', precResultFilter='';
+let ocMotivos=loadMotivos();
+
+function loadMotivos(){
+  try{
+    const raw=localStorage.getItem('precisionMotivos_v1');
+    return raw?new Map(Object.entries(JSON.parse(raw))):new Map();
+  }catch(e){ return new Map(); }
+}
+function saveMotivos(){
+  try{ localStorage.setItem('precisionMotivos_v1', JSON.stringify(Object.fromEntries(ocMotivos))); }
+  catch(e){ /* storage unavailable — edits stay in memory only */ }
+}
+
+// Build one row PER CLAVE within each OC (a single OC can have some
+// claves fulfilled correctly and others not — never aggregate by OC)
+// PLUS: pending proposals for claves not yet placed this month.
+function buildPendingProposals(){
+  const curMonth=mKey(new Date());
+  return GROUPED.filter(d=>d.asig>0 && d.directriz==='LEVANTAR PEDIDO' && mKey(d.fecha_pedido)===curMonth)
+    .map(d=>({oc:'—',clave:d.id,desc:d.desc,prov:d.prov,fechaPropuesta:d.fecha_pedido,
+      cantPropuesta:d.asig,real:null,hasProp:true,status:'pendiente',desv:null,motivo:'',key:'PEND__'+d.id}));
+}
+function buildPrecisionRows(){
+  const claveFecha=new Map(GROUPED.map(d=>[d.id, d.fecha_pedido]));
+  const otifRows=OTIF_DATA.filter(d=>d.oc).map(d=>{
+    const hasProp=d.cantPropuesta!==null&&d.cantPropuesta!==undefined;
+    const real=d.qty||0;
+    let status=null, desv=null;
+    if(hasProp){
+      if(real===0){ status='no_colocada'; }
+      else{
+        desv=Math.round((real-d.cantPropuesta)/d.cantPropuesta*100);
+        status=Math.abs(desv)<=15?'acertada':'desviada';
+      }
+    }
+    const key=d.oc+'__'+d.clave;
+    const motivo=ocMotivos.get(key)||d.motivo||'';
+    const fechaPropuesta=claveFecha.get(d.clave)||null;
+    return{oc:d.oc,clave:d.clave,desc:d.desc,prov:d.prov,fechaPropuesta,
+      cantPropuesta:hasProp?d.cantPropuesta:null,real,hasProp,status,desv,motivo,key};
+  });
+  return [...buildPendingProposals(), ...otifRows];
+}
+
+function updateMotivo(key,val){
+  if(val) ocMotivos.set(key,val); else ocMotivos.delete(key);
+  saveMotivos();
+  renderPrecisionTab();
+}
+
+function buildPrecProvOptions(){
+  const sel=document.getElementById('prec-prov-sel');
+  if(!sel) return;
+  const provs=['',...new Set(OTIF_DATA.map(d=>d.prov).filter(Boolean))];
+  sel.innerHTML=provs.map(p=>`<option value="${p}">${p||'Todos'}</option>`).join('');
+  sel.value=precProvFilter;
+}
+
+function renderPrecisionTab(){
+  if(!OTIF_DATA.length){
+    document.getElementById('prec-tbody').innerHTML='<tr><td colspan="11" class="no-data">Carga un archivo con datos de OTIF PEDIDOS para ver esta sección.</td></tr>';
+    return;
+  }
+  buildPrecProvOptions();
+  let rows=buildPrecisionRows();
+  if(precProvFilter) rows=rows.filter(r=>r.prov===precProvFilter);
+  if(precResultFilter) rows=rows.filter(r=>(r.status||'sin_dato')===precResultFilter);
+  rows.sort((a,b)=>{
+    const order={pendiente:-1,desviada:0,no_colocada:1,acertada:2,null:3};
+    const sa=order[a.status]??3, sb=order[b.status]??3;
+    if(sa!==sb) return sa-sb;
+    return String(a.oc).localeCompare(String(b.oc));
+  });
+
+  const pendientes=rows.filter(r=>r.status==='pendiente');
+  const placedRows=rows.filter(r=>r.status!=='pendiente');
+  const withData=placedRows.filter(r=>r.hasProp);
+  const acertadas=withData.filter(r=>r.status==='acertada');
+  const desviadas=withData.filter(r=>r.status==='desviada');
+  const noColocadas=withData.filter(r=>r.status==='no_colocada');
+  const sinDato=placedRows.length-withData.length;
+  const total=withData.length;
+  const pctAcert=total>0?Math.round(acertadas.length/total*100):0;
+
+  const col=(n,d,g,w)=>{const p=d>0?n/d*100:0;return p>=g?'var(--green)':p>=w?'var(--amber)':'var(--red)';};
+  document.getElementById('prec-kpis').innerHTML=[
+    {l:'Propuestas pendientes (mes actual)',v:pendientes.length,s:'por levantar — directriz: Levantar pedido',c:pendientes.length>0?'var(--purple)':'var(--green)'},
+    {l:'Claves evaluadas',v:total,s:sinDato>0?`${sinDato} sin dato capturado`:'con propuesta registrada',c:'var(--navy)'},
+    {l:'Acertadas (±15%)',v:acertadas.length,s:total>0?pctAcert+'% del total':'—',c:col(acertadas.length,total,70,40)},
+    {l:'Desviadas',v:desviadas.length,s:'fuera de tolerancia',c:desviadas.length>0?'var(--amber)':'var(--green)'},
+    {l:'No colocadas',v:noColocadas.length,s:'cantidad real = 0',c:noColocadas.length>0?'var(--red)':'var(--green)'},
+  ].map(k=>`<div class="prec-kpi" style="border-left:4px solid ${k.c}"><div class="prec-kpi-lbl">${k.l}</div><div class="prec-kpi-val" style="color:${k.c}">${k.v}</div><div class="prec-kpi-sub">${k.s}</div></div>`).join('');
+
+  if(precChart) precChart.destroy();
+  precChart=new Chart(document.getElementById('prec-status-chart'),{type:'doughnut',
+    data:{labels:['Acertadas','Desviadas','No colocadas'],
+      datasets:[{data:[acertadas.length,desviadas.length,noColocadas.length],
+        backgroundColor:['rgba(20,90,56,.8)','rgba(184,110,0,.8)','rgba(139,26,26,.8)'],borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:10}},
+        tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.parsed} claves`}}}}
+  });
+
+  const failRows=[...desviadas,...noColocadas];
+  const byResp=new Map();
+  Object.values(MOTIVO_RESP).forEach(r=>byResp.set(r,0));
+  byResp.set('Sin motivo',0);
+  failRows.forEach(r=>{
+    const m=(r.motivo||'').toUpperCase();
+    const resp=MOTIVO_RESP[m]||'Sin motivo';
+    byResp.set(resp,(byResp.get(resp)||0)+1);
+  });
+  const respColors={'Planeación':'var(--navy)','Proveedor':'var(--red)','Compras':'var(--purple)','Gerencia':'var(--amber)','Sin clasificar':'var(--tx3)','Sin motivo':'var(--tx3)'};
+  document.getElementById('prec-resp-grid').innerHTML=[...byResp.entries()].filter(([,v])=>v>0||failRows.length===0).map(([resp,cnt])=>
+    `<div class="prec-resp-card"><div class="prec-resp-val" style="color:${respColors[resp]||'var(--tx2)'}">${cnt}</div><div class="prec-resp-lbl">${resp}</div></div>`
+  ).join('')||'<div style="font-size:11px;color:var(--tx3);grid-column:1/-1">Sin desviaciones registradas.</div>';
+
+  document.getElementById('prec-row-count').textContent=rows.length+' claves';
+  document.getElementById('prec-footer').textContent=rows.length+' líneas visibles · Hoja: OTIF PEDIDOS + Asignacion';
+
+  const statusChip=s=>{
+    if(s==='pendiente')return'<span class="chip-pendiente">📌 Pendiente de levantar</span>';
+    if(s==='acertada')return'<span class="chip-acertada">✓ Acertada</span>';
+    if(s==='desviada')return'<span class="chip-desviada">⚠ Desviada</span>';
+    if(s==='no_colocada')return'<span class="chip-nocolocada">✗ No colocada</span>';
+    return'<span class="chip-sindato">Sin dato</span>';
+  };
+  const MOTIVO_OPTS=['','ERROR DE CALCULO','NO CUMPLE CANTIDAD MINIMA','VARIACION DE PRECIO','DECISION DE GERENCIA','OTRO'];
+  const motivoLbl={'':'— Seleccionar —','ERROR DE CALCULO':'Error de cálculo','NO CUMPLE CANTIDAD MINIMA':'No cumple cant. mínima','VARIACION DE PRECIO':'Variación de precio','DECISION DE GERENCIA':'Decisión de gerencia','OTRO':'Otro'};
+
+  document.getElementById('prec-tbody').innerHTML=rows.map(r=>{
+    const isPend=r.status==='pendiente';
+    const rowCls=isPend?'row-none':r.status==='acertada'?'row-ok':(r.status==='desviada'||r.status==='no_colocada')?'row-fail':'row-none';
+    const resp=MOTIVO_RESP[(r.motivo||'').toUpperCase()]||(r.motivo?'Sin clasificar':'—');
+    const needsMotivo=(r.status==='desviada'||r.status==='no_colocada');
+    const selOpts=MOTIVO_OPTS.map(v=>`<option value="${v}"${v===r.motivo?' selected':''}>${motivoLbl[v]}</option>`).join('');
+    const motivoCell=isPend
+      ?'<span class="dash">—</span>'
+      :`<select class="msel" style="font-size:10.5px;width:100%;${needsMotivo&&!r.motivo?'border-color:var(--red)':''}" onchange="updateMotivo('${r.key}',this.value)">${selOpts}</select>`;
+    return`<tr class="${rowCls}" style="${isPend?'background:var(--purple-bg)':''}">
+      <td style="font-family:monospace;font-weight:700">${r.oc}</td>
+      <td class="id-c">${r.clave}</td>
+      <td style="white-space:normal;word-break:break-word;max-width:200px;font-size:10.5px">${r.desc}</td>
+      <td>${r.prov==='GLOBALES'?'<span class="prov-chip p-imp">GLOBALES</span>':'<span class="prov-chip p-nac">'+r.prov+'</span>'}</td>
+      <td style="font-size:10px">${fmtDate(r.fechaPropuesta)||'<span class="dash">—</span>'}</td>
+      <td style="text-align:right">${r.hasProp?fmt(r.cantPropuesta):'<span class="dash">—</span>'}</td>
+      <td style="text-align:right;font-weight:700">${isPend?'<span class="dash">—</span>':fmt(r.real)}</td>
+      <td style="text-align:center;font-weight:700;color:${r.desv===null?'var(--tx3)':Math.abs(r.desv)<=15?'var(--green)':'var(--red)'}">${r.desv!==null?(r.desv>0?'+':'')+r.desv+'%':'—'}</td>
+      <td>${statusChip(r.status)}</td>
+      <td>${motivoCell}</td>
+      <td style="font-size:10px;color:var(--tx2)">${resp}</td>
+    </tr>`;
+  }).join('')||'<tr><td colspan="11" class="no-data">Sin claves para los filtros aplicados.</td></tr>';
+}
+
+function exportPrecision(){
+  if(!OTIF_DATA.length){alert('No hay datos para exportar.');return;}
+  const rows0=buildPrecisionRows();
+  const headers=['OC','Clave','Descripción','Proveedor','Fecha Propuesta','Cant. Propuesta','Cant. Real','Desv. %','Resultado','Motivo','Responsable'];
+  const rows=[headers,...rows0.map(r=>[
+    r.oc, r.clave, r.desc, r.prov,
+    fmtExport(r.fechaPropuesta),
+    r.hasProp?r.cantPropuesta:'',
+    r.real,
+    r.desv!==null?r.desv:'',
+    r.status==='acertada'?'Acertada':r.status==='desviada'?'Desviada':r.status==='no_colocada'?'No colocada':'',
+    r.motivo||'',
+    MOTIVO_RESP[(r.motivo||'').toUpperCase()]||'',
+  ])];
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:9},{wch:9},{wch:40},{wch:12},{wch:14},{wch:14},{wch:12},{wch:10},{wch:14},{wch:24},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Precision Pedido');
+  const ts=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'-');
+  XLSX.writeFile(wb, `Precision_Pedido_${ts}.xlsx`);
+}
+
 function switchMainTab(tab){
   currentMainTab=tab;
   document.getElementById('tab-inv').style.display=tab==='inv'?'block':'none';
   document.getElementById('tab-otif').style.display=tab==='otif'?'block':'none';
+  document.getElementById('tab-prec').style.display=tab==='prec'?'block':'none';
   document.getElementById('tab-btn-inv').classList.toggle('on',tab==='inv');
   document.getElementById('tab-btn-otif').classList.toggle('on',tab==='otif');
+  document.getElementById('tab-btn-prec').classList.toggle('on',tab==='prec');
   if(tab==='otif'&&OTIF_DATA.length){if(!document.getElementById('otif-prov-sel').dataset.built)buildOTIFFilters();renderOTIF();}
+  if(tab==='prec'&&OTIF_DATA.length){
+    if(!document.getElementById('prec-prov-sel').dataset.built){
+      document.getElementById('prec-prov-sel').dataset.built='1';
+      document.getElementById('prec-prov-sel').addEventListener('change',e=>{precProvFilter=e.target.value;renderPrecisionTab();});
+      document.getElementById('prec-result-sel').addEventListener('change',e=>{precResultFilter=e.target.value;renderPrecisionTab();});
+      document.getElementById('prec-clear-btn').addEventListener('click',()=>{
+        precProvFilter='';precResultFilter='';
+        document.getElementById('prec-prov-sel').value='';
+        document.getElementById('prec-result-sel').value='';
+        renderPrecisionTab();
+      });
+    }
+    renderPrecisionTab();
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1339,8 +1655,23 @@ function parseOTIF(raw){
     recibReal:typeof r[20]==='number'?r[20]:null,
     ifOk:String(r[21]||'').trim(),
     obs:String(r[22]||'').trim(),
+    cantPropuesta:typeof r[23]==='number'?r[23]:null,
+    motivo:String(r[24]||'').trim(),
     get difDias(){const f=this.foc,q=this.freq;return(f&&q)?Math.round((f.getTime()-q.getTime())/86400000):null;},
     get difEntrega(){const r=this.etaR,s=this.entregaSol;return(r&&s)?Math.round((r.getTime()-s.getTime())/86400000):null;},
+    get precisionStatus(){
+      const prop=this.cantPropuesta, real=this.qty;
+      if(prop===null||prop===undefined) return null; // sin dato capturado
+      if(real===0||!real) return 'no_colocada';
+      const desv=(real-prop)/prop*100;
+      if(Math.abs(desv)<=15) return 'acertada';
+      return 'desviada';
+    },
+    get desviacionPct(){
+      const prop=this.cantPropuesta, real=this.qty;
+      if(!prop) return null;
+      return Math.round((real-prop)/prop*100);
+    },
   }));
 }
 
@@ -1426,6 +1757,7 @@ function toggleOCCards(){
   if(g) g.style.display=ocVisible?'grid':'none';
   if(btn) btn.textContent=ocVisible?'▼ Ocultar':'▶ Mostrar';
 }
+
 function toggleTargetTrend(){
   trendVisible=!trendVisible;
   const b=document.getElementById('trend-body');
@@ -1561,6 +1893,9 @@ function renderTargetTrend(){
       <td style="font-size:11px;color:var(--tx2)">${diagText(r)}</td>
     </tr>`).join('');
 }
+
+
+
 function renderOTIF(){
   renderOTIFKPIs();
   renderTargetTrend();
@@ -1879,7 +2214,8 @@ function exportOTIF(){
   const headers=[
     'OC','Clave','Descripción','Proveedor','Cant. Pedida',
     'F. OC Real','F. Requerida','Dif. días','Target Comprador',
-    'Entrega Sol.','ETA Estimada','ETA Real','Dif. días entrega','On Time','Cant. Recibida','In Full','Observaciones'
+    'Entrega Sol.','ETA Estimada','ETA Real','Dif. días entrega','On Time','Cant. Recibida','In Full','Observaciones',
+    'Cant. Propuesta','Desv. %','Resultado Precisión','Motivo','Responsable'
   ];
 
   const SORT_DATE_COLS=new Set(['foc','freq','eta','etaR','entregaSol']);
@@ -1912,6 +2248,11 @@ function exportOTIF(){
     rec(d)&&d.recibReal!==null?d.recibReal:'',
     rec(d)?(d.ifOk==='COMPLETO'?'Completo':d.ifOk?'Incompleto':''):'',
     d.obs||'',
+    d.cantPropuesta!==null?d.cantPropuesta:'',
+    d.desviacionPct!==null?d.desviacionPct:'',
+    d.precisionStatus==='acertada'?'Acertada':d.precisionStatus==='desviada'?'Desviada':d.precisionStatus==='no_colocada'?'No colocada':'',
+    d.motivo||'',
+    MOTIVO_RESP[(d.motivo||'').toUpperCase()]||'',
   ])];
 
   const wb=XLSX.utils.book_new();
@@ -1919,7 +2260,8 @@ function exportOTIF(){
   ws['!cols']=[
     {wch:9},{wch:45},{wch:12},{wch:10},
     {wch:14},{wch:14},{wch:10},{wch:14},
-    {wch:14},{wch:14},{wch:12},{wch:14},{wch:12}
+    {wch:14},{wch:14},{wch:12},{wch:14},{wch:12},
+    {wch:14},{wch:10},{wch:16},{wch:24},{wch:14}
   ];
 
   XLSX.utils.book_append_sheet(wb, ws, 'OTIF Pedidos');
