@@ -1453,8 +1453,11 @@ function buildPendingProposals(){
     .map(d=>{
       const key='PEND__'+d.id;
       const motivo=ocMotivos.get(key)||'';
+      // Si ya se le asignó un motivo, significa que se decidió NO levantar
+      // la orden como se propuso → se considera Desviada, no Pendiente.
+      const status=motivo?'desviada':'pendiente';
       return{oc:'—',clave:d.id,desc:d.desc,prov:d.prov,fechaPropuesta:d.fecha_pedido,
-        cantPropuesta:d.asig,real:null,hasProp:true,status:'pendiente',desv:null,motivo,key};
+        cantPropuesta:d.asig,real:null,hasProp:true,status,desv:null,motivo,key};
     });
 }
 function buildPrecisionRows(){
