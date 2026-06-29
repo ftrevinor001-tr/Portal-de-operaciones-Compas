@@ -716,6 +716,9 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
           <option value="no_colocada">No colocada</option>
           <option value="sin_dato">Sin dato</option>
         </select>
+        <div class="filter-sep"></div>
+        <span class="tb-lbl">Mes:</span>
+        <select class="msel" id="prec-month-sel"><option value="">Todos los meses</option></select>
         <button class="clear-btn" id="prec-clear-btn" style="margin-left:8px">✕ Limpiar</button>
       </div>
     </div>
@@ -731,7 +734,8 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
       </div>
       <div class="prec-panel">
         <div class="prec-panel-title">🧭 Responsabilidad de las desviaciones</div>
-        <div class="prec-resp-grid" id="prec-resp-grid" style="margin-top:10px"></div>
+        <div style="position:relative;height:170px;margin-bottom:10px"><canvas id="prec-resp-chart"></canvas></div>
+        <div class="prec-resp-grid" id="prec-resp-grid"></div>
         <div style="margin-top:12px;font-size:10px;color:var(--tx3);line-height:1.6">
           Tolerancia de aceptación: <b>±15%</b> entre cantidad propuesta y cantidad real colocada.
           Si la cantidad real es 0, se clasifica como <b>No colocada</b>.
@@ -753,7 +757,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
       <div class="tbl-scroll" style="max-height:calc(100vh - 560px);min-height:300px">
         <table class="prec-table" style="width:100%">
           <thead><tr>
-            <th>OC</th><th>Clave</th><th>Descripción</th><th>Proveedor</th><th>Fecha Propuesta</th>
+            <th>OC</th><th>Clave</th><th>Descripción</th><th>Proveedor</th>
             <th style="text-align:right">Propuesta</th><th style="text-align:right">Real</th>
             <th style="text-align:center">Desv. %</th><th>Resultado</th>
             <th style="min-width:180px">Motivo</th><th>Responsable</th>
@@ -1430,7 +1434,8 @@ function renderTable(data){
 // PRECISIÓN DE PEDIDO — estado, persistencia y agregación por OC
 // ══════════════════════════════════════════════════════════════
 let precChart=null;
-let precProvFilter='', precResultFilter='';
+let precProvFilter='', precResultFilter='', precMonthFilter='';
+let precRespChart=null;
 let ocMotivos=loadMotivos();
 
 function loadMotivos(){
@@ -1453,10 +1458,10 @@ function buildPendingProposals(){
     .map(d=>{
       const key='PEND__'+d.id;
       const motivo=ocMotivos.get(key)||'';
-      // Si ya se le asignó un motivo, significa que se decidió NO levantar
-      // la orden como se propuso → se considera Desviada, no Pendiente.
-      const status=motivo?'desviada':'pendiente';
-      return{oc:'—',clave:d.id,desc:d.desc,prov:d.prov,fechaPropuesta:d.fecha_pedido,
+      // Si no tiene OC y ya se le asignó un motivo, significa que se decidió
+      // NO levantar la orden → se considera "No colocada", no Pendiente.
+      const status=motivo?'no_colocada':'pendiente';
+      return{oc:'—',clave:d.id,desc:d.desc,prov:d.prov,fechaPropuesta:d.fecha_pedido,foc:null,
         cantPropuesta:d.asig,real:null,hasProp:true,status,desv:null,motivo,key};
     });
 }
@@ -1476,12 +1481,24 @@ function buildPrecisionRows(){
     const key=d.oc+'__'+d.clave;
     const motivo=ocMotivos.get(key)||d.motivo||'';
     const fechaPropuesta=claveFecha.get(d.clave)||null;
-    return{oc:d.oc,clave:d.clave,desc:d.desc,prov:d.prov,fechaPropuesta,
+    return{oc:d.oc,clave:d.clave,desc:d.desc,prov:d.prov,fechaPropuesta,foc:d.foc,
       cantPropuesta:hasProp?d.cantPropuesta:null,real,hasProp,status,desv,motivo,key};
   });
   return [...buildPendingProposals(), ...otifRows];
 }
 
+function fechaEfectiva(r){
+  return (r.oc&&r.oc!=='—') ? r.foc : r.fechaPropuesta;
+}
+function buildPrecMonthOptions(allRows){
+  const sel=document.getElementById('prec-month-sel');
+  if(!sel) return;
+  const keys=[...new Set(allRows.map(r=>mKey(fechaEfectiva(r))).filter(Boolean))].sort();
+  const cur=precMonthFilter;
+  sel.innerHTML='<option value="">Todos los meses</option>'+keys.map(k=>`<option value="${k}"${k===cur?' selected':''}>${mLabel(k)}</option>`).join('');
+  if(cur&&!keys.includes(cur)){precMonthFilter='';sel.value='';}
+  sel.className='msel'+(precMonthFilter?' msel-active':'');
+}
 function updateMotivo(key,val){
   if(val) ocMotivos.set(key,val); else ocMotivos.delete(key);
   saveMotivos();
@@ -1498,13 +1515,15 @@ function buildPrecProvOptions(){
 
 function renderPrecisionTab(){
   if(!OTIF_DATA.length){
-    document.getElementById('prec-tbody').innerHTML='<tr><td colspan="11" class="no-data">Carga un archivo con datos de OTIF PEDIDOS para ver esta sección.</td></tr>';
+    document.getElementById('prec-tbody').innerHTML='<tr><td colspan="10" class="no-data">Carga un archivo con datos de OTIF PEDIDOS para ver esta sección.</td></tr>';
     return;
   }
   buildPrecProvOptions();
   let rows=buildPrecisionRows();
+  buildPrecMonthOptions(rows);
   if(precProvFilter) rows=rows.filter(r=>r.prov===precProvFilter);
   if(precResultFilter) rows=rows.filter(r=>(r.status||'sin_dato')===precResultFilter);
+  if(precMonthFilter) rows=rows.filter(r=>mKey(fechaEfectiva(r))===precMonthFilter);
   rows.sort((a,b)=>{
     const order={pendiente:-1,desviada:0,no_colocada:1,acertada:2,null:3};
     const sa=order[a.status]??3, sb=order[b.status]??3;
@@ -1551,9 +1570,24 @@ function renderPrecisionTab(){
     byResp.set(resp,(byResp.get(resp)||0)+1);
   });
   const respColors={'Planeación':'var(--navy)','Proveedor':'var(--red)','Compras':'var(--purple)','Gerencia':'var(--amber)','Sin clasificar':'var(--tx3)','Sin motivo':'var(--tx3)'};
+  const respColorsHex={'Planeación':'#1c3557','Proveedor':'#8b1a1a','Compras':'#5c3a9a','Gerencia':'#7a4f00','Sin clasificar':'#6b6960','Sin motivo':'#6b6960'};
   document.getElementById('prec-resp-grid').innerHTML=[...byResp.entries()].filter(([,v])=>v>0||failRows.length===0).map(([resp,cnt])=>
     `<div class="prec-resp-card"><div class="prec-resp-val" style="color:${respColors[resp]||'var(--tx2)'}">${cnt}</div><div class="prec-resp-lbl">${resp}</div></div>`
   ).join('')||'<div style="font-size:11px;color:var(--tx3);grid-column:1/-1">Sin desviaciones registradas.</div>';
+
+  // Bar chart: deviations by responsible area
+  if(precRespChart) precRespChart.destroy();
+  const respEntries=[...byResp.entries()].filter(([,v])=>v>0);
+  precRespChart=new Chart(document.getElementById('prec-resp-chart'),{type:'bar',
+    data:{labels:respEntries.map(([r])=>r),
+      datasets:[{label:'Claves',data:respEntries.map(([,v])=>v),
+        backgroundColor:respEntries.map(([r])=>respColorsHex[r]||'#6b6960'),
+        borderRadius:5,borderSkipped:false}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`  ${ctx.parsed.x} claves`}}},
+      scales:{x:{beginAtZero:true,ticks:{precision:0,font:{size:10}},grid:{color:'#e8e6e0'}},
+        y:{ticks:{font:{size:10.5}},grid:{display:false}}}}
+  });
 
   document.getElementById('prec-row-count').textContent=rows.length+' claves';
   document.getElementById('prec-footer').textContent=rows.length+' líneas visibles · Hoja: OTIF PEDIDOS + Asignacion';
@@ -1583,7 +1617,6 @@ function renderPrecisionTab(){
       <td class="id-c">${r.clave}</td>
       <td style="white-space:normal;word-break:break-word;max-width:200px;font-size:10.5px">${r.desc}</td>
       <td>${r.prov==='GLOBALES'?'<span class="prov-chip p-imp">GLOBALES</span>':'<span class="prov-chip p-nac">'+r.prov+'</span>'}</td>
-      <td style="font-size:10px">${fmtDate(r.fechaPropuesta)||'<span class="dash">—</span>'}</td>
       <td style="text-align:right">${r.hasProp?fmt(r.cantPropuesta):'<span class="dash">—</span>'}</td>
       <td style="text-align:right;font-weight:700">${isPend?'<span class="dash">—</span>':fmt(r.real)}</td>
       <td style="text-align:center;font-weight:700;color:${r.desv===null?'var(--tx3)':Math.abs(r.desv)<=15?'var(--green)':'var(--red)'}">${r.desv!==null?(r.desv>0?'+':'')+r.desv+'%':'—'}</td>
@@ -1591,16 +1624,16 @@ function renderPrecisionTab(){
       <td>${motivoCell}</td>
       <td style="font-size:10px;color:var(--tx2)">${resp}</td>
     </tr>`;
-  }).join('')||'<tr><td colspan="11" class="no-data">Sin claves para los filtros aplicados.</td></tr>';
+  }).join('')||'<tr><td colspan="10" class="no-data">Sin claves para los filtros aplicados.</td></tr>';
 }
 
 function exportPrecision(){
   if(!OTIF_DATA.length){alert('No hay datos para exportar.');return;}
   const rows0=buildPrecisionRows();
-  const headers=['OC','Clave','Descripción','Proveedor','Fecha Propuesta','Cant. Propuesta','Cant. Real','Desv. %','Resultado','Motivo','Responsable'];
+  const headers=['OC','Clave','Descripción','Proveedor','Fecha Efectiva','Cant. Propuesta','Cant. Real','Desv. %','Resultado','Motivo','Responsable'];
   const rows=[headers,...rows0.map(r=>[
     r.oc, r.clave, r.desc, r.prov,
-    fmtExport(r.fechaPropuesta),
+    fmtExport(fechaEfectiva(r)),
     r.hasProp?r.cantPropuesta:'',
     r.real,
     r.desv!==null?r.desv:'',
@@ -1630,10 +1663,12 @@ function switchMainTab(tab){
       document.getElementById('prec-prov-sel').dataset.built='1';
       document.getElementById('prec-prov-sel').addEventListener('change',e=>{precProvFilter=e.target.value;renderPrecisionTab();});
       document.getElementById('prec-result-sel').addEventListener('change',e=>{precResultFilter=e.target.value;renderPrecisionTab();});
+      document.getElementById('prec-month-sel').addEventListener('change',e=>{precMonthFilter=e.target.value;renderPrecisionTab();});
       document.getElementById('prec-clear-btn').addEventListener('click',()=>{
-        precProvFilter='';precResultFilter='';
+        precProvFilter='';precResultFilter='';precMonthFilter='';
         document.getElementById('prec-prov-sel').value='';
         document.getElementById('prec-result-sel').value='';
+        document.getElementById('prec-month-sel').value='';
         renderPrecisionTab();
       });
     }
