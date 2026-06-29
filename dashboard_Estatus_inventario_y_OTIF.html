@@ -1450,8 +1450,12 @@ function saveMotivos(){
 function buildPendingProposals(){
   const curMonth=mKey(new Date());
   return GROUPED.filter(d=>d.asig>0 && d.directriz==='LEVANTAR PEDIDO' && mKey(d.fecha_pedido)===curMonth)
-    .map(d=>({oc:'—',clave:d.id,desc:d.desc,prov:d.prov,fechaPropuesta:d.fecha_pedido,
-      cantPropuesta:d.asig,real:null,hasProp:true,status:'pendiente',desv:null,motivo:'',key:'PEND__'+d.id}));
+    .map(d=>{
+      const key='PEND__'+d.id;
+      const motivo=ocMotivos.get(key)||'';
+      return{oc:'—',clave:d.id,desc:d.desc,prov:d.prov,fechaPropuesta:d.fecha_pedido,
+        cantPropuesta:d.asig,real:null,hasProp:true,status:'pendiente',desv:null,motivo,key};
+    });
 }
 function buildPrecisionRows(){
   const claveFecha=new Map(GROUPED.map(d=>[d.id, d.fecha_pedido]));
@@ -1566,10 +1570,11 @@ function renderPrecisionTab(){
     const rowCls=isPend?'row-none':r.status==='acertada'?'row-ok':(r.status==='desviada'||r.status==='no_colocada')?'row-fail':'row-none';
     const resp=MOTIVO_RESP[(r.motivo||'').toUpperCase()]||(r.motivo?'Sin clasificar':'—');
     const needsMotivo=(r.status==='desviada'||r.status==='no_colocada');
+    const motivoActive=(needsMotivo||isPend); // only desviada, no_colocada y pendiente pueden editar motivo
     const selOpts=MOTIVO_OPTS.map(v=>`<option value="${v}"${v===r.motivo?' selected':''}>${motivoLbl[v]}</option>`).join('');
-    const motivoCell=isPend
-      ?'<span class="dash">—</span>'
-      :`<select class="msel" style="font-size:10.5px;width:100%;${needsMotivo&&!r.motivo?'border-color:var(--red)':''}" onchange="updateMotivo('${r.key}',this.value)">${selOpts}</select>`;
+    const motivoCell=motivoActive
+      ?`<select class="msel" style="font-size:10.5px;width:100%;${needsMotivo&&!r.motivo?'border-color:var(--red)':''}" onchange="updateMotivo('${r.key}',this.value)">${selOpts}</select>`
+      :'<span class="dash">—</span>';
     return`<tr class="${rowCls}" style="${isPend?'background:var(--purple-bg)':''}">
       <td style="font-family:monospace;font-weight:700">${r.oc}</td>
       <td class="id-c">${r.clave}</td>
