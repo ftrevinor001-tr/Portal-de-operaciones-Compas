@@ -801,6 +801,7 @@ const GP_PALETTE=[
 ];
 let GP_C={};  // built dynamically from data groups
 const MES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+function curMonthKey(){ return mKey(new Date()); } // mes actual, usado como default en filtros de mes
 const MOTIVO_RESP={
   'ERROR DE CALCULO':'Planeación',
   'NO CUMPLE CANTIDAD MINIMA':'Proveedor',
@@ -822,7 +823,7 @@ let lvlVisible=false;
 let charts={urgency:null,scatter:null,boImpact:null,calendar:null};
 
 // ── OTIF state ──
-let OTIF_DATA=[], otifProv='', otifStatus='PROGRAMADO', otifMonth='';
+let OTIF_DATA=[], otifProv='', otifStatus='PROGRAMADO', otifMonth=curMonthKey();
 let trendCharts={month:null,prov:null};
 let trendVisible=false;
 let ocVisible=false;
@@ -1434,7 +1435,7 @@ function renderTable(data){
 // PRECISIÓN DE PEDIDO — estado, persistencia y agregación por OC
 // ══════════════════════════════════════════════════════════════
 let precChart=null;
-let precProvFilter='', precResultFilter='', precMonthFilter='';
+let precProvFilter='', precResultFilter='', precMonthFilter=curMonthKey();
 let precRespChart=null;
 let ocMotivos=loadMotivos();
 
@@ -1665,7 +1666,7 @@ function switchMainTab(tab){
       document.getElementById('prec-result-sel').addEventListener('change',e=>{precResultFilter=e.target.value;renderPrecisionTab();});
       document.getElementById('prec-month-sel').addEventListener('change',e=>{precMonthFilter=e.target.value;renderPrecisionTab();});
       document.getElementById('prec-clear-btn').addEventListener('click',()=>{
-        precProvFilter='';precResultFilter='';precMonthFilter='';
+        precProvFilter='';precResultFilter='';precMonthFilter=curMonthKey();
         document.getElementById('prec-prov-sel').value='';
         document.getElementById('prec-result-sel').value='';
         document.getElementById('prec-month-sel').value='';
@@ -1961,12 +1962,12 @@ function buildOTIFFilters(){
   const ps=document.getElementById('otif-prov-sel');
   ps.innerHTML=`<option value="">Todos los proveedores</option>`+provs.filter(v=>v!=='').map(v=>`<option value="${v}">${v}</option>`).join('');
   ps.value=otifProv;
-  ps.onchange=()=>{otifProv=ps.value;otifStatus='';otifMonth='';otifOC='';otifClave='';updateOTIFStatusOptions();updateOTIFMonthOptions();renderOTIF();};
+  ps.onchange=()=>{otifProv=ps.value;otifStatus='';otifMonth=curMonthKey();otifOC='';otifClave='';updateOTIFStatusOptions();updateOTIFMonthOptions();renderOTIF();};
   document.getElementById('otif-prov-sel').dataset.built='1';
   updateOTIFStatusOptions();
   // Clear top filters
   document.getElementById('otif-clear-top').onclick=()=>{
-    otifProv='';otifStatus='';otifMonth='';otifOC='';otifClave='';
+    otifProv='';otifStatus='';otifMonth=curMonthKey();otifOC='';otifClave='';
     document.getElementById('otif-prov-sel').dataset.built='';
     buildOTIFFilters();renderOTIF();
   };
