@@ -357,6 +357,11 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
 .prec-resp-lbl{font-size:9px;color:var(--tx2);margin-top:2px;line-height:1.3}
 .prec-table{width:100%;border-collapse:collapse;font-size:11px}
 .prec-table th{background:var(--navy);color:#fff;padding:6px 10px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.04em}
+.prec-table th[data-pcol]{cursor:pointer;user-select:none;transition:background .15s}
+.prec-table th[data-pcol]:hover{background:#2d5a8e}
+.prec-table th.prec-sorted{background:#2d5a8e}
+.prec-table th .psarr{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border-radius:3px;font-size:8px;margin-left:3px;opacity:.5;vertical-align:middle}
+.prec-table th.prec-sorted .psarr{opacity:1;background:rgba(255,255,255,.25)}
 .prec-table td{padding:6px 10px;border-bottom:.5px solid var(--brd);vertical-align:middle}
 .prec-table tr:hover td{background:var(--sf2)}
 .prec-table tr.row-fail td{background:#fff5f5}
@@ -718,7 +723,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
         </select>
         <div class="filter-sep"></div>
         <span class="tb-lbl">Mes:</span>
-        <select class="msel" id="prec-month-sel"><option value="">Todos los meses</option></select>
+        <select class="msel" id="prec-month-sel" multiple style="height:64px;min-width:130px" title="Ctrl/Cmd+clic para seleccionar varios meses"></select>
         <button class="clear-btn" id="prec-clear-btn" style="margin-left:8px">✕ Limpiar</button>
       </div>
     </div>
@@ -757,10 +762,17 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
       <div class="tbl-scroll" style="max-height:calc(100vh - 560px);min-height:300px">
         <table class="prec-table" style="width:100%">
           <thead><tr>
-            <th>OC</th><th>Clave</th><th>Descripción</th><th>Proveedor</th>
-            <th style="text-align:right">Propuesta</th><th style="text-align:right">Real</th>
-            <th style="text-align:center">Desv. %</th><th>Resultado</th>
-            <th style="min-width:180px">Motivo</th><th>Responsable</th>
+            <th data-pcol="oc">OC<span class="psarr">↕</span></th>
+            <th data-pcol="clave">Clave<span class="psarr">↕</span></th>
+            <th data-pcol="desc">Descripción<span class="psarr">↕</span></th>
+            <th data-pcol="prov" style="min-width:140px">Proveedor<span class="psarr">↕</span></th>
+            <th data-pcol="mesProp">Mes Propuesta<span class="psarr">↕</span></th>
+            <th data-pcol="propuesta" style="text-align:right">Propuesta<span class="psarr">↕</span></th>
+            <th data-pcol="real" style="text-align:right">Real<span class="psarr">↕</span></th>
+            <th data-pcol="desv" style="text-align:center">Desv. %<span class="psarr">↕</span></th>
+            <th data-pcol="resultado">Resultado<span class="psarr">↕</span></th>
+            <th data-pcol="motivo" style="min-width:180px">Motivo<span class="psarr">↕</span></th>
+            <th data-pcol="resp">Responsable<span class="psarr">↕</span></th>
           </tr></thead>
           <tbody id="prec-tbody"></tbody>
         </table>
@@ -802,6 +814,7 @@ const GP_PALETTE=[
 let GP_C={};  // built dynamically from data groups
 const MES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 function curMonthKey(){ return mKey(new Date()); } // mes actual, usado como default en filtros de mes
+function nextMonthKey(){ const d=new Date(); d.setMonth(d.getMonth()+1); return mKey(d); } // mes siguiente
 const MOTIVO_RESP={
   'ERROR DE CALCULO':'Planeación',
   'NO CUMPLE CANTIDAD MINIMA':'Proveedor',
@@ -939,7 +952,7 @@ function parseSheet(raw){
   const cFP=ci('LEVANTAR PEDIDO');
   const cDir=ci('DIRECTRIZ');
   const cProxEnt=ci('PROXIMA');
-  const cAsig=ciLast('ASIGNACION'); // LAST occurrence = actual qty (not % fraction)
+  const cAsig=ciLast('ASIGNACION'); // columna V — valor correcto por fila (principal Y secundaria); columna U solo tiene dato en la fila principal
 
   const tn=v=>typeof v==='number'?v:parseFloat(v)||0;
   const td=v=>{
@@ -1435,7 +1448,8 @@ function renderTable(data){
 // PRECISIÓN DE PEDIDO — estado, persistencia y agregación por OC
 // ══════════════════════════════════════════════════════════════
 let precChart=null;
-let precProvFilter='', precResultFilter='', precMonthFilter=curMonthKey();
+let precProvFilter='', precResultFilter='', precMonthFilter=[curMonthKey()];
+let precSortCol='', precSortDir=1;
 let precRespChart=null;
 let ocMotivos=loadMotivos();
 
@@ -1454,16 +1468,25 @@ function saveMotivos(){
 // claves fulfilled correctly and others not — never aggregate by OC)
 // PLUS: pending proposals for claves not yet placed this month.
 function buildPendingProposals(){
-  const curMonth=mKey(new Date());
-  return GROUPED.filter(d=>d.asig>0 && d.directriz==='LEVANTAR PEDIDO' && mKey(d.fecha_pedido)===curMonth)
-    .map(d=>{
+  const curMonth=curMonthKey();
+  return GROUPED.filter(d=>{
+    if(!(d.asig_total>0)) return false;
+    if(!d.fecha_pedido) return false;
+    const mk=mKey(d.fecha_pedido);
+    if(!mk) return false;
+    if(mk===curMonth) return d.directriz==='LEVANTAR PEDIDO'; // mes actual: ya debe estar marcada para levantar
+    return true; // cualquier otro mes (pasado o futuro) se muestra como vista de planeación
+  }).map(d=>{
       const key='PEND__'+d.id;
       const motivo=ocMotivos.get(key)||'';
       // Si no tiene OC y ya se le asignó un motivo, significa que se decidió
       // NO levantar la orden → se considera "No colocada", no Pendiente.
       const status=motivo?'no_colocada':'pendiente';
-      return{oc:'—',clave:d.id,desc:d.desc,prov:d.prov,fechaPropuesta:d.fecha_pedido,foc:null,
-        cantPropuesta:d.asig,real:null,hasProp:true,status,desv:null,motivo,key};
+      // Combina los proveedores de la clave (principal + secundarios) separados por "/"
+      const provs=[d.prov,...(d.children||[]).map(c=>c.prov)].filter(Boolean);
+      const provLabel=[...new Set(provs)].join('/');
+      return{oc:'—',clave:d.id,desc:d.desc,prov:provLabel,fechaPropuesta:d.fecha_pedido,foc:null,
+        cantPropuesta:d.asig_total,real:null,hasProp:true,status,desv:null,motivo,key};
     });
 }
 function buildPrecisionRows(){
@@ -1488,6 +1511,38 @@ function buildPrecisionRows(){
   return [...buildPendingProposals(), ...otifRows];
 }
 
+function precSortValue(r,col){
+  switch(col){
+    case 'oc': return r.oc==='—'?'':r.oc;
+    case 'clave': return r.clave;
+    case 'desc': return r.desc;
+    case 'prov': return r.prov;
+    case 'mesProp': return (r.status!=='acertada'&&r.fechaPropuesta instanceof Date&&!isNaN(r.fechaPropuesta))?r.fechaPropuesta.getTime():null;
+    case 'propuesta': return r.hasProp?r.cantPropuesta:null;
+    case 'real': return (r.oc&&r.oc!=='—')?r.real:null;
+    case 'desv': return r.desv;
+    case 'resultado': return r.status||'';
+    case 'motivo': return r.motivo||'';
+    case 'resp': return MOTIVO_RESP[(r.motivo||'').toUpperCase()]||'';
+    default: return '';
+  }
+}
+function updatePrecSortArrows(){
+  document.querySelectorAll('#tab-prec th[data-pcol]').forEach(th=>{
+    const col=th.dataset.pcol;
+    const arr=th.querySelector('.psarr');
+    const isActive=(col===precSortCol);
+    th.classList.toggle('prec-sorted',isActive);
+    if(arr) arr.textContent=isActive?(precSortDir===1?'↑':'↓'):'↕';
+  });
+}
+function provChipDisplay(provStr){
+  const parts=String(provStr||'').split('/').map(p=>p.trim()).filter(Boolean);
+  const chips=parts.map(p=>
+    p==='GLOBALES'?'<span class="prov-chip p-imp">GLOBALES</span>':`<span class="prov-chip p-nac">${p}</span>`
+  ).join('<span style="color:var(--tx3);font-size:9px;margin:0 2px">/</span>');
+  return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:2px">${chips}</div>`;
+}
 function fechaEfectiva(r){
   return (r.oc&&r.oc!=='—') ? r.foc : r.fechaPropuesta;
 }
@@ -1495,10 +1550,10 @@ function buildPrecMonthOptions(allRows){
   const sel=document.getElementById('prec-month-sel');
   if(!sel) return;
   const keys=[...new Set(allRows.map(r=>mKey(fechaEfectiva(r))).filter(Boolean))].sort();
-  const cur=precMonthFilter;
-  sel.innerHTML='<option value="">Todos los meses</option>'+keys.map(k=>`<option value="${k}"${k===cur?' selected':''}>${mLabel(k)}</option>`).join('');
-  if(cur&&!keys.includes(cur)){precMonthFilter='';sel.value='';}
-  sel.className='msel'+(precMonthFilter?' msel-active':'');
+  // descarta selecciones que ya no tengan datos disponibles
+  precMonthFilter=precMonthFilter.filter(k=>keys.includes(k));
+  sel.innerHTML=keys.map(k=>`<option value="${k}"${precMonthFilter.includes(k)?' selected':''}>${mLabel(k)}</option>`).join('');
+  sel.className='msel'+(precMonthFilter.length?' msel-active':'');
 }
 function updateMotivo(key,val){
   if(val) ocMotivos.set(key,val); else ocMotivos.delete(key);
@@ -1516,21 +1571,32 @@ function buildPrecProvOptions(){
 
 function renderPrecisionTab(){
   if(!OTIF_DATA.length){
-    document.getElementById('prec-tbody').innerHTML='<tr><td colspan="10" class="no-data">Carga un archivo con datos de OTIF PEDIDOS para ver esta sección.</td></tr>';
+    document.getElementById('prec-tbody').innerHTML='<tr><td colspan="11" class="no-data">Carga un archivo con datos de OTIF PEDIDOS para ver esta sección.</td></tr>';
     return;
   }
   buildPrecProvOptions();
   let rows=buildPrecisionRows();
   buildPrecMonthOptions(rows);
-  if(precProvFilter) rows=rows.filter(r=>r.prov===precProvFilter);
+  if(precProvFilter) rows=rows.filter(r=>String(r.prov).split('/').includes(precProvFilter));
   if(precResultFilter) rows=rows.filter(r=>(r.status||'sin_dato')===precResultFilter);
-  if(precMonthFilter) rows=rows.filter(r=>mKey(fechaEfectiva(r))===precMonthFilter);
-  rows.sort((a,b)=>{
-    const order={pendiente:-1,desviada:0,no_colocada:1,acertada:2,null:3};
-    const sa=order[a.status]??3, sb=order[b.status]??3;
-    if(sa!==sb) return sa-sb;
-    return String(a.oc).localeCompare(String(b.oc));
-  });
+  if(precMonthFilter.length) rows=rows.filter(r=>precMonthFilter.includes(mKey(fechaEfectiva(r))));
+  if(precSortCol){
+    rows.sort((a,b)=>{
+      let va=precSortValue(a,precSortCol), vb=precSortValue(b,precSortCol);
+      if(va===null||va===undefined) va=precSortDir===1?Infinity:-Infinity;
+      if(vb===null||vb===undefined) vb=precSortDir===1?Infinity:-Infinity;
+      if(typeof va==='string') return precSortDir*va.localeCompare(vb,'es');
+      return precSortDir*(va-vb);
+    });
+  } else {
+    rows.sort((a,b)=>{
+      const order={pendiente:-1,desviada:0,no_colocada:1,acertada:2,null:3};
+      const sa=order[a.status]??3, sb=order[b.status]??3;
+      if(sa!==sb) return sa-sb;
+      return String(a.oc).localeCompare(String(b.oc));
+    });
+  }
+  updatePrecSortArrows();
 
   const pendientes=rows.filter(r=>r.status==='pendiente');
   const placedRows=rows.filter(r=>r.status!=='pendiente');
@@ -1544,7 +1610,7 @@ function renderPrecisionTab(){
 
   const col=(n,d,g,w)=>{const p=d>0?n/d*100:0;return p>=g?'var(--green)':p>=w?'var(--amber)':'var(--red)';};
   document.getElementById('prec-kpis').innerHTML=[
-    {l:'Propuestas pendientes (mes actual)',v:pendientes.length,s:'por levantar — directriz: Levantar pedido',c:pendientes.length>0?'var(--purple)':'var(--green)'},
+    {l:'Propuestas pendientes (mes actual y sig.)',v:pendientes.length,s:'por levantar — directriz: Levantar pedido',c:pendientes.length>0?'var(--purple)':'var(--green)'},
     {l:'Claves evaluadas',v:total,s:sinDato>0?`${sinDato} sin dato capturado`:'con propuesta registrada',c:'var(--navy)'},
     {l:'Acertadas (±15%)',v:acertadas.length,s:total>0?pctAcert+'% del total':'—',c:col(acertadas.length,total,70,40)},
     {l:'Desviadas',v:desviadas.length,s:'fuera de tolerancia',c:desviadas.length>0?'var(--amber)':'var(--green)'},
@@ -1617,7 +1683,8 @@ function renderPrecisionTab(){
       <td style="font-family:monospace;font-weight:700">${r.oc}</td>
       <td class="id-c">${r.clave}</td>
       <td style="white-space:normal;word-break:break-word;max-width:200px;font-size:10.5px">${r.desc}</td>
-      <td>${r.prov==='GLOBALES'?'<span class="prov-chip p-imp">GLOBALES</span>':'<span class="prov-chip p-nac">'+r.prov+'</span>'}</td>
+      <td>${provChipDisplay(r.prov)}</td>
+      <td style="font-size:10px">${r.status==='acertada'?'<span class="dash">—</span>':(r.fechaPropuesta?mLabel(mKey(r.fechaPropuesta)):'<span class="dash">—</span>')}</td>
       <td style="text-align:right">${r.hasProp?fmt(r.cantPropuesta):'<span class="dash">—</span>'}</td>
       <td style="text-align:right;font-weight:700">${isPend?'<span class="dash">—</span>':fmt(r.real)}</td>
       <td style="text-align:center;font-weight:700;color:${r.desv===null?'var(--tx3)':Math.abs(r.desv)<=15?'var(--green)':'var(--red)'}">${r.desv!==null?(r.desv>0?'+':'')+r.desv+'%':'—'}</td>
@@ -1625,15 +1692,16 @@ function renderPrecisionTab(){
       <td>${motivoCell}</td>
       <td style="font-size:10px;color:var(--tx2)">${resp}</td>
     </tr>`;
-  }).join('')||'<tr><td colspan="10" class="no-data">Sin claves para los filtros aplicados.</td></tr>';
+  }).join('')||'<tr><td colspan="11" class="no-data">Sin claves para los filtros aplicados.</td></tr>';
 }
 
 function exportPrecision(){
   if(!OTIF_DATA.length){alert('No hay datos para exportar.');return;}
   const rows0=buildPrecisionRows();
-  const headers=['OC','Clave','Descripción','Proveedor','Fecha Efectiva','Cant. Propuesta','Cant. Real','Desv. %','Resultado','Motivo','Responsable'];
+  const headers=['OC','Clave','Descripción','Proveedor','Mes Propuesta','Fecha Efectiva','Cant. Propuesta','Cant. Real','Desv. %','Resultado','Motivo','Responsable'];
   const rows=[headers,...rows0.map(r=>[
     r.oc, r.clave, r.desc, r.prov,
+    r.fechaPropuesta?mLabel(mKey(r.fechaPropuesta)):'',
     fmtExport(fechaEfectiva(r)),
     r.hasProp?r.cantPropuesta:'',
     r.real,
@@ -1644,7 +1712,7 @@ function exportPrecision(){
   ])];
   const wb=XLSX.utils.book_new();
   const ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=[{wch:9},{wch:9},{wch:40},{wch:12},{wch:14},{wch:14},{wch:12},{wch:10},{wch:14},{wch:24},{wch:14}];
+  ws['!cols']=[{wch:9},{wch:9},{wch:40},{wch:14},{wch:12},{wch:14},{wch:14},{wch:12},{wch:10},{wch:14},{wch:24},{wch:14}];
   XLSX.utils.book_append_sheet(wb, ws, 'Precision Pedido');
   const ts=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'-');
   XLSX.writeFile(wb, `Precision_Pedido_${ts}.xlsx`);
@@ -1664,12 +1732,12 @@ function switchMainTab(tab){
       document.getElementById('prec-prov-sel').dataset.built='1';
       document.getElementById('prec-prov-sel').addEventListener('change',e=>{precProvFilter=e.target.value;renderPrecisionTab();});
       document.getElementById('prec-result-sel').addEventListener('change',e=>{precResultFilter=e.target.value;renderPrecisionTab();});
-      document.getElementById('prec-month-sel').addEventListener('change',e=>{precMonthFilter=e.target.value;renderPrecisionTab();});
+      document.getElementById('prec-month-sel').addEventListener('change',e=>{precMonthFilter=Array.from(e.target.selectedOptions).map(o=>o.value);renderPrecisionTab();});
       document.getElementById('prec-clear-btn').addEventListener('click',()=>{
-        precProvFilter='';precResultFilter='';precMonthFilter=curMonthKey();
+        precProvFilter='';precResultFilter='';precMonthFilter=[curMonthKey()];
         document.getElementById('prec-prov-sel').value='';
         document.getElementById('prec-result-sel').value='';
-        document.getElementById('prec-month-sel').value='';
+        Array.from(document.getElementById('prec-month-sel').options).forEach(o=>o.selected=false);
         renderPrecisionTab();
       });
     }
@@ -2327,6 +2395,20 @@ document.addEventListener('click', function(e){
   }
   updateSortArrows();
   renderAll();
+});
+
+// ══ Precisión de Pedido — column header sort ═══════════════════
+document.addEventListener('click', function(e){
+  var th = e.target.closest && e.target.closest('#tab-prec th[data-pcol]');
+  if(!th || !th.dataset || !th.dataset.pcol) return;
+  var col = th.dataset.pcol;
+  if(precSortCol === col){
+    precSortDir = (precSortDir === 1) ? -1 : 1;
+  } else {
+    precSortCol = col;
+    precSortDir = 1;
+  }
+  renderPrecisionTab();
 });
 </script>
 </body>
