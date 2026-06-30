@@ -342,36 +342,45 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
 .prec-section{background:var(--surface);border:1px solid var(--brd);border-radius:12px;margin-bottom:16px;overflow:hidden}
 .prec-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--brd)}
 .prec-hdr-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx2)}
-.prec-body{padding:16px 18px}
-.prec-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
-.prec-kpi{background:var(--sf2);border:1px solid var(--brd);border-radius:8px;padding:10px 14px}
-.prec-kpi-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:var(--tx3);margin-bottom:4px}
-.prec-kpi-val{font-size:20px;font-weight:800;line-height:1}
+.prec-body{padding:14px 18px}
+/* ── KPI cards ── */
+.prec-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px}
+.prec-kpi{background:var(--surface);border:1px solid var(--brd);border-radius:8px;padding:10px 14px}
+.prec-kpi-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:var(--tx3);margin-bottom:3px}
+.prec-kpi-val{font-size:22px;font-weight:800;line-height:1}
 .prec-kpi-sub{font-size:10px;color:var(--tx2);margin-top:3px}
-.prec-charts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
-.prec-panel{background:var(--sf2);border:1px solid var(--brd);border-radius:8px;padding:12px}
-.prec-panel-title{font-size:10px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
-.prec-resp-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
-.prec-resp-card{background:var(--surface);border-radius:6px;padding:8px 10px;text-align:center;border:1px solid var(--brd)}
-.prec-resp-val{font-size:18px;font-weight:800}
+/* ── Charts row — compact ── */
+.prec-charts{display:grid;grid-template-columns:220px 1fr;gap:12px;margin-bottom:14px}
+.prec-panel{background:var(--sf2);border:1px solid var(--brd);border-radius:8px;padding:10px 14px}
+.prec-panel-title{font-size:10px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.prec-resp-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px}
+.prec-resp-card{background:var(--surface);border-radius:6px;padding:7px 8px;text-align:center;border:1px solid var(--brd)}
+.prec-resp-val{font-size:17px;font-weight:800}
 .prec-resp-lbl{font-size:9px;color:var(--tx2);margin-top:2px;line-height:1.3}
-.prec-table{width:100%;border-collapse:collapse;font-size:11px}
-.prec-table th{background:var(--navy);color:#fff;padding:6px 10px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.04em}
+/* ── Filters area ── */
+.prec-filter-bar{display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px;padding:12px 18px;background:var(--surface);border:1px solid var(--brd);border-radius:10px;margin-bottom:12px}
+.prec-filter-group{display:flex;flex-direction:column;gap:4px}
+.prec-filter-label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3)}
+.prec-filter-row{display:flex;align-items:center;gap:6px}
+/* ── Table ── */
+.prec-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.prec-table th{background:var(--navy);color:#fff;padding:9px 12px;text-align:left;font-size:11px;font-weight:600;letter-spacing:.03em;white-space:nowrap}
 .prec-table th[data-pcol]{cursor:pointer;user-select:none;transition:background .15s}
 .prec-table th[data-pcol]:hover{background:#2d5a8e}
 .prec-table th.prec-sorted{background:#2d5a8e}
-.prec-table th .psarr{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border-radius:3px;font-size:8px;margin-left:3px;opacity:.5;vertical-align:middle}
+.prec-table th .psarr{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border-radius:3px;font-size:8px;margin-left:4px;opacity:.45;vertical-align:middle}
 .prec-table th.prec-sorted .psarr{opacity:1;background:rgba(255,255,255,.25)}
-.prec-table td{padding:6px 10px;border-bottom:.5px solid var(--brd);vertical-align:middle}
-.prec-table tr:hover td{background:var(--sf2)}
-.prec-table tr.row-fail td{background:#fff5f5}
-.prec-table tr.row-ok td{background:#f5faf5}
-.prec-table tr.row-none td{background:#fafafa}
-.chip-acertada{background:var(--green-bg);color:var(--green);font-size:9px;padding:2px 7px;border-radius:6px;font-weight:700}
-.chip-desviada{background:var(--amber-bg);color:var(--amber);font-size:9px;padding:2px 7px;border-radius:6px;font-weight:700}
-.chip-nocolocada{background:var(--red-bg);color:var(--red);font-size:9px;padding:2px 7px;border-radius:6px;font-weight:700}
-.chip-sindato{background:#f0eeea;color:var(--tx3);font-size:9px;padding:2px 7px;border-radius:6px;font-weight:600}
-.chip-pendiente{background:var(--purple-bg);color:var(--purple);font-size:9px;padding:2px 7px;border-radius:6px;font-weight:700}
+.prec-table td{padding:9px 12px;border-bottom:1px solid var(--brd);vertical-align:middle;font-size:12.5px;line-height:1.4}
+.prec-table tr:hover td{background:var(--sf2);cursor:default}
+.prec-table tr.row-fail td{background:#fff7f7}
+.prec-table tr.row-ok td{background:#f4fbf6}
+.prec-table tr.row-none td{background:var(--surface)}
+/* ── Status chips ── */
+.chip-acertada{background:var(--green-bg);color:var(--green);font-size:10px;padding:3px 9px;border-radius:20px;font-weight:700;white-space:nowrap}
+.chip-desviada{background:var(--amber-bg);color:var(--amber);font-size:10px;padding:3px 9px;border-radius:20px;font-weight:700;white-space:nowrap}
+.chip-nocolocada{background:var(--red-bg);color:var(--red);font-size:10px;padding:3px 9px;border-radius:20px;font-weight:700;white-space:nowrap}
+.chip-sindato{background:#f0eeea;color:var(--tx3);font-size:10px;padding:3px 9px;border-radius:20px;font-weight:600;white-space:nowrap}
+.chip-pendiente{background:var(--purple-bg);color:var(--purple);font-size:10px;padding:3px 9px;border-radius:20px;font-weight:700;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -707,24 +716,28 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
   <div id="tab-prec" style="display:none">
 
     <!-- Filters -->
-    <div class="filter-section" style="margin-bottom:16px">
-      <div class="filter-row">
-        <span class="tb-lbl">Proveedor:</span>
-        <select class="msel" id="prec-prov-sel"><option value="">Todos</option></select>
-        <div class="filter-sep"></div>
-        <span class="tb-lbl">Resultado:</span>
-        <select class="msel" id="prec-result-sel">
-          <option value="">Todos</option>
-          <option value="pendiente">Pendiente de levantar</option>
-          <option value="acertada">Acertada</option>
-          <option value="desviada">Desviada</option>
-          <option value="no_colocada">No colocada</option>
+    <div class="prec-filter-bar">
+      <div class="prec-filter-group">
+        <span class="prec-filter-label">🏭 Proveedor</span>
+        <select class="msel" id="prec-prov-sel" style="min-width:150px"><option value="">Todos los proveedores</option></select>
+      </div>
+      <div class="prec-filter-group">
+        <span class="prec-filter-label">📌 Resultado</span>
+        <select class="msel" id="prec-result-sel" style="min-width:180px">
+          <option value="">Todos los resultados</option>
+          <option value="pendiente">📌 Pendiente de levantar</option>
+          <option value="acertada">✓ Acertada</option>
+          <option value="desviada">⚠ Desviada</option>
+          <option value="no_colocada">✗ No colocada</option>
           <option value="sin_dato">Sin dato</option>
         </select>
-        <div class="filter-sep"></div>
-        <span class="tb-lbl">Mes:</span>
-        <select class="msel" id="prec-month-sel" multiple style="height:64px;min-width:130px" title="Ctrl/Cmd+clic para seleccionar varios meses"></select>
-        <button class="clear-btn" id="prec-clear-btn" style="margin-left:8px">✕ Limpiar</button>
+      </div>
+      <div class="prec-filter-group">
+        <span class="prec-filter-label">📅 Mes de propuesta <span style="font-weight:400;opacity:.7">(Ctrl+clic = varios)</span></span>
+        <select class="msel" id="prec-month-sel" multiple style="height:80px;min-width:150px;font-size:12px" title="Ctrl/Cmd+clic para seleccionar varios meses"></select>
+      </div>
+      <div class="prec-filter-group" style="align-self:flex-end">
+        <button class="clear-btn" id="prec-clear-btn" style="padding:6px 14px;font-size:11px">✕ Limpiar filtros</button>
       </div>
     </div>
 
@@ -733,17 +746,19 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
 
     <!-- Charts + Responsibility -->
     <div class="prec-charts">
-      <div class="prec-panel">
-        <div class="prec-panel-title">📊 Distribución de resultados</div>
-        <div style="position:relative;height:200px"><canvas id="prec-status-chart"></canvas></div>
+      <div class="prec-panel" style="display:flex;flex-direction:column;align-items:center">
+        <div class="prec-panel-title" style="width:100%">📊 Distribución</div>
+        <div style="position:relative;height:150px;width:150px"><canvas id="prec-status-chart"></canvas></div>
+        <div id="prec-donut-legend" style="margin-top:6px;font-size:10px;display:flex;flex-direction:column;gap:3px;width:100%"></div>
       </div>
       <div class="prec-panel">
         <div class="prec-panel-title">🧭 Responsabilidad de las desviaciones</div>
-        <div style="position:relative;height:170px;margin-bottom:10px"><canvas id="prec-resp-chart"></canvas></div>
-        <div class="prec-resp-grid" id="prec-resp-grid"></div>
-        <div style="margin-top:12px;font-size:10px;color:var(--tx3);line-height:1.6">
-          Tolerancia de aceptación: <b>±15%</b> entre cantidad propuesta y cantidad real colocada.
-          Si la cantidad real es 0, se clasifica como <b>No colocada</b>.
+        <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start">
+          <div style="position:relative;height:140px"><canvas id="prec-resp-chart"></canvas></div>
+          <div class="prec-resp-grid" id="prec-resp-grid" style="grid-template-columns:1fr;gap:4px;min-width:90px"></div>
+        </div>
+        <div style="margin-top:8px;font-size:10px;color:var(--tx3)">
+          Tolerancia: <b>±15%</b> · Real = 0 → <b>No colocada</b>
         </div>
       </div>
     </div>
@@ -759,7 +774,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
         💡 El campo <b>Motivo</b> es editable: selecciona una opción y se guarda automáticamente en este navegador.
         Para que el cambio quede en tu archivo fuente, usa <b>⬇ Exportar Excel</b> y sube ese archivo a tu repositorio.
       </div>
-      <div class="tbl-scroll" style="max-height:calc(100vh - 560px);min-height:300px">
+      <div class="tbl-scroll" style="max-height:calc(100vh - 420px);min-height:350px">
         <table class="prec-table" style="width:100%">
           <thead><tr>
             <th data-pcol="oc">OC<span class="psarr">↕</span></th>
@@ -1617,15 +1632,21 @@ function renderPrecisionTab(){
     {l:'No colocadas',v:noColocadas.length,s:'cantidad real = 0',c:noColocadas.length>0?'var(--red)':'var(--green)'},
   ].map(k=>`<div class="prec-kpi" style="border-left:4px solid ${k.c}"><div class="prec-kpi-lbl">${k.l}</div><div class="prec-kpi-val" style="color:${k.c}">${k.v}</div><div class="prec-kpi-sub">${k.s}</div></div>`).join('');
 
+  // ── Doughnut: includes Pendientes ─────────────────────────
   if(precChart) precChart.destroy();
+  const donutLabels=['📌 Pendientes','✓ Acertadas','⚠ Desviadas','✗ No colocadas'];
+  const donutData=[pendientes.length,acertadas.length,desviadas.length,noColocadas.length];
+  const donutColors=['rgba(92,58,154,.8)','rgba(20,90,56,.8)','rgba(184,110,0,.8)','rgba(139,26,26,.8)'];
   precChart=new Chart(document.getElementById('prec-status-chart'),{type:'doughnut',
-    data:{labels:['Acertadas','Desviadas','No colocadas'],
-      datasets:[{data:[acertadas.length,desviadas.length,noColocadas.length],
-        backgroundColor:['rgba(20,90,56,.8)','rgba(184,110,0,.8)','rgba(139,26,26,.8)'],borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:10}},
-        tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.parsed} claves`}}}}
+    data:{labels:donutLabels,datasets:[{data:donutData,backgroundColor:donutColors,borderWidth:0,hoverOffset:4}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'68%',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.parsed} claves`}}}}
   });
+  // Custom legend
+  const donutLegendEl=document.getElementById('prec-donut-legend');
+  if(donutLegendEl) donutLegendEl.innerHTML=donutLabels.map((l,i)=>
+    donutData[i]>0?`<div style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:50%;background:${donutColors[i]};display:inline-block;flex-shrink:0"></span><span style="font-size:10px;color:var(--tx2)">${l}: <b>${donutData[i]}</b></span></div>`:''
+  ).join('');
 
   const failRows=[...desviadas,...noColocadas];
   const byResp=new Map();
@@ -1640,20 +1661,20 @@ function renderPrecisionTab(){
   const respColorsHex={'Planeación':'#1c3557','Proveedor':'#8b1a1a','Compras':'#5c3a9a','Gerencia':'#7a4f00','Sin clasificar':'#6b6960','Sin motivo':'#6b6960'};
   document.getElementById('prec-resp-grid').innerHTML=[...byResp.entries()].filter(([,v])=>v>0||failRows.length===0).map(([resp,cnt])=>
     `<div class="prec-resp-card"><div class="prec-resp-val" style="color:${respColors[resp]||'var(--tx2)'}">${cnt}</div><div class="prec-resp-lbl">${resp}</div></div>`
-  ).join('')||'<div style="font-size:11px;color:var(--tx3);grid-column:1/-1">Sin desviaciones registradas.</div>';
+  ).join('')||'<div style="font-size:11px;color:var(--tx3)">Sin desviaciones.</div>';
 
-  // Bar chart: deviations by responsible area
+  // ── Bar chart compact ──────────────────────────────────────
   if(precRespChart) precRespChart.destroy();
   const respEntries=[...byResp.entries()].filter(([,v])=>v>0);
   precRespChart=new Chart(document.getElementById('prec-resp-chart'),{type:'bar',
     data:{labels:respEntries.map(([r])=>r),
       datasets:[{label:'Claves',data:respEntries.map(([,v])=>v),
         backgroundColor:respEntries.map(([r])=>respColorsHex[r]||'#6b6960'),
-        borderRadius:5,borderSkipped:false}]},
+        borderRadius:4,borderSkipped:false}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`  ${ctx.parsed.x} claves`}}},
       scales:{x:{beginAtZero:true,ticks:{precision:0,font:{size:10}},grid:{color:'#e8e6e0'}},
-        y:{ticks:{font:{size:10.5}},grid:{display:false}}}}
+        y:{ticks:{font:{size:10.5},color:'var(--tx)'},grid:{display:false}}}}
   });
 
   document.getElementById('prec-row-count').textContent=rows.length+' claves';
