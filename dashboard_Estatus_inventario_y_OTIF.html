@@ -851,7 +851,7 @@ let lvlVisible=false;
 let charts={urgency:null,scatter:null,boImpact:null,calendar:null};
 
 // ── OTIF state ──
-let OTIF_DATA=[], otifProv='', otifStatus='PROGRAMADO', otifMonth=curMonthKey();
+let OTIF_DATA=[], otifProv='', otifStatus='', otifMonth='';
 let trendCharts={month:null,prov:null};
 let trendVisible=false;
 let ocVisible=false;
@@ -1858,6 +1858,10 @@ function updateOTIFMonthOptions(){
     if(d.etaR)keys.add(mKey(d.etaR));
   });
   const sorted=[...keys].filter(Boolean).sort();
+  // Default: use last month that has data (not current calendar month which may be empty)
+  if(!otifMonth||!sorted.includes(otifMonth)){
+    otifMonth=sorted[sorted.length-1]||'';
+  }
   const ms=document.getElementById('otif-month-sel');
   ms.innerHTML=`<option value="">Todos los meses</option>`+sorted.map(k=>`<option value="${k}"${k===otifMonth?' selected':''}>${mLabel(k)}</option>`).join('');
   ms.onchange=()=>{otifMonth=ms.value;renderOTIF();};
@@ -2030,7 +2034,8 @@ function renderTargetTrend(){
 
 
 function renderOTIF(){
-  renderOTIFKPIs();
+  updateOTIFMonthOptions();   // primero: fija otifMonth al último mes con datos
+  renderOTIFKPIs();           // ahora sí usa el otifMonth correcto
   renderTargetTrend();
   // OC cards: filter by prov + status + month of foc
   renderOCCards(OTIF_DATA.filter(d=>{
@@ -2040,7 +2045,6 @@ function renderOTIF(){
     return true;
   }));
   if(!ocVisible){const g=document.getElementById('oc-cards');if(g)g.style.display='none';}
-  updateOTIFMonthOptions();
   updateOTIFDetailCascade();
   renderOTIFTable(filteredOTIF());
 }
@@ -2051,12 +2055,12 @@ function buildOTIFFilters(){
   const ps=document.getElementById('otif-prov-sel');
   ps.innerHTML=`<option value="">Todos los proveedores</option>`+provs.filter(v=>v!=='').map(v=>`<option value="${v}">${v}</option>`).join('');
   ps.value=otifProv;
-  ps.onchange=()=>{otifProv=ps.value;otifStatus='';otifMonth=curMonthKey();otifOC='';otifClave='';updateOTIFStatusOptions();updateOTIFMonthOptions();renderOTIF();};
+  ps.onchange=()=>{otifProv=ps.value;otifStatus='';otifMonth='';otifOC='';otifClave='';updateOTIFStatusOptions();updateOTIFMonthOptions();renderOTIF();};
   document.getElementById('otif-prov-sel').dataset.built='1';
   updateOTIFStatusOptions();
   // Clear top filters
   document.getElementById('otif-clear-top').onclick=()=>{
-    otifProv='';otifStatus='';otifMonth=curMonthKey();otifOC='';otifClave='';
+    otifProv='';otifStatus='';otifMonth='';otifOC='';otifClave='';
     document.getElementById('otif-prov-sel').dataset.built='';
     buildOTIFFilters();renderOTIF();
   };
