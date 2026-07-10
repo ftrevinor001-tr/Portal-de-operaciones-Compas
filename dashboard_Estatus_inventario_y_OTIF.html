@@ -567,8 +567,17 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
         <span class="tb-lbl">Estatus:</span>
         <select class="msel" id="otif-status-sel"><option value="">Todos</option></select>
         <div class="filter-sep"></div>
-        <span class="tb-lbl">Mes: <span style="font-weight:400;opacity:.65;font-size:9px">(Ctrl+clic)</span></span>
-        <select class="msel" id="otif-month-sel" multiple size="3" style="min-width:130px;font-size:11px" title="Ctrl/Cmd+clic para seleccionar varios meses"></select>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+          <input type="checkbox" id="chk-month-oc" checked onchange="toggleOtifMonthFilter('oc',this.checked);renderOTIF()" style="width:14px;height:14px;accent-color:var(--navy)">
+          <span class="tb-lbl" style="cursor:pointer" title="Filtra por mes de colocación de la OC — Target de Comprador">🎯 Mes OC <span style="font-weight:400;opacity:.65;font-size:9px">(Ctrl+clic)</span></span>
+        </label>
+        <select class="msel" id="otif-month-sel" multiple size="3" style="min-width:130px;font-size:11px" title="Ctrl/Cmd+clic para varios meses"></select>
+        <div class="filter-sep"></div>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+          <input type="checkbox" id="chk-month-recep" checked onchange="toggleOtifMonthFilter('recep',this.checked);renderOTIF()" style="width:14px;height:14px;accent-color:var(--navy)">
+          <span class="tb-lbl" style="cursor:pointer" title="Filtra por mes de recepción real ETA Real — OTIF de Proveedor">📦 Mes Recepción <span style="font-weight:400;opacity:.65;font-size:9px">(Ctrl+clic)</span></span>
+        </label>
+        <select class="msel" id="otif-month-recep-sel" multiple size="3" style="min-width:130px;font-size:11px" title="Ctrl/Cmd+clic para varios meses"></select>
         <button class="clear-btn" id="otif-clear-top" style="margin-left:8px">✕ Limpiar</button>
       </div>
     </div>
@@ -650,6 +659,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
               <th colspan="5" style="background:#1c3557">IDENTIFICACIÓN</th>
               <th colspan="4" style="background:#8b1a1a">TARGET DE COMPRADOR</th>
               <th colspan="8" style="background:#0e4d72">OTIF DE PROVEEDOR</th>
+              <th colspan="3" style="background:#1a5c45">LEAD TIME</th>
             </tr>
             <tr>
               <th data-ocol="oc"      style="width:72px">OC<span class="sarr">↕</span></th>
@@ -669,6 +679,9 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
               <th data-ocol="recibReal" class="num" style="width:80px">Cant. Recibida<span class="sarr">↕</span></th>
               <th data-ocol="ifOk"    class="ctr" style="width:88px">In Full<span class="sarr">↕</span></th>
               <th data-ocol="obs"     style="min-width:130px">Observaciones<span class="sarr">↕</span></th>
+              <th data-ocol="ltEstimado" class="num" style="width:80px">LT Estim. (m)<span class="sarr">↕</span></th>
+              <th data-ocol="ltReal"     class="num" style="width:80px">LT Real (m)<span class="sarr">↕</span></th>
+              <th data-ocol="ltDif"      class="num" style="width:80px">Dif. LT (m)<span class="sarr">↕</span></th>
             </tr>
           </thead>
           <tbody id="otif-tbody"></tbody>
@@ -855,8 +868,9 @@ let lvlVisible=false;
 let charts={urgency:null,scatter:null,boImpact:null,calendar:null};
 
 // ── OTIF state ──
-let OTIF_DATA=[], otifProv='', otifStatus='', otifMonth=[];
-let otifMonthInited=false; // true once default month has been auto-set
+let OTIF_DATA=[], otifProv='', otifStatus='', otifMonth=[], otifMonthRecep=[];
+let otifMonthInited=false, otifMonthRecepInited=false;
+let otifMonthOcEnabled=true, otifMonthRecepEnabled=true;
 let trendCharts={month:null,prov:null};
 let trendVisible=false;
 let ocVisible=false;
@@ -933,9 +947,13 @@ function processWorkbook(wb, filename){
     if(pedSheetName){
       const wsPed=wb.Sheets[pedSheetName];
       const rawPed=XLSX.utils.sheet_to_json(wsPed,{header:1,raw:true,cellDates:true});
+      GROUPED=buildGroups();
+    // Build clave→ltEstimado lookup FIRST so OTIF rows can use it
+    window._ltMap=new Map(ALL.filter(d=>d.isMain&&d.ltEstimado!=null).map(d=>[d.id,d.ltEstimado]));
       OTIF_DATA=parseOTIF(rawPed);
+    // Attach ltEstimado from Asignacion to each OTIF row by clave
+    OTIF_DATA.forEach(d=>{d.ltEstimado=window._ltMap.get(String(d.clave))||window._ltMap.get(d.clave)||null;});
     }else{OTIF_DATA=[];}
-    GROUPED=buildGroups();
     document.getElementById('file-tag').textContent=filename+' · '+sn;
     document.getElementById('drop-screen').style.display='none';
     document.getElementById('app').style.display='block';
@@ -978,7 +996,7 @@ function parseSheet(raw){
   const cDesc=ci('DESCRIPCI'), cGrp=ci('SUB GRUPO')>=0?ci('SUB GRUPO'):ci('SUBGRUPO');
   const cProv=ci('PROVEEDOR'), cOrig=ci('ORIGEN');
   const cInv=ci('INVENTARIO ACTUAL'), cVm=ci('VENTAS'), cMi=ci('MESES INV');
-  const cBo=ci('BO'), cQ=ci('INVENTARIO FINAL');
+  const cBo=ci('BO'), cQ=ci('INVENTARIO FINAL'), cLtEst=ci('ENTREGA MESES');
   const allH=headers.reduce((acc,h,i)=>{if(h.includes('INVENTARIO HASTA'))acc.push(i);return acc;},[]);
   const cHA=allH[0]??-1, cHD=allH[1]??-1;
   const cFP=ci('LEVANTAR PEDIDO');
@@ -1024,6 +1042,7 @@ function parseSheet(raw){
       directriz:isMain?String(row[cDir]||'').trim():null,
       proxima_entrada:td(row[cProxEnt]),  // ETA date for this provider's OC
       asig:tn(row[cAsig]),
+      ltEstimado:cLtEst>=0&&row[cLtEst]!=null?parseFloat(row[cLtEst])||null:null,
       isMain,
       lvlNow:vm>0?classifyMi(mi):null,
       lvlBO:vm>0?classifyMi(miAfter):null,
@@ -1809,6 +1828,9 @@ function parseOTIF(raw){
     motivo:String(r[24]||'').trim(),
     get difDias(){const f=this.foc,q=this.freq;return(f&&q)?Math.round((f.getTime()-q.getTime())/86400000):null;},
     get difEntrega(){const r=this.etaR,s=this.entregaSol;return(r&&s)?Math.round((r.getTime()-s.getTime())/86400000):null;},
+
+    get ltReal(){const f=this.foc,r=this.etaR;return(f&&r)?parseFloat(((r.getTime()-f.getTime())/86400000/30.44).toFixed(1)):null;},
+    get ltDif(){const est=this.ltEstimado;return(this.ltReal!==null&&est!=null)?parseFloat((this.ltReal-est).toFixed(1)):null;},
     get precisionStatus(){
       const prop=this.cantPropuesta, real=this.qty;
       if(prop===null||prop===undefined) return null; // sin dato capturado
@@ -1830,7 +1852,8 @@ function otifByProvStatus(){
   return OTIF_DATA.filter(d=>{
     if(otifProv&&d.prov!==otifProv)return false;
     if(otifStatus&&d.estatus!==otifStatus)return false;
-    if(otifMonth.length&&!otifMonth.includes(mKey(d.foc)))return false;
+    if(otifMonthOcEnabled&&otifMonth.length&&!otifMonth.includes(mKey(d.foc)))return false;
+    if(otifMonthRecepEnabled&&otifMonthRecep.length&&!otifMonthRecep.includes(mKey(d.etaR)))return false;
     return true;
   });
 }
@@ -1855,7 +1878,7 @@ function otifProvData(){
   return OTIF_DATA.filter(d=>{
     if(otifProv&&d.prov!==otifProv)return false;
     if(d.estatus!=='RECIBIDO')return false;
-    if(otifMonth.length&&!otifMonth.includes(mKey(d.etaR)))return false;
+    if(otifMonthRecep.length&&!otifMonthRecep.includes(mKey(d.etaR)))return false;
     return true;
   });
 }
@@ -1868,12 +1891,22 @@ function updateOTIFStatusOptions(){
   ss.className='msel'+(otifStatus?' msel-active':'');
   ss.onchange=()=>{otifStatus=ss.value;otifOC='';otifClave='';updateOTIFMonthOptions();renderOTIF();};
 }
+function toggleOtifMonthFilter(type,enabled){
+  if(type==='oc'){
+    otifMonthOcEnabled=enabled;
+    const sel=document.getElementById('otif-month-sel');
+    if(sel) sel.style.opacity=enabled?'1':'0.35';
+  } else {
+    otifMonthRecepEnabled=enabled;
+    const sel=document.getElementById('otif-month-recep-sel');
+    if(sel) sel.style.opacity=enabled?'1':'0.35';
+  }
+}
 function updateOTIFMonthOptions(){
   // Combine months from foc and etaR
   const keys=new Set();
   OTIF_DATA.filter(d=>!otifProv||d.prov===otifProv).forEach(d=>{
-    if(d.foc)keys.add(mKey(d.foc));
-    if(d.etaR)keys.add(mKey(d.etaR));
+    if(d.foc)keys.add(mKey(d.foc)); // foc only — etaR handled by updateOTIFMonthRecepOptions
   });
   const sorted=[...keys].filter(Boolean).sort();
   // Auto-select last month on first load
@@ -1887,6 +1920,25 @@ function updateOTIFMonthOptions(){
   ms.innerHTML=sorted.map(k=>`<option value="${k}"${otifMonth.includes(k)?' selected':''}>${mLabel(k)}</option>`).join('');
   ms.onchange=()=>{otifMonth=Array.from(ms.selectedOptions).map(o=>o.value);ms.className='msel'+(otifMonth.length?' msel-active':'');renderOTIF();};
   ms.className='msel'+(otifMonth.length?' msel-active':'');
+}
+
+function updateOTIFMonthRecepOptions(){
+  const keys=new Set();
+  OTIF_DATA.filter(d=>(!otifProv||d.prov===otifProv)&&d.estatus==='RECIBIDO').forEach(d=>{
+    if(d.etaR)keys.add(mKey(d.etaR));
+  });
+  const sorted=[...keys].filter(Boolean).sort();
+  if(!otifMonthRecepInited){
+    otifMonthRecep=sorted.length?[sorted[sorted.length-1]]:[];
+    otifMonthRecepInited=true;
+  } else {
+    otifMonthRecep=otifMonthRecep.filter(k=>sorted.includes(k));
+  }
+  const ms=document.getElementById('otif-month-recep-sel');
+  if(!ms)return;
+  ms.innerHTML=sorted.map(k=>`<option value="${k}"${otifMonthRecep.includes(k)?' selected':''}>${mLabel(k)}</option>`).join('');
+  ms.onchange=()=>{otifMonthRecep=Array.from(ms.selectedOptions).map(o=>o.value);ms.className='msel'+(otifMonthRecep.length?' msel-active':'');renderOTIF();};
+  ms.className='msel'+(otifMonthRecep.length?' msel-active':'');
 }
 function updateOTIFDetailCascade(){
   const byPS=otifByProvStatus();
@@ -2062,14 +2114,15 @@ function renderTargetTrend(){
 
 
 function renderOTIF(){
-  updateOTIFMonthOptions();   // primero: fija otifMonth al último mes con datos
-  renderOTIFKPIs();           // ahora sí usa el otifMonth correcto
+  updateOTIFMonthOptions();
+  updateOTIFMonthRecepOptions();
+  renderOTIFKPIs();
   renderTargetTrend();
   // OC cards: filter by prov + status + month of foc
   renderOCCards(OTIF_DATA.filter(d=>{
     if(otifProv&&d.prov!==otifProv)return false;
     if(otifStatus&&d.estatus!==otifStatus)return false;
-    if(otifMonth.length&&!otifMonth.includes(mKey(d.foc)))return false;
+    if(otifMonthOcEnabled&&otifMonth.length&&!otifMonth.includes(mKey(d.foc)))return false;
     return true;
   }));
   if(!ocVisible){const g=document.getElementById('oc-cards');if(g)g.style.display='none';}
@@ -2083,12 +2136,15 @@ function buildOTIFFilters(){
   const ps=document.getElementById('otif-prov-sel');
   ps.innerHTML=`<option value="">Todos los proveedores</option>`+provs.filter(v=>v!=='').map(v=>`<option value="${v}">${v}</option>`).join('');
   ps.value=otifProv;
-  ps.onchange=()=>{otifProv=ps.value;otifStatus='';otifMonth=[];otifMonthInited=false;otifOC='';otifClave='';updateOTIFStatusOptions();updateOTIFMonthOptions();renderOTIF();};
+  ps.onchange=()=>{otifProv=ps.value;otifStatus='';otifMonth=[];otifMonthInited=false;otifMonthRecep=[];otifMonthRecepInited=false;otifOC='';otifClave='';updateOTIFStatusOptions();updateOTIFMonthOptions();renderOTIF();};
   document.getElementById('otif-prov-sel').dataset.built='1';
   updateOTIFStatusOptions();
   // Clear top filters
   document.getElementById('otif-clear-top').onclick=()=>{
-    otifProv='';otifStatus='';otifMonth=[];otifMonthInited=false;otifOC='';otifClave='';
+    otifProv='';otifStatus='';otifMonth=[];otifMonthInited=false;otifMonthRecep=[];otifMonthRecepInited=false;otifOC='';otifClave='';
+    otifMonthOcEnabled=true;otifMonthRecepEnabled=true;
+    const chkOc=document.getElementById('chk-month-oc');if(chkOc)chkOc.checked=true;
+    const chkRec=document.getElementById('chk-month-recep');if(chkRec)chkRec.checked=true;
     document.getElementById('otif-prov-sel').dataset.built='';
     buildOTIFFilters();renderOTIF();
   };
@@ -2132,6 +2188,7 @@ function buildOTIFFilters(){
 function renderOTIFKPIs(){
   const td=targetData(), pd=otifProvData();
   const mesLbl=otifMonth.length===1?` · ${mLabel(otifMonth[0])}`:otifMonth.length>1?` · ${otifMonth.length} meses`:'';
+  const mesRecepLbl=otifMonthRecep.length===1?` · ${mLabel(otifMonthRecep[0])}`:otifMonthRecep.length>1?` · ${otifMonthRecep.length} meses`:'';
   const pct=(n,d)=>d>0?`${Math.round(n/d*100)}%`:'—';
   const col=(n,d,g,w)=>{const p=d>0?n/d*100:0;return p>=g?'var(--green)':p>=w?'var(--amber)':'var(--red)';};
   const kpi=(lbl,val,s,c)=>`<div class="kpi" style="--kc:${c};border:1px solid var(--brd);border-radius:8px;padding:12px 14px"><div class="kpi-lbl">${lbl}</div><div class="kpi-val">${val}</div><div class="kpi-sub">${s}</div></div>`;
@@ -2245,7 +2302,7 @@ function renderOTIFTable(data){
   updateOTIFSortArrows();
 
   if(!sorted.length){
-    document.getElementById('otif-tbody').innerHTML='<tr><td colspan="17" class="no-data">Sin resultados para los filtros aplicados.</td></tr>';
+    document.getElementById('otif-tbody').innerHTML='<tr><td colspan="20" class="no-data">Sin resultados para los filtros aplicados.</td></tr>';
     return;
   }
 
@@ -2293,6 +2350,9 @@ function renderOTIFTable(data){
       <td class="num">${cantRecibCell(d)}</td>
       <td class="ctr">${chipIF(d.ifOk,rec)}</td>
       <td style="white-space:normal;word-break:break-word;font-size:11px;color:var(--tx2)">${d.obs||'—'}</td>
+      <td class="num" style="font-size:11px">${d.ltEstimado!=null?d.ltEstimado+'m':'<span class="dash">—</span>'}</td>
+      <td class="num" style="font-size:11px;font-weight:600">${d.ltReal!==null?d.ltReal+'m':'<span class="dash">—</span>'}</td>
+      <td class="num" style="font-size:11px;font-weight:700;color:${d.ltDif===null?'var(--tx3)':d.ltDif<=0?'var(--green)':d.ltDif<=1?'var(--amber)':'var(--red)'}">${d.ltDif!==null?(d.ltDif>0?'+':'')+d.ltDif+'m':'<span class="dash">—</span>'}</td>
     </tr>`;
   }).join('');
 }
@@ -2379,7 +2439,7 @@ function exportOTIF(){
   const headers=[
     'OC','Clave','Descripción','Proveedor','Cant. Pedida',
     'F. OC Real','F. Requerida','Dif. días','Target Comprador',
-    'Entrega Sol.','ETA Estimada','ETA Real','Dif. días entrega','On Time','Cant. Recibida','In Full','Observaciones',
+    'Entrega Sol.','ETA Estimada','ETA Real','Dif. días entrega','On Time','Cant. Recibida','In Full','Observaciones','LT Estim. (m)','LT Real (m)','Dif. LT (m)',
     'Cant. Propuesta','Desv. %','Resultado Precisión','Motivo','Responsable'
   ];
 
