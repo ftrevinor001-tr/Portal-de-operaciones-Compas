@@ -314,6 +314,8 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
 .trend-section{background:var(--surface);border:1px solid var(--brd);border-radius:12px;margin-bottom:16px;overflow:hidden}
 .trend-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--brd)}
 .trend-hdr-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx2)}
+.sec-toggle{font-size:11px;font-weight:600;padding:4px 14px;border:1.5px solid var(--brd2);border-radius:6px;background:var(--surface);cursor:pointer;color:var(--tx2);white-space:nowrap;transition:all .15s}
+.sec-toggle:hover{border-color:var(--navy2);color:var(--navy2);background:var(--navy-bg)}
 .trend-toggle{font-size:11px;padding:3px 12px;border:1px solid var(--brd2);border-radius:6px;background:var(--sf2);cursor:pointer;color:var(--tx2)}
 .trend-body{padding:16px 18px}
 .trend-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
@@ -353,7 +355,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
 .prec-charts{display:grid;grid-template-columns:220px 1fr;gap:12px;margin-bottom:14px}
 .prec-panel{background:var(--sf2);border:1px solid var(--brd);border-radius:8px;padding:10px 14px}
 .prec-panel-title{font-size:10px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
-.prec-resp-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px}
+.prec-resp-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:10px}
 .prec-resp-card{background:var(--surface);border-radius:6px;padding:7px 8px;text-align:center;border:1px solid var(--brd)}
 .prec-resp-val{font-size:17px;font-weight:800}
 .prec-resp-lbl{font-size:9px;color:var(--tx2);margin-top:2px;line-height:1.3}
@@ -431,13 +433,10 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
 
     <!-- LEVEL CARDS -->
     <div class="lvl-section">
-      <div class="lvl-header">
+      <div class="lvl-header" style="justify-content:space-between">
+        <span class="lvl-title">📊 Niveles de Inventario — Actual vs. Con Back Order</span>
         <div style="display:flex;align-items:center;gap:10px">
-          <span class="lvl-title">📊 Niveles de Inventario — Actual vs. Con Back Order</span>
-          <button id="lvl-toggle-btn" onclick="toggleLevelCards()"
-            style="font-size:11px;padding:3px 12px;border:1px solid var(--brd2);border-radius:6px;background:var(--sf2);cursor:pointer;color:var(--tx2);white-space:nowrap">
-            ▼ Ocultar
-          </button>
+          <button id="lvl-toggle-btn" class="sec-toggle" onclick="toggleLevelCards()">▶ Mostrar</button>
         </div>
         <div class="lvl-pf" id="lvl-pf-wrap">
           <span class="lvl-pf-lbl">Proveedor:</span>
@@ -578,7 +577,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
     <div class="trend-section" id="target-trend-section">
       <div class="trend-hdr">
         <span class="trend-hdr-title">📈 Tendencia del Target de Comprador — por OC y Proveedor</span>
-        <button class="trend-toggle" id="trend-tog-btn" onclick="toggleTargetTrend()">▶ Mostrar</button>
+        <button class="sec-toggle" id="trend-tog-btn" onclick="toggleTargetTrend()">▶ Mostrar</button>
       </div>
       <div class="trend-body" id="trend-body" style="display:none">
         <!-- KPI mini-cards -->
@@ -609,9 +608,9 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
 
 
     <!-- OC cards (PROGRAMADO only) -->
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-      <span style="font-size:11px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.06em">OC's Vigentes</span>
-      <button id="oc-toggle-btn" onclick="toggleOCCards()" style="font-size:11px;padding:3px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--sf2);cursor:pointer;color:var(--tx2)">▶ Mostrar</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:8px 14px;background:var(--surface);border:1px solid var(--brd);border-radius:8px">
+      <span style="font-size:11px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.06em">📦 OC's Vigentes</span>
+      <button id="oc-toggle-btn" class="sec-toggle" onclick="toggleOCCards()">▶ Mostrar</button>
     </div>
     <div class="oc-grid" id="oc-cards"></div>
 
@@ -705,9 +704,9 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
         <p>Compara la <b>cantidad que el sistema proponía</b> al momento de levantar la OC (capturada manualmente) contra la <b>cantidad real</b> con que se colocó. Requiere llenar 2 columnas nuevas en la hoja <em>OTIF PEDIDOS</em> del Excel, después de Observaciones:</p>
         <ul style="margin:6px 0 6px 18px;padding:0">
           <li><b>Cantidad Propuesta</b> (columna X) — valor de "Asignación" que mostraba el sistema el día que se generó la OC.</li>
-          <li><b>Motivo</b> (columna Y) — obligatorio si Real = 0 o si la desviación supera ±15%. Usar uno de: <em>ERROR DE CALCULO, NO CUMPLE CANTIDAD MINIMA, VARIACION DE PRECIO, DECISION DE GERENCIA, OTRO</em>.</li>
+          <li><b>Motivo</b> (columna Y) — obligatorio si Real = 0 o si la desviación supera ±20%. Usar uno de: <em>ERROR DE CALCULO, NO CUMPLE CANTIDAD MINIMA, VARIACION DE PRECIO, DECISION DE GERENCIA, OTRO</em>.</li>
         </ul>
-        <p><b>Clasificación:</b> Real = 0 → <em>No colocada</em> · desviación ≤ ±15% → <em>Acertada</em> · desviación &gt; ±15% → <em>Desviada</em>. Cada motivo se traduce automáticamente a un responsable (Planeación, Proveedor, Compras o Gerencia).</p>
+        <p><b>Clasificación:</b> Real = 0 → <em>No colocada</em> · desviación ≤ ±20% → <em>Acertada</em> · desviación &gt; ±20% → <em>Desviada</em>. Cada motivo se traduce automáticamente a un responsable (Planeación, Proveedor, Compras o Gerencia).</p>
       </div>
     </div>
   </div><!-- /tab-otif -->
@@ -744,7 +743,12 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
     <!-- KPIs -->
     <div class="prec-kpis" id="prec-kpis"></div>
 
-    <!-- Charts + Responsibility -->
+    <!-- Charts + Responsibility (collapsible) -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:8px 14px;background:var(--surface);border:1px solid var(--brd);border-radius:8px">
+      <span style="font-size:11px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.06em">📊 Distribución y Responsabilidad</span>
+      <button id="prec-charts-tog-btn" class="sec-toggle" onclick="togglePrecCharts()">▶ Mostrar</button>
+    </div>
+    <div id="prec-charts-body" style="display:none">
     <div class="prec-charts">
       <div class="prec-panel" style="display:flex;flex-direction:column;align-items:center">
         <div class="prec-panel-title" style="width:100%">📊 Distribución</div>
@@ -753,14 +757,13 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
       </div>
       <div class="prec-panel">
         <div class="prec-panel-title">🧭 Responsabilidad de las desviaciones</div>
-        <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start">
-          <div style="position:relative;height:140px"><canvas id="prec-resp-chart"></canvas></div>
-          <div class="prec-resp-grid" id="prec-resp-grid" style="grid-template-columns:1fr;gap:4px;min-width:90px"></div>
-        </div>
+        <div style="position:relative;height:140px"><canvas id="prec-resp-chart"></canvas></div>
+        <div class="prec-resp-grid" id="prec-resp-grid" style="margin-top:10px"></div>
         <div style="margin-top:8px;font-size:10px;color:var(--tx3)">
-          Tolerancia: <b>±15%</b> · Real = 0 → <b>No colocada</b>
+          Tolerancia: <b>±20%</b> · Real = 0 → <b>No colocada</b>
         </div>
       </div>
+    </div>
     </div>
 
     <!-- OC-level detail table with EDITABLE Motivo -->
@@ -837,7 +840,7 @@ const MOTIVO_RESP={
   'DECISION DE GERENCIA':'Gerencia',
   'OTRO':'Sin clasificar',
 };
-const TOLERANCIA_PCT=15;
+const TOLERANCIA_PCT=20;
 
 // ══════════════════════════════════════════════════════════════
 // STATE
@@ -852,6 +855,7 @@ let charts={urgency:null,scatter:null,boImpact:null,calendar:null};
 
 // ── OTIF state ──
 let OTIF_DATA=[], otifProv='', otifStatus='', otifMonth='';
+let otifMonthInited=false; // true once default month has been auto-set
 let trendCharts={month:null,prov:null};
 let trendVisible=false;
 let ocVisible=false;
@@ -924,6 +928,7 @@ function processWorkbook(wb, filename){
     document.getElementById('drop-screen').style.display='none';
     document.getElementById('app').style.display='block';
     activeGroup='';activeProv='';activeTermMonth='';activePedMonth='';
+    otifMonthInited=false;
     activeLvlProv='';searchText='';sortCol='mi';sortDir=1;
     buildFilters();renderAll();
   }catch(err){
@@ -1228,7 +1233,7 @@ function toggleLevelCards(){
   const btn=document.getElementById('lvl-toggle-btn');
   if(body){body.style.display=lvlVisible?'':'none';}
   if(pf){pf.style.display=lvlVisible?'':'none';}
-  if(btn){btn.textContent=lvlVisible?'▼ Ocultar':'▶ Mostrar';}
+  if(btn){btn.textContent=lvlVisible?'▼ Ocultar':'▶ Mostrar';btn.className='sec-toggle';}
 }
 function renderLevelCards(){
   const base=filteredFull();
@@ -1514,7 +1519,7 @@ function buildPrecisionRows(){
       if(real===0){ status='no_colocada'; }
       else{
         desv=Math.round((real-d.cantPropuesta)/d.cantPropuesta*100);
-        status=Math.abs(desv)<=15?'acertada':'desviada';
+        status=Math.abs(desv)<=TOLERANCIA_PCT?'acertada':'desviada';
       }
     }
     const key=d.oc+'__'+d.clave;
@@ -1627,7 +1632,7 @@ function renderPrecisionTab(){
   document.getElementById('prec-kpis').innerHTML=[
     {l:'Propuestas pendientes (mes actual y sig.)',v:pendientes.length,s:'por levantar — directriz: Levantar pedido',c:pendientes.length>0?'var(--purple)':'var(--green)'},
     {l:'Claves evaluadas',v:total,s:sinDato>0?`${sinDato} sin dato capturado`:'con propuesta registrada',c:'var(--navy)'},
-    {l:'Acertadas (±15%)',v:acertadas.length,s:total>0?pctAcert+'% del total':'—',c:col(acertadas.length,total,70,40)},
+    {l:'Acertadas (±20%)',v:acertadas.length,s:total>0?pctAcert+'% del total':'—',c:col(acertadas.length,total,70,40)},
     {l:'Desviadas',v:desviadas.length,s:'fuera de tolerancia',c:desviadas.length>0?'var(--amber)':'var(--green)'},
     {l:'No colocadas',v:noColocadas.length,s:'cantidad real = 0',c:noColocadas.length>0?'var(--red)':'var(--green)'},
   ].map(k=>`<div class="prec-kpi" style="border-left:4px solid ${k.c}"><div class="prec-kpi-lbl">${k.l}</div><div class="prec-kpi-val" style="color:${k.c}">${k.v}</div><div class="prec-kpi-sub">${k.s}</div></div>`).join('');
@@ -1708,7 +1713,7 @@ function renderPrecisionTab(){
       <td style="font-size:10px">${r.status==='acertada'?'<span class="dash">—</span>':(r.fechaPropuesta?mLabel(mKey(r.fechaPropuesta)):'<span class="dash">—</span>')}</td>
       <td style="text-align:right">${r.hasProp?fmt(r.cantPropuesta):'<span class="dash">—</span>'}</td>
       <td style="text-align:right;font-weight:700">${isPend?'<span class="dash">—</span>':fmt(r.real)}</td>
-      <td style="text-align:center;font-weight:700;color:${r.desv===null?'var(--tx3)':Math.abs(r.desv)<=15?'var(--green)':'var(--red)'}">${r.desv!==null?(r.desv>0?'+':'')+r.desv+'%':'—'}</td>
+      <td style="text-align:center;font-weight:700;color:${r.desv===null?'var(--tx3)':Math.abs(r.desv)<=TOLERANCIA_PCT?'var(--green)':'var(--red)'}">${r.desv!==null?(r.desv>0?'+':'')+r.desv+'%':'—'}</td>
       <td>${statusChip(r.status)}</td>
       <td>${motivoCell}</td>
       <td style="font-size:10px;color:var(--tx2)">${resp}</td>
@@ -1797,7 +1802,7 @@ function parseOTIF(raw){
       if(prop===null||prop===undefined) return null; // sin dato capturado
       if(real===0||!real) return 'no_colocada';
       const desv=(real-prop)/prop*100;
-      if(Math.abs(desv)<=15) return 'acertada';
+      if(Math.abs(desv)<=TOLERANCIA_PCT) return 'acertada';
       return 'desviada';
     },
     get desviacionPct(){
@@ -1813,6 +1818,7 @@ function otifByProvStatus(){
   return OTIF_DATA.filter(d=>{
     if(otifProv&&d.prov!==otifProv)return false;
     if(otifStatus&&d.estatus!==otifStatus)return false;
+    if(otifMonth&&mKey(d.foc)!==otifMonth)return false;
     return true;
   });
 }
@@ -1858,9 +1864,12 @@ function updateOTIFMonthOptions(){
     if(d.etaR)keys.add(mKey(d.etaR));
   });
   const sorted=[...keys].filter(Boolean).sort();
-  // Default: use last month that has data (not current calendar month which may be empty)
-  if(!otifMonth||!sorted.includes(otifMonth)){
+  // Auto-select last month with data only on first load (not if user chose "Todos los meses")
+  if(!otifMonthInited){
     otifMonth=sorted[sorted.length-1]||'';
+    otifMonthInited=true;
+  } else if(otifMonth&&!sorted.includes(otifMonth)){
+    otifMonth=''; // current selection no longer exists in filtered data — reset
   }
   const ms=document.getElementById('otif-month-sel');
   ms.innerHTML=`<option value="">Todos los meses</option>`+sorted.map(k=>`<option value="${k}"${k===otifMonth?' selected':''}>${mLabel(k)}</option>`).join('');
@@ -1887,6 +1896,13 @@ function updateOTIFDetailCascade(){
 }
 
 
+function togglePrecCharts(){
+  const b=document.getElementById('prec-charts-body');
+  const btn=document.getElementById('prec-charts-tog-btn');
+  const vis=b&&b.style.display!=='none';
+  if(b) b.style.display=vis?'none':'';
+  if(btn) btn.textContent=vis?'▶ Mostrar':'▼ Ocultar';
+}
 function toggleOCCards(){
   ocVisible=!ocVisible;
   const g=document.getElementById('oc-cards');
@@ -2055,12 +2071,12 @@ function buildOTIFFilters(){
   const ps=document.getElementById('otif-prov-sel');
   ps.innerHTML=`<option value="">Todos los proveedores</option>`+provs.filter(v=>v!=='').map(v=>`<option value="${v}">${v}</option>`).join('');
   ps.value=otifProv;
-  ps.onchange=()=>{otifProv=ps.value;otifStatus='';otifMonth='';otifOC='';otifClave='';updateOTIFStatusOptions();updateOTIFMonthOptions();renderOTIF();};
+  ps.onchange=()=>{otifProv=ps.value;otifStatus='';otifMonth='';otifMonthInited=false;otifOC='';otifClave='';updateOTIFStatusOptions();updateOTIFMonthOptions();renderOTIF();};
   document.getElementById('otif-prov-sel').dataset.built='1';
   updateOTIFStatusOptions();
   // Clear top filters
   document.getElementById('otif-clear-top').onclick=()=>{
-    otifProv='';otifStatus='';otifMonth='';otifOC='';otifClave='';
+    otifProv='';otifStatus='';otifMonth='';otifMonthInited=false;otifOC='';otifClave='';
     document.getElementById('otif-prov-sel').dataset.built='';
     buildOTIFFilters();renderOTIF();
   };
