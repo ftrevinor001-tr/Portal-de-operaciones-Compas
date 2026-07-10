@@ -1853,7 +1853,7 @@ function otifByProvStatus(){
     if(otifProv&&d.prov!==otifProv)return false;
     if(otifStatus&&d.estatus!==otifStatus)return false;
     if(otifMonthOcEnabled&&otifMonth.length&&!otifMonth.includes(mKey(d.foc)))return false;
-    if(otifMonthRecepEnabled&&otifMonthRecep.length&&!otifMonthRecep.includes(mKey(d.etaR)))return false;
+    if(otifMonthRecepEnabled&&otifMonthRecep.length&&d.etaR&&!otifMonthRecep.includes(mKey(d.etaR)))return false;
     return true;
   });
 }
@@ -1878,7 +1878,7 @@ function otifProvData(){
   return OTIF_DATA.filter(d=>{
     if(otifProv&&d.prov!==otifProv)return false;
     if(d.estatus!=='RECIBIDO')return false;
-    if(otifMonthRecep.length&&!otifMonthRecep.includes(mKey(d.etaR)))return false;
+    if(otifMonthRecep.length&&d.etaR&&!otifMonthRecep.includes(mKey(d.etaR)))return false;
     return true;
   });
 }
@@ -2123,6 +2123,7 @@ function renderOTIF(){
     if(otifProv&&d.prov!==otifProv)return false;
     if(otifStatus&&d.estatus!==otifStatus)return false;
     if(otifMonthOcEnabled&&otifMonth.length&&!otifMonth.includes(mKey(d.foc)))return false;
+    if(otifMonthRecepEnabled&&otifMonthRecep.length&&d.etaR&&!otifMonthRecep.includes(mKey(d.etaR)))return false;
     return true;
   }));
   if(!ocVisible){const g=document.getElementById('oc-cards');if(g)g.style.display='none';}
