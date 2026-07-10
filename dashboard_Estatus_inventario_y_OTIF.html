@@ -414,7 +414,8 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
       <div class="hdr-sub" id="file-tag">—</div>
     </div>
     <div class="hdr-r">
-      <button class="hdr-btn" id="reload-btn">↺ Cambiar archivo</button>
+      <button class="hdr-btn" id="refresh-btn" title="Recarga datos.xlsx del repositorio sin recargar la página">🔄 Actualizar datos</button>
+      <button class="hdr-btn" id="reload-btn">📂 Cargar de Excel</button>
     </div>
   </header>
 
@@ -566,8 +567,8 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
         <span class="tb-lbl">Estatus:</span>
         <select class="msel" id="otif-status-sel"><option value="">Todos</option></select>
         <div class="filter-sep"></div>
-        <span class="tb-lbl">Mes:</span>
-        <select class="msel" id="otif-month-sel"><option value="">Todos los meses</option></select>
+        <span class="tb-lbl">Mes: <span style="font-weight:400;opacity:.65;font-size:9px">(Ctrl+clic)</span></span>
+        <select class="msel" id="otif-month-sel" multiple size="3" style="min-width:130px;font-size:11px" title="Ctrl/Cmd+clic para seleccionar varios meses"></select>
         <button class="clear-btn" id="otif-clear-top" style="margin-left:8px">✕ Limpiar</button>
       </div>
     </div>
@@ -733,7 +734,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
       </div>
       <div class="prec-filter-group">
         <span class="prec-filter-label">📅 Mes de propuesta <span style="font-weight:400;opacity:.7">(Ctrl+clic = varios)</span></span>
-        <select class="msel" id="prec-month-sel" multiple style="height:80px;min-width:150px;font-size:12px" title="Ctrl/Cmd+clic para seleccionar varios meses"></select>
+        <select class="msel" id="prec-month-sel" multiple size="3" style="min-width:130px;font-size:11.5px" title="Ctrl/Cmd+clic para seleccionar varios meses"></select>
       </div>
       <div class="prec-filter-group" style="align-self:flex-end">
         <button class="clear-btn" id="prec-clear-btn" style="padding:6px 14px;font-size:11px">✕ Limpiar filtros</button>
@@ -854,7 +855,7 @@ let lvlVisible=false;
 let charts={urgency:null,scatter:null,boImpact:null,calendar:null};
 
 // ── OTIF state ──
-let OTIF_DATA=[], otifProv='', otifStatus='', otifMonth='';
+let OTIF_DATA=[], otifProv='', otifStatus='', otifMonth=[];
 let otifMonthInited=false; // true once default month has been auto-set
 let trendCharts={month:null,prov:null};
 let trendVisible=false;
@@ -871,6 +872,17 @@ document.getElementById('drop-zone').addEventListener('dragover',e=>{e.preventDe
 document.getElementById('drop-zone').addEventListener('dragleave',e=>e.currentTarget.classList.remove('over'));
 document.getElementById('drop-zone').addEventListener('drop',e=>{e.preventDefault();e.currentTarget.classList.remove('over');if(e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0])});
 document.getElementById('file-input').addEventListener('change',e=>{if(e.target.files[0])loadFile(e.target.files[0])});
+document.getElementById('refresh-btn').addEventListener('click',async()=>{
+  const btn=document.getElementById('refresh-btn');
+  const orig=btn.textContent;
+  btn.textContent='⏳ Actualizando…';
+  btn.disabled=true;
+  try{
+    await autoLoadFromRepo();
+  }catch(e){/* errors handled inside autoLoadFromRepo */}
+  btn.textContent=orig;
+  btn.disabled=false;
+});
 document.getElementById('reload-btn').addEventListener('click',()=>{
   document.getElementById('app').style.display='none';
   document.getElementById('drop-screen').style.display='flex';
@@ -1818,7 +1830,7 @@ function otifByProvStatus(){
   return OTIF_DATA.filter(d=>{
     if(otifProv&&d.prov!==otifProv)return false;
     if(otifStatus&&d.estatus!==otifStatus)return false;
-    if(otifMonth&&mKey(d.foc)!==otifMonth)return false;
+    if(otifMonth.length&&!otifMonth.includes(mKey(d.foc)))return false;
     return true;
   });
 }
@@ -1834,7 +1846,7 @@ function filteredOTIF(){
 function targetData(){
   return OTIF_DATA.filter(d=>{
     if(otifProv&&d.prov!==otifProv)return false;
-    if(otifMonth&&mKey(d.foc)!==otifMonth)return false;
+    if(otifMonth.length&&!otifMonth.includes(mKey(d.foc)))return false;
     return true;
   });
 }
@@ -1843,7 +1855,7 @@ function otifProvData(){
   return OTIF_DATA.filter(d=>{
     if(otifProv&&d.prov!==otifProv)return false;
     if(d.estatus!=='RECIBIDO')return false;
-    if(otifMonth&&mKey(d.etaR)!==otifMonth)return false;
+    if(otifMonth.length&&!otifMonth.includes(mKey(d.etaR)))return false;
     return true;
   });
 }
@@ -1864,17 +1876,17 @@ function updateOTIFMonthOptions(){
     if(d.etaR)keys.add(mKey(d.etaR));
   });
   const sorted=[...keys].filter(Boolean).sort();
-  // Auto-select last month with data only on first load (not if user chose "Todos los meses")
+  // Auto-select last month on first load
   if(!otifMonthInited){
-    otifMonth=sorted[sorted.length-1]||'';
+    otifMonth=sorted.length?[sorted[sorted.length-1]]:[];
     otifMonthInited=true;
-  } else if(otifMonth&&!sorted.includes(otifMonth)){
-    otifMonth=''; // current selection no longer exists in filtered data — reset
+  } else {
+    otifMonth=otifMonth.filter(k=>sorted.includes(k));
   }
   const ms=document.getElementById('otif-month-sel');
-  ms.innerHTML=`<option value="">Todos los meses</option>`+sorted.map(k=>`<option value="${k}"${k===otifMonth?' selected':''}>${mLabel(k)}</option>`).join('');
-  ms.onchange=()=>{otifMonth=ms.value;renderOTIF();};
-  ms.className='msel'+(otifMonth?' msel-active':'');
+  ms.innerHTML=sorted.map(k=>`<option value="${k}"${otifMonth.includes(k)?' selected':''}>${mLabel(k)}</option>`).join('');
+  ms.onchange=()=>{otifMonth=Array.from(ms.selectedOptions).map(o=>o.value);ms.className='msel'+(otifMonth.length?' msel-active':'');renderOTIF();};
+  ms.className='msel'+(otifMonth.length?' msel-active':'');
 }
 function updateOTIFDetailCascade(){
   const byPS=otifByProvStatus();
@@ -2057,7 +2069,7 @@ function renderOTIF(){
   renderOCCards(OTIF_DATA.filter(d=>{
     if(otifProv&&d.prov!==otifProv)return false;
     if(otifStatus&&d.estatus!==otifStatus)return false;
-    if(otifMonth&&mKey(d.foc)!==otifMonth)return false;
+    if(otifMonth.length&&!otifMonth.includes(mKey(d.foc)))return false;
     return true;
   }));
   if(!ocVisible){const g=document.getElementById('oc-cards');if(g)g.style.display='none';}
@@ -2071,12 +2083,12 @@ function buildOTIFFilters(){
   const ps=document.getElementById('otif-prov-sel');
   ps.innerHTML=`<option value="">Todos los proveedores</option>`+provs.filter(v=>v!=='').map(v=>`<option value="${v}">${v}</option>`).join('');
   ps.value=otifProv;
-  ps.onchange=()=>{otifProv=ps.value;otifStatus='';otifMonth='';otifMonthInited=false;otifOC='';otifClave='';updateOTIFStatusOptions();updateOTIFMonthOptions();renderOTIF();};
+  ps.onchange=()=>{otifProv=ps.value;otifStatus='';otifMonth=[];otifMonthInited=false;otifOC='';otifClave='';updateOTIFStatusOptions();updateOTIFMonthOptions();renderOTIF();};
   document.getElementById('otif-prov-sel').dataset.built='1';
   updateOTIFStatusOptions();
   // Clear top filters
   document.getElementById('otif-clear-top').onclick=()=>{
-    otifProv='';otifStatus='';otifMonth='';otifMonthInited=false;otifOC='';otifClave='';
+    otifProv='';otifStatus='';otifMonth=[];otifMonthInited=false;otifOC='';otifClave='';
     document.getElementById('otif-prov-sel').dataset.built='';
     buildOTIFFilters();renderOTIF();
   };
@@ -2119,7 +2131,7 @@ function buildOTIFFilters(){
 }
 function renderOTIFKPIs(){
   const td=targetData(), pd=otifProvData();
-  const mesLbl=otifMonth?` · ${mLabel(otifMonth)}`:'';
+  const mesLbl=otifMonth.length===1?` · ${mLabel(otifMonth[0])}`:otifMonth.length>1?` · ${otifMonth.length} meses`:'';
   const pct=(n,d)=>d>0?`${Math.round(n/d*100)}%`:'—';
   const col=(n,d,g,w)=>{const p=d>0?n/d*100:0;return p>=g?'var(--green)':p>=w?'var(--amber)':'var(--red)';};
   const kpi=(lbl,val,s,c)=>`<div class="kpi" style="--kc:${c};border:1px solid var(--brd);border-radius:8px;padding:12px 14px"><div class="kpi-lbl">${lbl}</div><div class="kpi-val">${val}</div><div class="kpi-sub">${s}</div></div>`;
