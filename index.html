@@ -730,14 +730,17 @@ async function procesarExcel(file){
       const fixFechas=rs=>rs.map(r=>{const o={};Object.keys(r).forEach(k=>{const v2=r[k];
         o[k]=(/fecha/i.test(k)&&typeof v2==='number'&&v2>20000&&v2<80000)?serAFecha(v2):v2;});return o;});
       const numDe=v3=>{if(typeof v3==='number')return v3;const s3=String(v3==null?'':v3).replace(/[$\s]/g,'').replace(/,(?=\d{3})/g,'');const n3=parseFloat(s3);return isNaN(n3)?v3:n3;};
-      const orders=fixFechas(rowsOC).filter(o=>String(o['Folio']||'').trim()!=='')
+      // Lectura por posición de columna (método a prueba de fallos)
+      const aArrays=ws2=>XLSX.utils.sheet_to_json(ws2,{header:1,raw:true,defval:''});
+      const aObjetos=aoa=>{if(!aoa.length)return[];const hdrs=aoa[0].map(h=>String(h).trim());
+        return aoa.slice(1).map(r=>{const o={};hdrs.forEach((h,i2)=>{if(h)o[h]=r[i2]!==undefined?r[i2]:'';});return o;});};
+      const orders=fixFechas(aObjetos(aArrays(wsOC))).filter(o=>String(o['Folio']||'').trim()!=='')
         .map(o=>{['Subtotal','Importe IVA','Importe','Plazo Pago'].forEach(k=>{if(o[k]!==''&&o[k]!=null)o[k]=numDe(o[k]);});return o;});
       const montoTot=orders.reduce((s3,o)=>s3+(typeof o['Importe']==='number'?o['Importe']:0),0);
       log('   Verificación → Importe total: $'+Math.round(montoTot).toLocaleString('es-MX')+' en '+orders.length.toLocaleString()+' OCs');
-      if(!montoTot){log('   ⚠️ Importe quedó en 0. Columnas detectadas: '+Object.keys(orders[0]||{}).join(' | '));}
-      const rowsProd=XLSX.utils.sheet_to_json(wb.Sheets['Productos Incluidos en'],{raw:true,defval:''});
+      if(!montoTot){log('   ⚠️ Importe quedó en 0. Columnas: '+Object.keys(orders[0]||{}).join(' | '));}
       const products={};
-      fixFechas(rowsProd).forEach(p=>{const k=String(p['FOLIO OC']||'').trim();if(k)(products[k]=products[k]||[]).push(p);});
+      fixFechas(aObjetos(aArrays(wb.Sheets['Productos Incluidos en']))).forEach(p=>{const k=String(p['FOLIO OC']||'').trim();if(k)(products[k]=products[k]||[]).push(p);});
       const boJson=JSON.stringify({orders:orders,products:products,generated:new Date().toISOString()});
       const{body:bb,gz:bgz}=await gzipBlob(boJson);
       const bruta=bgz?'payloads/backorders.json.gz':'payloads/backorders.json';
