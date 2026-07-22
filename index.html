@@ -6,6 +6,7 @@
 <title>Portal de Compras</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f172a;height:100vh;display:flex;flex-direction:column;overflow:hidden}
@@ -64,6 +65,33 @@
   table.mtx td{padding:7px 10px;border-bottom:1px solid #eef2f7;color:#1a2035}
   .abtn{padding:9px 16px;background:#1c4587;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-top:12px}
   .abtn:hover{background:#1565c0}
+
+  /* ── MI RESUMEN ── */
+  .res-body{position:absolute;inset:0;background:#f1f5f9;overflow:auto;padding:22px}
+  .res-head{max-width:1180px;margin:0 auto 16px;display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+  .res-head h2{font-size:17px;color:#1a2035;margin-right:auto}
+  .res-head select{padding:8px 12px;border:1.5px solid #d7dce6;border-radius:9px;font-size:13px;background:#fff}
+  .mes-chip{padding:6px 12px;border-radius:16px;border:1.5px solid #d7dce6;background:#fff;font-size:12px;cursor:pointer;color:#334155;user-select:none}
+  .mes-chip.on{background:#1c4587;border-color:#1c4587;color:#fff}
+  .kpi-grid{max-width:1180px;margin:0 auto 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px}
+  .kpi{background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 1px 6px rgba(15,23,42,.06);border-left:4px solid #d7dce6;cursor:pointer;transition:transform .12s}
+  .kpi:hover{transform:translateY(-2px)}
+  .kpi .n{font-size:24px;font-weight:800;color:#1a2035}
+  .kpi .t{font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.04em;margin-top:3px}
+  .kpi.s-alta{border-left-color:#c0392b}.kpi.s-media{border-left-color:#b8860b}.kpi.s-baja{border-left-color:#2a7d8c}.kpi.s-ok{border-left-color:#4a7c59}
+  .res-grid{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:900px){.res-grid{grid-template-columns:1fr}}
+  .res-card{background:#fff;border-radius:12px;padding:16px 18px;box-shadow:0 1px 6px rgba(15,23,42,.06)}
+  .res-card h3{font-size:13px;color:#1a2035;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .badge{font-size:11px;font-weight:700;padding:2px 9px;border-radius:11px;color:#fff}
+  .b-alta{background:#c0392b}.b-media{background:#b8860b}.b-baja{background:#2a7d8c}.b-ok{background:#4a7c59}
+  .res-card .full{grid-column:1/-1}
+  .alist{max-height:250px;overflow:auto;font-size:12px}
+  .alist table{width:100%;border-collapse:collapse}
+  .alist th{position:sticky;top:0;background:#f8fafc;color:#475569;text-align:left;padding:5px 8px;font-size:11px;border-bottom:1.5px solid #e2e8f0}
+  .alist td{padding:4px 8px;border-bottom:1px solid #f1f5f9;color:#1e293b}
+  .empty-res{max-width:700px;margin:60px auto;text-align:center;color:#64748b;font-size:14px;background:#fff;padding:40px;border-radius:14px}
+  .chartbox{position:relative;height:230px}
 </style>
 </head>
 <body>
@@ -102,33 +130,48 @@
 </div>
 
 <div class="tabs-bar">
-  <div class="tab active" onclick="switchTab(0)"><span class="tab-icon">📉</span>Histórico Faltantes</div>
-  <div class="tab" onclick="switchTab(1)"><span class="tab-icon">📦</span>Monitor de Inventario</div>
-  <div class="tab" onclick="switchTab(2)"><span class="tab-icon">🔄</span>Estatus Back Orders</div>
-  <div class="tab" onclick="switchTab(3)"><span class="tab-icon">🎯</span>Inventario &amp; OTIF</div>
-  <div class="tab" onclick="switchTab(4)" id="tab-admin"><span class="tab-icon">⚙️</span>Admin</div>
+  <div class="tab active" onclick="switchTab(0)"><span class="tab-icon">🏠</span>Mi Resumen</div>
+  <div class="tab" onclick="switchTab(1)"><span class="tab-icon">📉</span>Histórico Faltantes</div>
+  <div class="tab" onclick="switchTab(2)"><span class="tab-icon">📦</span>Monitor de Inventario</div>
+  <div class="tab" onclick="switchTab(3)"><span class="tab-icon">🔄</span>Estatus Back Orders</div>
+  <div class="tab" onclick="switchTab(4)"><span class="tab-icon">🎯</span>Inventario &amp; OTIF</div>
+  <div class="tab" onclick="switchTab(5)" id="tab-admin"><span class="tab-icon">⚙️</span>Admin</div>
 </div>
 
 <div class="frames">
-  <div class="frame-wrap active" id="fw-0">
-    <div class="loader" id="ld-0"><div class="spinner"></div><p>Cargando Histórico Faltantes…</p></div>
-    <iframe id="fr-0" onload="hideLd(0)"></iframe>
+
+  <!-- ════ MI RESUMEN ════ -->
+  <div class="frame-wrap active" id="fw-res">
+    <div class="res-body">
+      <div class="res-head">
+        <h2 id="res-title">🏠 Mi Resumen</h2>
+        <label style="font-size:12px;color:#64748b">Comprador:</label>
+        <select id="res-comp" onchange="renderResumen()"></select>
+        <span id="res-meses"></span>
+      </div>
+      <div id="res-content"><div class="empty-res">Cargando resumen…</div></div>
+    </div>
   </div>
+
   <div class="frame-wrap" id="fw-1">
-    <div class="loader" id="ld-1"><div class="spinner"></div><p>Cargando Monitor de Inventario…</p></div>
+    <div class="loader" id="ld-1"><div class="spinner"></div><p>Cargando Histórico Faltantes…</p></div>
     <iframe id="fr-1" onload="hideLd(1)"></iframe>
   </div>
   <div class="frame-wrap" id="fw-2">
-    <div class="loader" id="ld-2"><div class="spinner"></div><p>Cargando Estatus Back Orders…</p></div>
+    <div class="loader" id="ld-2"><div class="spinner"></div><p>Cargando Monitor de Inventario…</p></div>
     <iframe id="fr-2" onload="hideLd(2)"></iframe>
   </div>
   <div class="frame-wrap" id="fw-3">
-    <div class="loader" id="ld-3"><div class="spinner"></div><p>Cargando Inventario &amp; OTIF…</p></div>
+    <div class="loader" id="ld-3"><div class="spinner"></div><p>Cargando Estatus Back Orders…</p></div>
     <iframe id="fr-3" onload="hideLd(3)"></iframe>
+  </div>
+  <div class="frame-wrap" id="fw-4">
+    <div class="loader" id="ld-4"><div class="spinner"></div><p>Cargando Inventario &amp; OTIF…</p></div>
+    <iframe id="fr-4" onload="hideLd(4)"></iframe>
   </div>
 
   <!-- ════ ADMIN ════ -->
-  <div class="frame-wrap" id="fw-4">
+  <div class="frame-wrap" id="fw-5">
     <div class="admin-body">
       <div class="admin-card" id="adm-lock">
         <h2>🔒 Panel de administración</h2>
@@ -223,7 +266,7 @@ function entrarPortal(){
   const chip=document.getElementById('user-chip');
   document.getElementById('user-name').textContent='👤 '+usuarioActual;
   chip.style.display='flex';
-  loadTab(0);
+  switchTab(0);
 }
 async function doLogout(){
   sessionStorage.removeItem('pc_usuario');
@@ -239,17 +282,113 @@ const SRCS=[
   'dashboard_Estatus_inventario_y_OTIF.html'
 ];
 const loadedTabs=[false,false,false,false];
-function loadTab(i){
-  if(i<4&&!loadedTabs[i]){loadedTabs[i]=true;document.getElementById('fr-'+i).src=SRCS[i];}
+function loadTab(i){ // i = 1..4 (iframes)
+  const k=i-1;
+  if(i>=1&&i<=4&&!loadedTabs[k]){loadedTabs[k]=true;document.getElementById('fr-'+i).src=SRCS[k];}
 }
 function switchTab(i){
   document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('active',j===i));
   document.querySelectorAll('.frame-wrap').forEach((f,j)=>f.classList.toggle('active',j===i));
   loadTab(i);
-  if(i===4&&esAdmin){document.getElementById('adm-lock').style.display='none';document.getElementById('adm-open').style.display='block';}
+  if(i===0) cargarResumen();
+  if(i===5&&esAdmin){document.getElementById('adm-lock').style.display='none';document.getElementById('adm-open').style.display='block';}
 }
 function hideLd(i){const l=document.getElementById('ld-'+i);if(l)l.classList.add('hidden');}
 function tick(){const now=new Date();document.getElementById('clock').textContent=now.toLocaleDateString('es-MX',{weekday:'short',day:'2-digit',month:'short'})+' · '+now.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});}
+
+
+// ═══════════ MI RESUMEN ═══════════
+const TIPOS={
+  FALTANTES:{t:'Claves en faltante',sev:'alta',icon:'🔴',dash:'Histórico Faltantes'},
+  FALTANTE_NUEVO:{t:'Faltantes nuevos',sev:'alta',icon:'🆕',dash:'Histórico Faltantes'},
+  RIESGO:{t:'Claves en riesgo',sev:'media',icon:'⚠️',dash:'Histórico Faltantes'},
+  PROLONGADO:{t:'Faltante/riesgo prolongado',sev:'alta',icon:'⏳',dash:'Monitor de Inventario'},
+  SOBREINVENTARIO:{t:'Sobre inventario',sev:'baja',icon:'📦',dash:'Histórico Faltantes'},
+  OC_5_MESES:{t:'OC >5 meses sin recibir',sev:'alta',icon:'🚨',dash:'Back Orders'},
+  OC_SIN_APLICAR:{t:'OC sin aplicar >2 semanas',sev:'media',icon:'📋',dash:'Back Orders'},
+  PEDIDO_PROPUESTO:{t:'Pedidos propuestos a colocar',sev:'media',icon:'🛒',dash:'Inventario & OTIF'},
+  OTIF:{t:'OTIF de entregas',sev:'ok',icon:'🎯',dash:'Inventario & OTIF'}
+};
+let RES={alarmas:null,resumen:null,mesesSel:new Set(),chart:null};
+
+async function cargarResumen(){
+  const cont=document.getElementById('res-content');
+  if(RES.alarmas){renderResumen();return;}
+  cont.innerHTML='<div class="empty-res">Cargando resumen…</div>';
+  const[a,d]=await Promise.all([
+    sb.from('alarmas').select('*'),
+    sb.from('datasets').select('payload').eq('clave','resumen').maybeSingle()
+  ]);
+  if(a.error){cont.innerHTML='<div class="empty-res">❌ '+a.error.message+'</div>';return;}
+  if(!a.data||!a.data.length){cont.innerHTML='<div class="empty-res">📭 Aún no hay alarmas calculadas.<br><br>El administrador debe subir el Excel maestro en la pestaña <b>Admin</b> (con esta versión del portal) para generarlas.</div>';return;}
+  RES.alarmas=a.data;
+  RES.resumen=d.data?d.data.payload:null;
+  // Selector de comprador
+  const comps=[...new Set(a.data.map(r=>r.comprador))].filter(x=>x!=='GENERAL').sort();
+  const sel=document.getElementById('res-comp');
+  const propio=comps.includes(usuarioActual)?usuarioActual:'GENERAL';
+  sel.innerHTML='<option value="GENERAL">🌐 GENERAL (todos)</option>'+comps.map(x=>`<option ${x===propio?'selected':''}>${x}</option>`).join('');
+  if(propio==='GENERAL')sel.value='GENERAL';
+  // Chips de meses
+  const meses=(RES.resumen&&RES.resumen.meses)||[];
+  RES.mesesSel=new Set(meses.length?[meses[meses.length-1]]:[]);
+  document.getElementById('res-meses').innerHTML=meses.map(m=>`<span class="mes-chip${RES.mesesSel.has(m)?' on':''}" data-m="${m}" onclick="togMes(this)">${fmtMes(m)}</span>`).join(' ');
+  renderResumen();
+}
+function fmtMes(m){const M=['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];const[y,mm]=m.split('-');return M[+mm]+' '+y.slice(2);}
+function togMes(el){const m=el.dataset.m;
+  if(RES.mesesSel.has(m)){if(RES.mesesSel.size>1)RES.mesesSel.delete(m);}else RES.mesesSel.add(m);
+  document.querySelectorAll('.mes-chip').forEach(ch=>ch.classList.toggle('on',RES.mesesSel.has(ch.dataset.m)));
+  renderResumen();
+}
+function alarmaDe(comp,tipo){return (RES.alarmas||[]).find(r=>r.comprador===comp&&r.tipo===tipo);}
+function renderResumen(){
+  if(!RES.alarmas)return;
+  const comp=document.getElementById('res-comp').value;
+  document.getElementById('res-title').textContent=comp==='GENERAL'?'🏠 Resumen General':'🏠 Resumen de '+comp;
+  const uf=RES.resumen?RES.resumen.uf:'';
+  const orden=['FALTANTES','FALTANTE_NUEVO','RIESGO','PROLONGADO','OC_5_MESES','OC_SIN_APLICAR','PEDIDO_PROPUESTO','SOBREINVENTARIO','OTIF'];
+  // KPIs
+  let kpis='';
+  orden.forEach(t=>{const a=alarmaDe(comp,t);const T=TIPOS[t];
+    let n=a?(a.datos&&a.datos.total!=null?a.datos.total:0):0;
+    if(t==='OTIF'&&a&&a.datos)n=a.datos.pct+'%';
+    kpis+=`<div class="kpi s-${T.sev}" onclick="document.getElementById('card-${t}')?.scrollIntoView({behavior:'smooth'})"><div class="n">${n}</div><div class="t">${T.icon} ${T.t}</div></div>`;
+  });
+  // Gráfica de evolución de faltantes (meses seleccionados)
+  let chartHtml='';
+  if(RES.resumen&&RES.resumen.fechas){chartHtml=`<div class="res-card full" id="card-chart"><h3>📈 Evolución de faltantes · ${[...RES.mesesSel].sort().map(fmtMes).join(' + ')}</h3><div class="chartbox"><canvas id="res-chart"></canvas></div></div>`;}
+  // Tarjetas con detalle
+  let cards='';
+  orden.forEach(t=>{const a=alarmaDe(comp,t);if(!a)return;const T=TIPOS[t];const d=a.datos||{};
+    let body='';
+    if(t==='OTIF'){body=`<p style="font-size:13px;color:#334155">${d.enTiempo||0} de ${d.total||0} pedidos recibidos EN TIEMPO (<b>${d.pct||0}%</b>).</p>`;}
+    else{
+      const items=d.items||[];
+      if(!items.length){body='<p style="font-size:12px;color:#64748b">Sin registros. ✅</p>';}
+      else{
+        const cols=Object.keys(items[0]);
+        body='<div class="alist"><table><tr>'+cols.map(k=>'<th>'+k+'</th>').join('')+'</tr>'+
+          items.map(it=>'<tr>'+cols.map(k=>'<td>'+(it[k]??'')+'</td>').join('')+'</tr>').join('')+'</table></div>';
+        if(d.total>items.length)body+=`<p style="font-size:11px;color:#94a3b8;margin-top:6px">Mostrando ${items.length} de ${d.total}. El detalle completo está en el dashboard ${T.dash}.</p>`;
+      }
+    }
+    cards+=`<div class="res-card" id="card-${t}"><h3>${T.icon} ${T.t} <span class="badge b-${T.sev}">${d.total!=null?d.total:''}</span> <span style="margin-left:auto;font-size:10px;color:#94a3b8">${T.dash}</span></h3>${a.descripcion?`<p style="font-size:11px;color:#64748b;margin-bottom:8px">${a.descripcion}</p>`:''}${body}</div>`;
+  });
+  document.getElementById('res-content').innerHTML=
+    `<div class="kpi-grid">${kpis}</div>`+
+    `<p style="max-width:1180px;margin:0 auto 12px;font-size:11px;color:#94a3b8">Al corte del ${uf?uf.split('-').reverse().join('/'):'último Excel cargado'} · las alarmas reflejan el estado actual; el filtro de meses aplica a la gráfica de evolución.</p>`+
+    `<div class="res-grid">${chartHtml}${cards}</div>`;
+  pintarChart(comp);
+}
+function pintarChart(comp){
+  if(!RES.resumen||!RES.resumen.fechas)return;
+  const ctx=document.getElementById('res-chart');if(!ctx)return;
+  const fechas=RES.resumen.fechas.filter(f=>RES.mesesSel.has(f.slice(0,7)));
+  const serie=fechas.map(f=>comp==='GENERAL'?(RES.resumen.totalByDay[f]||0):((RES.resumen.compByDay[comp]||{})[f]||0));
+  if(RES.chart)RES.chart.destroy();
+  RES.chart=new Chart(ctx,{type:'line',data:{labels:fechas.map(f=>f.slice(8)+'/'+f.slice(5,7)),datasets:[{label:'Claves en faltante',data:serie,borderColor:'#c0582a',backgroundColor:'rgba(192,88,42,.12)',fill:true,tension:.25,pointRadius:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+}
 
 // ═══════════ ADMIN ═══════════
 async function adminLogin(){
@@ -299,6 +438,100 @@ function buildData(raw,rawD,fn){
   const detFalt={};
   if(detR.length){const lf=ufd[ufd.length-1];detR.filter(r=>r.fecha===lf&&r.estatus==='FALTANTE').forEach(r=>{detFalt[r.comprador]=detFalt[r.comprador]||{};detFalt[r.comprador][r.clmov]=detFalt[r.comprador][r.clmov]||[];detFalt[r.comprador][r.clmov].push(r);});}
   return{fechas,compradores,totalByDay,clavesTotal,clasByDay,compByDay,compClByDay,CDATA,AREA,uf,pf,mA,mAn,fU,totalHoy:totalByDay[uf]||0,clavesHoy:clavesTotal[uf]||0,filename:fn,detR,detF:ufd,detM:uq('marca'),detCM:uq('clmov'),detG:uq('grupo'),detC:uq('comprador'),detE:uq('estatus'),detRd:uq('reorden'),detFalt};
+}
+
+
+// ── Cálculo de alarmas por comprador ──
+function pDX(v){
+  if(v===null||v===undefined||v==='')return null;
+  if(typeof v==='number'){const d=new Date(Math.round((v-25569)*86400000));return isNaN(d)?null:d.toISOString().slice(0,10);}
+  if(v instanceof Date)return isNaN(v)?null:v.toISOString().slice(0,10);
+  return pD(String(v));
+}
+function limpiarClaves(obj){const o={};Object.keys(obj).forEach(k=>o[k.trim()]=obj[k]);return o;}
+function diasEntre(a,b){return Math.round((new Date(b)-new Date(a))/86400000);}
+
+function computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif){
+  const detR=payload.detR, ufd=payload.detF, uf=ufd[ufd.length-1], primera=ufd[0];
+  const mes=uf.slice(0,7);
+  const hoyISO=uf;
+  // referencia para "nuevos": último día del mes anterior disponible, o primer día de datos
+  const prevMes=ufd.filter(f=>f.slice(0,7)<mes);
+  const refNuevo=prevMes.length?prevMes[prevMes.length-1]:primera;
+
+  const hoyRows=detR.filter(r=>r.fecha===uf);
+  const refRows=detR.filter(r=>r.fecha===refNuevo);
+  const refFaltSet=new Set(refRows.filter(r=>r.estatus==='FALTANTE').map(r=>r.clave));
+  const claveComp={};hoyRows.forEach(r=>{claveComp[String(r.clave).trim()]=r.comprador;});
+
+  // rachas F/R por clave
+  const frSet={};detR.forEach(r=>{if(r.estatus==='FALTANTE'||r.estatus==='RIESGO'){(frSet[r.clave]=frSet[r.clave]||new Set()).add(r.fecha);}});
+  function racha(clave){let ini=null;for(let i=ufd.length-1;i>=0;i--){if(frSet[clave]&&frSet[clave].has(ufd[i]))ini=ufd[i];else break;}
+    return ini?{dias:diasEntre(ini,uf)+1,desdeInicio:ini===primera}:null;}
+
+  const comps=[...new Set(hoyRows.map(r=>r.comprador))].sort();
+  const alarmas=[];
+  const CAP=200;
+  function push(comp,dashboard,tipo,items,total,descripcion,extra){
+    alarmas.push({comprador:comp,dashboard,tipo,mes,descripcion:descripcion||null,severidad:(TIPOS[tipo]||{}).sev||'media',
+      datos:Object.assign({total:total,items:items?items.slice(0,CAP):undefined},extra||{})});
+  }
+
+  // OC preprocesadas
+  const ocs=rowsOC.map(r=>({folio:String(r['Folio']||'').trim(),fecha:pDX(r['Fecha']),proveedor:String(r['Proveedor']||'').trim(),
+    estatus:String(r['Estatus']||'').trim().toUpperCase(),estadoOC:String(r['Estado OC']||'').trim().toUpperCase(),
+    comprador:String(r['COMPRADOR']||'').trim().toUpperCase()||'SIN ASIGNAR'})).filter(r=>r.folio&&r.fecha);
+  function lim5m(f){const d=new Date(uf);d.setMonth(d.getMonth()-5);return f<d.toISOString().slice(0,10);}
+  function lim2s(f){const d=new Date(uf);d.setDate(d.getDate()-14);return f<d.toISOString().slice(0,10);}
+
+  // Asignación / OTIF preprocesadas (mapeo clave→comprador vía Detalle)
+  const asig=rowsAsig.map(limpiarClaves).map(r=>({clave:String(r['ID ind.']||r['ID']||'').trim(),descripcion:String(r['Descripción']||'').trim(),
+    directriz:String(r['DIRECTRIZ DE PEDIDO']||'').trim().toUpperCase(),cantidad:r['CANTIDAD A PEDIR'],proveedor:String(r['PROVEEDORES']||'').trim(),
+    fechaLev:pDX(r['LEVANTAR PEDIDO'])})).filter(r=>r.clave);
+  asig.forEach(r=>{r.comprador=claveComp[r.clave]||'SIN ASIGNAR';});
+  const otif=rowsOtif.map(limpiarClaves).map(r=>({clave:String(r['Clave']||'').trim(),estatus:String(r['ESTATUS']||'').trim().toUpperCase(),
+    otifEnt:String(r['OTIF Entrega']||'').trim().toUpperCase(),oc:String(r['OC']||'').trim(),proveedor:String(r['PROVEEDOR']||'').trim()})).filter(r=>r.clave);
+  otif.forEach(r=>{r.comprador=claveComp[r.clave]||'SIN ASIGNAR';});
+
+  for(const comp of ['GENERAL',...comps]){
+    const mine=r=>comp==='GENERAL'||r.comprador===comp;
+    const hoyC=hoyRows.filter(mine);
+
+    const falt=hoyC.filter(r=>r.estatus==='FALTANTE').map(r=>({Clave:r.clave,Nombre:r.nombre,Marca:r.marca,'Clasif.Mov':r.clmov,'Back Order':r.bo}));
+    push(comp,'faltantes','FALTANTES',falt,falt.length);
+
+    const nuevos=hoyC.filter(r=>r.estatus==='FALTANTE'&&!refFaltSet.has(r.clave)).map(r=>({Clave:r.clave,Nombre:r.nombre,Marca:r.marca,'Clasif.Mov':r.clmov}));
+    push(comp,'faltantes','FALTANTE_NUEVO',nuevos,nuevos.length,'Claves en faltante hoy que no lo estaban al '+refNuevo.split('-').reverse().join('/'));
+
+    const rsg=hoyC.filter(r=>r.estatus==='RIESGO').map(r=>({Clave:r.clave,Nombre:r.nombre,Marca:r.marca,'Meses Inv':(+r.meses_inv).toFixed(1),'T.Entrega':r.t_entrega}));
+    push(comp,'faltantes','RIESGO',rsg,rsg.length);
+
+    const sob=hoyC.filter(r=>r.estatus==='SOBRE INVENTARIO').map(r=>({Clave:r.clave,Nombre:r.nombre,Marca:r.marca,'Meses Inv':(+r.meses_inv).toFixed(1),'Obj':r.obj_meses}));
+    push(comp,'faltantes','SOBREINVENTARIO',sob,sob.length);
+
+    const prol=[];hoyC.forEach(r=>{if(r.estatus==='FALTANTE'||r.estatus==='RIESGO'){const rc=racha(r.clave);
+      if(rc&&(rc.dias>=60||rc.desdeInicio))prol.push({Clave:r.clave,Nombre:r.nombre,Estatus:r.estatus,'Días seguidos':rc.dias+(rc.desdeInicio?' (todo el periodo)':'')});}});
+    prol.sort((a,b)=>parseInt(b['Días seguidos'])-parseInt(a['Días seguidos']));
+    push(comp,'inventario','PROLONGADO',prol,prol.length,'Claves con faltante o riesgo por 2+ meses continuos; mientras el histórico de la hoja Detalle sea menor a 60 días, se listan las que llevan todo el periodo disponible ('+(diasEntre(primera,uf)+1)+' días).');
+
+    const mineOC=ocs.filter(r=>comp==='GENERAL'||r.comprador===comp);
+    const oc5=mineOC.filter(r=>['PENDIENTE RECIBIR','RECIBIDO PARCIALMENTE'].includes(r.estadoOC)&&lim5m(r.fecha))
+      .map(r=>({Folio:r.folio,Proveedor:r.proveedor,'Fecha OC':r.fecha.split('-').reverse().join('/'),Estado:r.estadoOC}));
+    push(comp,'backorders','OC_5_MESES',oc5,oc5.length);
+
+    const ocap=mineOC.filter(r=>r.estadoOC==='PENDIENTE APLICAR'&&lim2s(r.fecha))
+      .map(r=>({Folio:r.folio,Proveedor:r.proveedor,'Fecha OC':r.fecha.split('-').reverse().join('/')}));
+    push(comp,'backorders','OC_SIN_APLICAR',ocap,ocap.length,'Órdenes con Estado OC = PENDIENTE APLICAR y más de 14 días de antigüedad.');
+
+    const ped=asig.filter(r=>r.directriz==='LEVANTAR PEDIDO'&&mine(r))
+      .map(r=>({Clave:r.clave,Descripción:r.descripcion,'Cant. a pedir':r.cantidad,Proveedor:r.proveedor,'Fecha sugerida':r.fechaLev?r.fechaLev.split('-').reverse().join('/'):''}));
+    push(comp,'otif','PEDIDO_PROPUESTO',ped,ped.length);
+
+    const rec=otif.filter(r=>r.estatus==='RECIBIDO'&&mine(r));
+    const ent=rec.filter(r=>r.otifEnt==='EN TIEMPO').length;
+    push(comp,'otif','OTIF',null,rec.length,null,{enTiempo:ent,pct:rec.length?Math.round(ent/rec.length*100):0});
+  }
+  return {alarmas,mes,uf};
 }
 
 // ── Carga del Excel maestro ──
@@ -356,6 +589,33 @@ async function procesarExcel(file){
 
     const cg=await sb.from('cargas').insert({archivo:file.name,usuario:usuarioActual||'admin',periodo_inicio:payload.pf,periodo_fin:payload.uf,resumen:{hoja1:raw.length,detalle:rawD.length,dashboard:'faltantes'}});
     if(cg.error) log('⚠️ Historial de cargas: '+cg.error.message);
+
+    // ── ALARMAS POR COMPRADOR ──
+    log('🔔 Calculando alarmas por comprador…');
+    const wsOC=wb.Sheets['RP01-23 Ordenes de Compra'];
+    const wsAs=wb.Sheets['Asignacion'];
+    const wsOt=wb.Sheets['OTIF PEDIDOS'];
+    const rowsOC=wsOC?XLSX.utils.sheet_to_json(wsOC,{raw:true,defval:''}):[];
+    const rowsAsig=wsAs?XLSX.utils.sheet_to_json(wsAs,{raw:true,defval:'',range:1}):[];
+    const rowsOtif=wsOt?XLSX.utils.sheet_to_json(wsOt,{raw:true,defval:'',range:2}):[];
+    if(!wsOC)log('⚠️ No se encontró la hoja RP01-23 Ordenes de Compra: alarmas de Back Orders vacías.');
+    if(!wsAs)log('⚠️ No se encontró la hoja Asignacion: pedidos propuestos vacíos.');
+    if(!wsOt)log('⚠️ No se encontró la hoja OTIF PEDIDOS: indicador OTIF vacío.');
+    const res=computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif);
+    log('   '+res.alarmas.length+' alarmas calculadas para '+([...new Set(res.alarmas.map(a=>a.comprador))].length-1)+' compradores + GENERAL');
+    log('☁️ Publicando alarmas…');
+    const del=await sb.from('alarmas').delete().gte('id',0);
+    if(del.error)throw new Error('limpiando alarmas: '+del.error.message);
+    for(let i=0;i<res.alarmas.length;i+=50){
+      const ins=await sb.from('alarmas').insert(res.alarmas.slice(i,i+50));
+      if(ins.error)throw new Error('insertando alarmas: '+ins.error.message);
+    }
+    log('☁️ Publicando resumen de evolución…');
+    const resumenPayload={fechas:payload.fechas,meses:[...new Set(payload.fechas.map(f=>f.slice(0,7)))].sort(),uf:payload.uf,
+      compradores:payload.compradores,totalByDay:payload.totalByDay,compByDay:payload.compByDay};
+    const dr=await sb.from('datasets').upsert({clave:'resumen',payload:resumenPayload,actualizado_por:usuarioActual||'admin'});
+    if(dr.error)throw new Error('dataset resumen: '+dr.error.message);
+    RES.alarmas=null; // forzar recarga de Mi Resumen
 
     if(document.getElementById('chk-bk').checked){
       log('💾 Respaldando Excel original ('+Math.round(file.size/1048576)+' MB)…');
