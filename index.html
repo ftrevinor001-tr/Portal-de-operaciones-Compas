@@ -729,7 +729,12 @@ async function procesarExcel(file){
       const serAFecha=v2=>new Date(Math.round((v2-25569)*86400000)).toISOString().replace('T',' ').slice(0,19);
       const fixFechas=rs=>rs.map(r=>{const o={};Object.keys(r).forEach(k=>{const v2=r[k];
         o[k]=(/fecha/i.test(k)&&typeof v2==='number'&&v2>20000&&v2<80000)?serAFecha(v2):v2;});return o;});
-      const orders=fixFechas(rowsOC).filter(o=>String(o['Folio']||'').trim()!=='');
+      const numDe=v3=>{if(typeof v3==='number')return v3;const s3=String(v3==null?'':v3).replace(/[$\s]/g,'').replace(/,(?=\d{3})/g,'');const n3=parseFloat(s3);return isNaN(n3)?v3:n3;};
+      const orders=fixFechas(rowsOC).filter(o=>String(o['Folio']||'').trim()!=='')
+        .map(o=>{['Subtotal','Importe IVA','Importe','Plazo Pago'].forEach(k=>{if(o[k]!==''&&o[k]!=null)o[k]=numDe(o[k]);});return o;});
+      const montoTot=orders.reduce((s3,o)=>s3+(typeof o['Importe']==='number'?o['Importe']:0),0);
+      log('   Verificación → Importe total: $'+Math.round(montoTot).toLocaleString('es-MX')+' en '+orders.length.toLocaleString()+' OCs');
+      if(!montoTot){log('   ⚠️ Importe quedó en 0. Columnas detectadas: '+Object.keys(orders[0]||{}).join(' | '));}
       const rowsProd=XLSX.utils.sheet_to_json(wb.Sheets['Productos Incluidos en'],{raw:true,defval:''});
       const products={};
       fixFechas(rowsProd).forEach(p=>{const k=String(p['FOLIO OC']||'').trim();if(k)(products[k]=products[k]||[]).push(p);});

@@ -350,7 +350,7 @@ tr.detail-row td{padding:0;background:#F0F7FF;border-bottom:2px solid var(--sky-
           <option value="">Todos</option><option>PENDIENTE</option><option>APLICADO</option>
         </select>
       </div>
-      <div class="filter-group">
+      <div class="filter-group" style="display:none">
         <label>Comprador que Capturó OC</label>
         <select id="f-comprador" onchange="applyFilters()"><option value="">Todos</option></select>
       </div>
@@ -551,7 +551,7 @@ function normalizeOrders(estadoMap){
     o._estatus  = String(o['Estatus']||'').trim().toUpperCase();
     o._bo       = String(o['Back Order']||'').trim().toUpperCase();
     o._prov     = String(o['Proveedor']||'').trim();
-    o._comp     = String(o['Comprador Capturo']||'').trim();
+    o._comp     = String(o['COMPRADOR']||o['Comprador Capturo']||'').trim();  // comprador de clave
     // Estado OC: from map (Excel load) or from JSON field
     o._estadoOC = (estadoMap && estadoMap[o._folio])
       || String(o['Estado OC']||'').trim().toUpperCase()
@@ -686,6 +686,12 @@ function processJson(json){
 
     allOrders   = json.orders;
     allProducts = json.products || {};
+
+    // Blindaje: asegurar importes numéricos venga como venga el dato
+    const aNum = x => { if(typeof x==='number') return x;
+      const n2 = parseFloat(String(x==null?'':x).replace(/[$,\s]/g,'').replace(/,/g,'.'));
+      return isNaN(n2) ? '' : n2; };
+    allOrders.forEach(o=>{ ['Subtotal','Importe IVA','Importe'].forEach(k=>{ if(o[k]!==''&&o[k]!=null) o[k]=aNum(o[k]); }); });
 
     // Limpiar timestamps de fechas por si acaso
     allOrders.forEach(o=>{
