@@ -201,8 +201,14 @@
 
         <div class="admin-card">
           <h2>📈 Métricas de ingreso</h2>
-          <p class="desc">Cantidad de veces que ha entrado cada persona.</p>
-          <button class="abtn" onclick="cargarMetricas()">🔄 Actualizar métricas</button>
+          <p class="desc">Ingresos diarios de los compradores (no incluye visitantes) y horas conectados. El tiempo se mide mientras la pestaña del portal permanece abierta.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:8px">
+            <button class="abtn" style="margin-top:0" onclick="cargarMetricas()">🔄 Actualizar</button>
+            <label style="font-size:12px;color:#64748b">Mes:</label><select id="met-mes" onchange="poblarSemanas();renderMetChart()" style="padding:7px 10px;border:1.5px solid #d7dce6;border-radius:8px;font-size:13px"></select>
+            <label style="font-size:12px;color:#64748b">Semana:</label><select id="met-sem" onchange="renderMetChart()" style="padding:7px 10px;border:1.5px solid #d7dce6;border-radius:8px;font-size:13px"></select>
+            <button class="abtn" style="margin-top:0;margin-left:auto;background:#c0392b" onclick="reiniciarVisitas()">🗑 Reiniciar conteo de visitas</button>
+          </div>
+          <div style="position:relative;height:260px"><canvas id="met-chart"></canvas></div>
           <div id="mtx"></div>
         </div>
       </div>
@@ -255,13 +261,20 @@ async function mostrarPicker(){
   if(error||!data||!data.length){g.innerHTML='<div style="grid-column:1/-1;color:#c0392b">No se pudo cargar la lista de usuarios: '+(error?error.message:'sin datos')+'</div>';return;}
   g.innerHTML=data.map(u=>`<button class="pick-btn" onclick="elegirUsuario('${u.nombre.replace(/'/g,"\\'")}')">${u.nombre}<span class="tag">${u.tipo}</span></button>`).join('');
 }
+let ingresoId=null;
 async function elegirUsuario(nombre){
   usuarioActual=nombre;
   sessionStorage.setItem('pc_usuario',nombre);
-  sb.from('ingresos').insert({usuario:nombre}).then(({error})=>{if(error)console.warn('ingreso no registrado:',error.message);});
+  sb.from('ingresos').insert({usuario:nombre}).select('id').single().then(({data,error})=>{
+    if(error)console.warn('ingreso no registrado:',error.message);
+    else{ingresoId=data.id;latido();}
+  });
   document.getElementById('gate-user').style.display='none';
   entrarPortal();
 }
+function latido(){if(!ingresoId)return;sb.from('ingresos').update({ultimo_latido:new Date().toISOString()}).eq('id',ingresoId).then(()=>{});}
+setInterval(latido,5*60*1000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')latido();});
 function entrarPortal(){
   const chip=document.getElementById('user-chip');
   document.getElementById('user-name').textContent='👤 '+usuarioActual;
@@ -304,10 +317,10 @@ const TIPOS={
   RIESGO:{t:'Claves en riesgo',sev:'media',icon:'⚠️',dash:'Histórico Faltantes'},
   PROLONGADO:{t:'Faltante/riesgo prolongado',sev:'alta',icon:'⏳',dash:'Monitor de Inventario'},
   SOBREINVENTARIO:{t:'Sobre inventario',sev:'baja',icon:'📦',dash:'Histórico Faltantes'},
-  OC_5_MESES:{t:'OC >5 meses sin recibir',sev:'alta',icon:'🚨',dash:'Back Orders'},
-  OC_SIN_APLICAR:{t:'OC sin aplicar >2 semanas',sev:'media',icon:'📋',dash:'Back Orders'},
+  OC_3_MESES:{t:'OC >3 meses sin recibir',sev:'alta',icon:'🚨',dash:'Back Orders'},
+  OC_SIN_APLICAR:{t:'OC sin aplicar >1 semana',sev:'media',icon:'📋',dash:'Back Orders'},
   PEDIDO_PROPUESTO:{t:'Pedidos propuestos a colocar',sev:'media',icon:'🛒',dash:'Inventario & OTIF'},
-  OTIF:{t:'OTIF de entregas',sev:'ok',icon:'🎯',dash:'Inventario & OTIF'}
+  TARGET:{t:'Target por comprador',sev:'ok',icon:'🎯',dash:'Inventario & OTIF'}
 };
 let RES={alarmas:null,resumen:null,mesesSel:new Set(),chart:null};
 
@@ -347,12 +360,12 @@ function renderResumen(){
   const comp=document.getElementById('res-comp').value;
   document.getElementById('res-title').textContent=comp==='GENERAL'?'🏠 Resumen General':'🏠 Resumen de '+comp;
   const uf=RES.resumen?RES.resumen.uf:'';
-  const orden=['FALTANTES','FALTANTE_NUEVO','RIESGO','PROLONGADO','OC_5_MESES','OC_SIN_APLICAR','PEDIDO_PROPUESTO','SOBREINVENTARIO','OTIF'];
+  const orden=['FALTANTES','FALTANTE_NUEVO','RIESGO','PROLONGADO','OC_3_MESES','OC_SIN_APLICAR','PEDIDO_PROPUESTO','SOBREINVENTARIO','TARGET'];
   // KPIs
   let kpis='';
   orden.forEach(t=>{const a=alarmaDe(comp,t);const T=TIPOS[t];
     let n=a?(a.datos&&a.datos.total!=null?a.datos.total:0):0;
-    if(t==='OTIF'&&a&&a.datos)n=a.datos.pct+'%';
+    if(t==='TARGET'&&a&&a.datos)n=(a.datos.pct!=null?a.datos.pct+'%':'—');
     kpis+=`<div class="kpi s-${T.sev}" onclick="document.getElementById('card-${t}')?.scrollIntoView({behavior:'smooth'})"><div class="n">${n}</div><div class="t">${T.icon} ${T.t}</div></div>`;
   });
   // Gráfica de evolución de faltantes (meses seleccionados)
@@ -362,8 +375,16 @@ function renderResumen(){
   let cards='';
   orden.forEach(t=>{const a=alarmaDe(comp,t);if(!a)return;const T=TIPOS[t];const d=a.datos||{};
     let body='';
-    if(t==='OTIF'){body=`<p style="font-size:13px;color:#334155">${d.enTiempo||0} de ${d.total||0} pedidos recibidos EN TIEMPO (<b>${d.pct||0}%</b>).</p>`;}
+    if(t==='TARGET'){
+      body=`<p style="font-size:13px;color:#334155">${d.ocsOk||0} de ${d.total||0} órdenes de compra cumplen Target (<b>${d.pct!=null?d.pct+'%':'—'}</b>).</p>`;
+      const its=d.items||[];
+      if(its.length){const cols=Object.keys(its[0]);
+        body+='<div class="alist" style="margin-top:8px"><table><tr>'+cols.map(k=>'<th>'+k+'</th>').join('')+'</tr>'+its.map(it=>'<tr>'+cols.map(k=>'<td>'+(it[k]??'')+'</td>').join('')+'</tr>').join('')+'</table></div>';}
+    }
     else{
+      if(t==='FALTANTES'&&d.porClmov){
+        body+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">'+Object.entries(d.porClmov).map(([k,v])=>`<span style="font-size:11px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:12px;padding:3px 10px;color:#334155"><b>${v}</b> ${k}</span>`).join('')+'</div>';
+      }
       const items=d.items||[];
       if(!items.length){body='<p style="font-size:12px;color:#64748b">Sin registros. ✅</p>';}
       else{
@@ -455,9 +476,8 @@ function computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif){
   const detR=payload.detR, ufd=payload.detF, uf=ufd[ufd.length-1], primera=ufd[0];
   const mes=uf.slice(0,7);
   const hoyISO=uf;
-  // referencia para "nuevos": último día del mes anterior disponible, o primer día de datos
-  const prevMes=ufd.filter(f=>f.slice(0,7)<mes);
-  const refNuevo=prevMes.length?prevMes[prevMes.length-1]:primera;
+  // referencia para "nuevos": el día inmediato anterior disponible
+  const refNuevo=ufd.length>1?ufd[ufd.length-2]:primera;
 
   const hoyRows=detR.filter(r=>r.fecha===uf);
   const refRows=detR.filter(r=>r.fecha===refNuevo);
@@ -481,27 +501,34 @@ function computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif){
   const ocs=rowsOC.map(r=>({folio:String(r['Folio']||'').trim(),fecha:pDX(r['Fecha']),proveedor:String(r['Proveedor']||'').trim(),
     estatus:String(r['Estatus']||'').trim().toUpperCase(),estadoOC:String(r['Estado OC']||'').trim().toUpperCase(),
     comprador:String(r['COMPRADOR']||'').trim().toUpperCase()||'SIN ASIGNAR'})).filter(r=>r.folio&&r.fecha);
-  function lim5m(f){const d=new Date(uf);d.setMonth(d.getMonth()-5);return f<d.toISOString().slice(0,10);}
-  function lim2s(f){const d=new Date(uf);d.setDate(d.getDate()-14);return f<d.toISOString().slice(0,10);}
+  function lim3m(f){const d=new Date(uf);d.setMonth(d.getMonth()-3);return f<d.toISOString().slice(0,10);}
+  function lim1s(f){const d=new Date(uf);d.setDate(d.getDate()-7);return f<d.toISOString().slice(0,10);}
 
   // Asignación / OTIF preprocesadas (mapeo clave→comprador vía Detalle)
   const asig=rowsAsig.map(limpiarClaves).map(r=>({clave:String(r['ID ind.']||r['ID']||'').trim(),descripcion:String(r['Descripción']||'').trim(),
     directriz:String(r['DIRECTRIZ DE PEDIDO']||'').trim().toUpperCase(),cantidad:r['CANTIDAD A PEDIR'],proveedor:String(r['PROVEEDORES']||'').trim(),
     fechaLev:pDX(r['LEVANTAR PEDIDO'])})).filter(r=>r.clave);
   asig.forEach(r=>{r.comprador=claveComp[r.clave]||'SIN ASIGNAR';});
-  const otif=rowsOtif.map(limpiarClaves).map(r=>({clave:String(r['Clave']||'').trim(),estatus:String(r['ESTATUS']||'').trim().toUpperCase(),
-    otifEnt:String(r['OTIF Entrega']||'').trim().toUpperCase(),oc:String(r['OC']||'').trim(),proveedor:String(r['PROVEEDOR']||'').trim()})).filter(r=>r.clave);
+  const nrm=v=>String(v==null?'':v).trim().replace(/\.0$/,'');
+  const otif=rowsOtif.map(limpiarClaves).map(r=>({clave:nrm(r['Clave']),estatus:String(r['ESTATUS']||'').trim().toUpperCase(),
+    enTiempo:String(r['EN TIEMPO']||'').trim().toUpperCase(),oc:nrm(r['OC']),proveedor:String(r['PROVEEDOR']||'').trim()})).filter(r=>r.clave);
   otif.forEach(r=>{r.comprador=claveComp[r.clave]||'SIN ASIGNAR';});
 
   for(const comp of ['GENERAL',...comps]){
     const mine=r=>comp==='GENERAL'||r.comprador===comp;
     const hoyC=hoyRows.filter(mine);
 
-    const falt=hoyC.filter(r=>r.estatus==='FALTANTE').map(r=>({Clave:r.clave,Nombre:r.nombre,Marca:r.marca,'Clasif.Mov':r.clmov,'Back Order':r.bo}));
-    push(comp,'faltantes','FALTANTES',falt,falt.length);
+    const ORD_MOV=['SAGRADOS','ALTA ROTACIÓN','MEDIA ROTACIÓN','LENTA ROTACIÓN','NUEVOS'];
+    const ETQ_MOV={'SAGRADOS':'Sagrados','ALTA ROTACIÓN':'Alta','MEDIA ROTACIÓN':'Media','LENTA ROTACIÓN':'Lenta','NUEVOS':'Nuevos'};
+    const faltR=hoyC.filter(r=>r.estatus==='FALTANTE'&&String(r.clmov||'').toUpperCase()!=='SIN COMPRA');
+    faltR.sort((a,b)=>{const ia=ORD_MOV.indexOf(String(a.clmov||'').toUpperCase()),ib=ORD_MOV.indexOf(String(b.clmov||'').toUpperCase());
+      return (ia<0?99:ia)-(ib<0?99:ib)||String(a.clave).localeCompare(String(b.clave));});
+    const porClmov={};ORD_MOV.forEach(m2=>{const n2=faltR.filter(r=>String(r.clmov||'').toUpperCase()===m2).length;if(n2)porClmov[ETQ_MOV[m2]]=n2;});
+    const falt=faltR.map(r=>({Clave:r.clave,Nombre:r.nombre,Marca:r.marca,'Clasif.Mov':r.clmov,'Back Order':r.bo}));
+    push(comp,'faltantes','FALTANTES',falt,falt.length,'Organizadas por clasificación de movimiento: Sagrados → Alta → Media → Lenta → Nuevos. Excluye claves SIN COMPRA.',{porClmov});
 
-    const nuevos=hoyC.filter(r=>r.estatus==='FALTANTE'&&!refFaltSet.has(r.clave)).map(r=>({Clave:r.clave,Nombre:r.nombre,Marca:r.marca,'Clasif.Mov':r.clmov}));
-    push(comp,'faltantes','FALTANTE_NUEVO',nuevos,nuevos.length,'Claves en faltante hoy que no lo estaban al '+refNuevo.split('-').reverse().join('/'));
+    const nuevos=hoyC.filter(r=>r.estatus==='FALTANTE'&&String(r.clmov||'').toUpperCase()!=='SIN COMPRA'&&!refFaltSet.has(r.clave)).map(r=>({Clave:r.clave,Nombre:r.nombre,Marca:r.marca,'Clasif.Mov':r.clmov}));
+    push(comp,'faltantes','FALTANTE_NUEVO',nuevos,nuevos.length,'Comparación del día actual ('+uf.split('-').reverse().join('/')+') contra el día anterior ('+refNuevo.split('-').reverse().join('/')+'): claves en faltante hoy que ayer no lo estaban.');
 
     const rsg=hoyC.filter(r=>r.estatus==='RIESGO').map(r=>({Clave:r.clave,Nombre:r.nombre,Marca:r.marca,'Meses Inv':(+r.meses_inv).toFixed(1),'T.Entrega':r.t_entrega}));
     push(comp,'faltantes','RIESGO',rsg,rsg.length);
@@ -515,21 +542,24 @@ function computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif){
     push(comp,'inventario','PROLONGADO',prol,prol.length,'Claves con faltante o riesgo por 2+ meses continuos; mientras el histórico de la hoja Detalle sea menor a 60 días, se listan las que llevan todo el periodo disponible ('+(diasEntre(primera,uf)+1)+' días).');
 
     const mineOC=ocs.filter(r=>comp==='GENERAL'||r.comprador===comp);
-    const oc5=mineOC.filter(r=>['PENDIENTE RECIBIR','RECIBIDO PARCIALMENTE'].includes(r.estadoOC)&&lim5m(r.fecha))
+    const oc3=mineOC.filter(r=>['PENDIENTE RECIBIR','RECIBIDO PARCIALMENTE'].includes(r.estadoOC)&&lim3m(r.fecha))
       .map(r=>({Folio:r.folio,Proveedor:r.proveedor,'Fecha OC':r.fecha.split('-').reverse().join('/'),Estado:r.estadoOC}));
-    push(comp,'backorders','OC_5_MESES',oc5,oc5.length);
+    push(comp,'backorders','OC_3_MESES',oc3,oc3.length,'Lógica: órdenes de compra con Estado OC = PENDIENTE RECIBIR o RECIBIDO PARCIALMENTE cuya fecha de colocación es anterior a 3 meses contados desde el corte ('+uf.split('-').reverse().join('/')+'). Es material solicitado que sigue sin llegar completo.');
 
-    const ocap=mineOC.filter(r=>r.estadoOC==='PENDIENTE APLICAR'&&lim2s(r.fecha))
+    const ocap=mineOC.filter(r=>r.estadoOC==='PENDIENTE APLICAR'&&lim1s(r.fecha))
       .map(r=>({Folio:r.folio,Proveedor:r.proveedor,'Fecha OC':r.fecha.split('-').reverse().join('/')}));
-    push(comp,'backorders','OC_SIN_APLICAR',ocap,ocap.length,'Órdenes con Estado OC = PENDIENTE APLICAR y más de 14 días de antigüedad.');
+    push(comp,'backorders','OC_SIN_APLICAR',ocap,ocap.length,'Órdenes con Estado OC = PENDIENTE APLICAR y más de 7 días desde su colocación.');
 
     const ped=asig.filter(r=>r.directriz==='LEVANTAR PEDIDO'&&mine(r))
       .map(r=>({Clave:r.clave,Descripción:r.descripcion,'Cant. a pedir':r.cantidad,Proveedor:r.proveedor,'Fecha sugerida':r.fechaLev?r.fechaLev.split('-').reverse().join('/'):''}));
     push(comp,'otif','PEDIDO_PROPUESTO',ped,ped.length);
 
-    const rec=otif.filter(r=>r.estatus==='RECIBIDO'&&mine(r));
-    const ent=rec.filter(r=>r.otifEnt==='EN TIEMPO').length;
-    push(comp,'otif','OTIF',null,rec.length,null,{enTiempo:ent,pct:rec.length?Math.round(ent/rec.length*100):0});
+    const mineOt=otif.filter(mine);
+    const porOC={};mineOt.forEach(r=>{if(!r.oc)return;(porOC[r.oc]=porOC[r.oc]||{t:0,ok:0}).t++;if(r.enTiempo==='EN TIEMPO')porOC[r.oc].ok++;});
+    const ocsT=Object.keys(porOC);
+    const itemsT=ocsT.map(oc=>({OC:oc,Partidas:porOC[oc].t,'En tiempo':porOC[oc].ok,Cumple:(porOC[oc].ok/porOC[oc].t>=0.95)?'✓':'✗'}));
+    const okT=itemsT.filter(i=>i.Cumple==='✓').length;
+    push(comp,'otif','TARGET',itemsT,ocsT.length,'Lógica del dashboard Inventario & OTIF: una OC cumple Target cuando el 95% o más de sus partidas llegaron EN TIEMPO; el Target del comprador es el % de sus OCs que cumplen.',{ocsOk:okT,pct:ocsT.length?Math.round(okT/ocsT.length*100):null});
   }
   return {alarmas,mes,uf};
 }
@@ -646,18 +676,59 @@ async function descargarComentarios(){
 }
 
 // ── Métricas ──
+let MET={rows:null,chart:null};
+const PALETA=['#1c4587','#c0582a','#4a7c59','#7b5aa6','#b8860b','#2a7d8c','#c0392b','#5b8dbf','#8a6d3b','#5e8c61','#a05195','#665191'];
 async function cargarMetricas(){
   const box=document.getElementById('mtx');box.innerHTML='<p style="color:#64748b;font-size:13px;margin-top:10px">Cargando…</p>';
-  const desde=new Date(Date.now()-90*86400000).toISOString();
-  const{data,error}=await sb.from('ingresos').select('usuario,creado_en').gte('creado_en',desde).order('creado_en',{ascending:false}).limit(5000);
+  const desde=new Date(Date.now()-120*86400000).toISOString();
+  const{data,error}=await sb.from('ingresos').select('usuario,creado_en,ultimo_latido').gte('creado_en',desde).order('creado_en').limit(10000);
   if(error){box.innerHTML='<p style="color:#c0392b">'+error.message+'</p>';return;}
-  const agg={};
-  (data||[]).forEach(r=>{const u=r.usuario;agg[u]=agg[u]||{total:0,ultimo:r.creado_en};agg[u].total++;});
+  MET.rows=data||[];
+  // tabla resumen (todos, incluye visitantes)
+  const agg={};MET.rows.forEach(r=>{const u=r.usuario;agg[u]=agg[u]||{total:0,hrs:0,ultimo:r.creado_en};agg[u].total++;agg[u].hrs+=durH(r);if(r.creado_en>agg[u].ultimo)agg[u].ultimo=r.creado_en;});
   const filas=Object.entries(agg).sort((a,b)=>b[1].total-a[1].total)
-    .map(([u,v])=>`<tr><td>${u}</td><td>${v.total}</td><td>${new Date(v.ultimo).toLocaleString('es-MX')}</td></tr>`).join('');
-  box.innerHTML='<table class="mtx"><tr><th>Usuario</th><th>Ingresos (90 días)</th><th>Último ingreso</th></tr>'+(filas||'<tr><td colspan=3>Sin ingresos registrados aún</td></tr>')+'</table>';
+    .map(([u,v])=>`<tr><td>${u}</td><td>${v.total}</td><td>${v.hrs.toFixed(1)} h</td><td>${new Date(v.ultimo).toLocaleString('es-MX')}</td></tr>`).join('');
+  box.innerHTML='<table class="mtx"><tr><th>Usuario</th><th>Ingresos</th><th>Horas conectado</th><th>Último ingreso</th></tr>'+(filas||'<tr><td colspan=4>Sin ingresos registrados aún</td></tr>')+'</table>';
+  // meses disponibles
+  const meses=[...new Set(MET.rows.map(r=>r.creado_en.slice(0,7)))].sort();
+  const sel=document.getElementById('met-mes');
+  sel.innerHTML=meses.map(m=>`<option value="${m}">${fmtMes(m)}</option>`).join('');
+  if(meses.length)sel.value=meses[meses.length-1];
+  poblarSemanas();renderMetChart();
 }
-
+function durH(r){
+  if(!r.ultimo_latido)return 2/60; // sin latido: mínimo 2 minutos
+  const h=(new Date(r.ultimo_latido)-new Date(r.creado_en))/3600000;
+  return Math.max(2/60,Math.min(h,12)); // tope 12h por sesión (pestañas olvidadas)
+}
+function poblarSemanas(){
+  const s=document.getElementById('met-sem');
+  s.innerHTML='<option value="">Todas</option><option value="1">Semana 1 (1-7)</option><option value="2">Semana 2 (8-14)</option><option value="3">Semana 3 (15-21)</option><option value="4">Semana 4 (22-28)</option><option value="5">Semana 5 (29-31)</option>';
+}
+function renderMetChart(){
+  if(!MET.rows)return;
+  const mes=document.getElementById('met-mes').value;
+  const sem=document.getElementById('met-sem').value;
+  const rows=MET.rows.filter(r=>!r.usuario.toUpperCase().startsWith('VISITANTE')&&r.creado_en.slice(0,7)===mes)
+    .filter(r=>{if(!sem)return true;const d=+r.creado_en.slice(8,10);return d>=(sem-1)*7+1&&d<=sem*7;});
+  const dias=[...new Set(rows.map(r=>r.creado_en.slice(0,10)))].sort();
+  const users=[...new Set(rows.map(r=>r.usuario))].sort();
+  const datasets=users.map((u,i)=>({label:u,backgroundColor:PALETA[i%PALETA.length],
+    data:dias.map(d=>+rows.filter(r=>r.usuario===u&&r.creado_en.slice(0,10)===d).reduce((s,r)=>s+durH(r),0).toFixed(2))}));
+  const ctx=document.getElementById('met-chart');
+  if(MET.chart)MET.chart.destroy();
+  MET.chart=new Chart(ctx,{type:'bar',data:{labels:dias.map(d=>d.slice(8)+'/'+d.slice(5,7)),datasets},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:10}}},
+        tooltip:{callbacks:{label:c2=>{const n=rows.filter(r=>r.usuario===c2.dataset.label&&r.creado_en.slice(0,10)===dias[c2.dataIndex]).length;return c2.dataset.label+': '+c2.raw+' h ('+n+' ingreso'+(n===1?'':'s')+')';}}}},
+      scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,title:{display:true,text:'Horas conectado'}}}}});
+}
+async function reiniciarVisitas(){
+  if(!confirm('¿Seguro que quieres BORRAR todo el conteo de visitas? Esta acción no se puede deshacer.\n\nSugerencia: descarga antes las métricas si las necesitas.'))return;
+  const{error}=await sb.from('ingresos').delete().gte('id',0);
+  if(error){alert('No se pudo reiniciar: '+error.message+'\n\nSi dice "row-level security", ejecuta en Supabase el script SQL adicional que acompaña esta actualización.');return;}
+  MET.rows=null;alert('Conteo de visitas reiniciado ✅');cargarMetricas();
+}
 init();
 </script>
 </body>
