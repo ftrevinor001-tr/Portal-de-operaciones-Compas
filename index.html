@@ -148,6 +148,7 @@
         <label style="font-size:12px;color:#64748b">Comprador:</label>
         <select id="res-comp" onchange="renderResumen()"></select>
         <span id="res-meses"></span>
+        <button class="abtn" style="margin-top:0" id="res-dl" onclick="descargarResumenExcel()">⬇ Descargar Excel</button>
       </div>
       <div id="res-content"><div class="empty-res">Cargando resumen…</div></div>
     </div>
@@ -409,6 +410,88 @@ function pintarChart(comp){
   const serie=fechas.map(f=>comp==='GENERAL'?(RES.resumen.totalByDay[f]||0):((RES.resumen.compByDay[comp]||{})[f]||0));
   if(RES.chart)RES.chart.destroy();
   RES.chart=new Chart(ctx,{type:'line',data:{labels:fechas.map(f=>f.slice(8)+'/'+f.slice(5,7)),datasets:[{label:'Claves en faltante',data:serie,borderColor:'#c0582a',backgroundColor:'rgba(192,88,42,.12)',fill:true,tension:.25,pointRadius:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+}
+
+// ── Exportar Mi Resumen a Excel ──
+function cargarExcelJS(){
+  return new Promise((res,rej)=>{
+    if(window.ExcelJS)return res();
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
+    s.onload=()=>res();s.onerror=()=>rej(new Error('No se pudo cargar la librería de exportación.'));
+    document.head.appendChild(s);
+  });
+}
+function nombreHoja(s){return s.replace(/[\[\]\*\?\/\\:]/g,' ').slice(0,31);}
+async function descargarResumenExcel(){
+  const btn=document.getElementById('res-dl');
+  if(!RES.alarmas){alert('Aún no hay información cargada en Mi Resumen.');return;}
+  const comp=document.getElementById('res-comp').value;
+  btn.disabled=true;btn.textContent='⏳ Generando…';
+  try{
+    await cargarExcelJS();
+    const wb=new ExcelJS.Workbook();
+    wb.creator='Portal de Compras';
+    const uf=RES.resumen?RES.resumen.uf:'';
+    const orden=['FALTANTES','FALTANTE_NUEVO','RIESGO','PROLONGADO','OC_3_MESES','OC_SIN_APLICAR','PEDIDO_PROPUESTO','SOBREINVENTARIO','TARGET'];
+    const estiloHdr=r=>{r.font={bold:true,color:{argb:'FFFFFFFF'}};r.eachCell(cl=>{cl.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1E3A5F'}};cl.border={bottom:{style:'thin'}};});};
+
+    // Hoja 1: Resumen de KPIs
+    const wsR=wb.addWorksheet('Resumen');
+    wsR.addRow(['Resumen de '+(comp==='GENERAL'?'GENERAL (todos)':comp)]).font={bold:true,size:14};
+    wsR.addRow(['Al corte del',uf?uf.split('-').reverse().join('/'):'']);
+    wsR.addRow([]);
+    estiloHdr(wsR.addRow(['Indicador','Total','Dashboard']));
+    orden.forEach(t=>{const a=alarmaDe(comp,t);if(!a)return;const T=TIPOS[t];const d=a.datos||{};
+      wsR.addRow([T.t, t==='TARGET'?(d.pct!=null?d.pct+'%':'—'):(d.total!=null?d.total:0), T.dash]);});
+    wsR.columns=[{width:34},{width:12},{width:24}];
+
+    // Una hoja por tarjeta
+    const usados={Resumen:1};
+    orden.forEach(t=>{
+      const a=alarmaDe(comp,t);if(!a)return;const T=TIPOS[t];const d=a.datos||{};
+      let nom=nombreHoja(T.t);let k=2;while(usados[nom]){nom=nombreHoja(T.t.slice(0,28))+' '+(k++);}usados[nom]=1;
+      const ws=wb.addWorksheet(nom);
+      ws.addRow([T.t+(comp!=='GENERAL'?' · '+comp:' · GENERAL')]).font={bold:true,size:13};
+      if(a.descripcion)ws.addRow([a.descripcion]).font={italic:true,size:9,color:{argb:'FF6B7A99'}};
+      if(t==='FALTANTES'&&d.porClmov){ws.addRow(['Desglose: '+Object.entries(d.porClmov).map(([k2,v2])=>k2+': '+v2).join(' · ')]);}
+      if(t==='TARGET')ws.addRow(['Cumplen Target: '+(d.ocsOk||0)+' de '+(d.total||0)+' OCs ('+(d.pct!=null?d.pct+'%':'—')+')']).font={bold:true};
+      ws.addRow([]);
+      const items=d.items||[];
+      if(items.length){
+        const cols=Object.keys(items[0]);
+        estiloHdr(ws.addRow(cols));
+        items.forEach(it=>ws.addRow(cols.map(k2=>it[k2]??'')));
+        if(d.total>items.length)ws.addRow(['('+items.length+' de '+d.total+' — detalle completo en el dashboard '+T.dash+')']).font={italic:true,size:9};
+        ws.columns=cols.map(k2=>({width:Math.min(45,Math.max(12,k2.length+6))}));
+      }else{ws.addRow([t==='TARGET'?'':'Sin registros ✅']);}
+    });
+
+    // Hoja de la gráfica (imagen + datos)
+    if(RES.chart&&RES.resumen){
+      const wsG=wb.addWorksheet('Gráfica');
+      wsG.addRow(['Evolución de faltantes · '+(comp==='GENERAL'?'GENERAL':comp)+' · '+[...RES.mesesSel].sort().map(fmtMes).join(' + ')]).font={bold:true,size:13};
+      try{
+        const png=RES.chart.toBase64Image();
+        const imgId=wb.addImage({base64:png,extension:'png'});
+        wsG.addImage(imgId,{tl:{col:0,row:2},ext:{width:920,height:380}});
+      }catch(e){wsG.addRow(['(No se pudo capturar la imagen de la gráfica)']);}
+      // datos de respaldo de la gráfica a partir de la fila 25
+      const fechas=RES.resumen.fechas.filter(f=>RES.mesesSel.has(f.slice(0,7)));
+      let fila=24;
+      estiloHdr(wsG.getRow(fila));wsG.getRow(fila).values=['Fecha','Claves en faltante'];
+      fechas.forEach(f=>{fila++;wsG.getRow(fila).values=[f.split('-').reverse().join('/'),
+        comp==='GENERAL'?(RES.resumen.totalByDay[f]||0):((RES.resumen.compByDay[comp]||{})[f]||0)];});
+      wsG.columns=[{width:14},{width:18}];
+    }
+
+    const buf=await wb.xlsx.writeBuffer();
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+    a.download='Mi_Resumen_'+(comp==='GENERAL'?'General':comp.replace(/\s+/g,'_'))+'_'+(uf||'').replace(/-/g,'')+'.xlsx';
+    a.click();
+  }catch(e){alert('No se pudo generar el Excel: '+e.message);}
+  btn.disabled=false;btn.textContent='⬇ Descargar Excel';
 }
 
 // ═══════════ ADMIN ═══════════
