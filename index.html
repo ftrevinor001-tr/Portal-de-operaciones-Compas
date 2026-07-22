@@ -184,7 +184,7 @@
       <div id="adm-open" style="display:none">
         <div class="admin-card">
           <h2>📤 Cargar Excel maestro</h2>
-          <p class="desc">Sube el archivo <b>Portal_de_compras_Info.xlsx</b>. En este paquete se procesa y publica el dashboard de <b>Histórico Faltantes</b> (hojas: Hoja1 y Detalle). Los demás dashboards se conectan en el siguiente paquete.</p>
+          <p class="desc">Sube el archivo <b>Portal_de_compras_Info.xlsx</b>. Una sola carga actualiza los 4 dashboards y las alarmas: Histórico Faltantes (Hoja1 + Detalle), Monitor de Inventario (Historico de faltantes), Estatus Back Orders (RP01-23 + Productos Incluidos en) e Inventario &amp; OTIF (Asignacion + OTIF PEDIDOS).</p>
           <div class="drop" id="drop" onclick="document.getElementById('fx').click()">📂 Arrastra aquí el Excel o haz clic para seleccionarlo</div>
           <input type="file" id="fx" accept=".xlsx,.xlsm" style="display:none">
           <div class="chkrow"><input type="checkbox" id="chk-bk" checked><label for="chk-bk">Guardar copia del Excel original como respaldo descargable</label></div>
@@ -290,9 +290,9 @@ async function doLogout(){
 // ═══════════ TABS ═══════════
 const SRCS=[
   'dash_faltantes.html',
-  'https://ftrevinor001-tr.github.io/monitor-inventario/',
-  'https://ftrevinor001-tr.github.io/Estatus_BO/',
-  'dashboard_Estatus_inventario_y_OTIF.html'
+  'dash_monitor.html',
+  'dash_backorders.html',
+  'dash_otif.html'
 ];
 const loadedTabs=[false,false,false,false];
 function loadTab(i){ // i = 1..4 (iframes)
@@ -564,6 +564,62 @@ function computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif){
   return {alarmas,mes,uf};
 }
 
+
+// ── Constructor del payload del Monitor de Inventario ──
+function construirMonitor(rawH, miMap){
+  const rows=rawH.map(r=>({f:pD(r['Día/ mes.1']),c:String(r['Clave']||'').trim(),n:String(r['Nombre']||'').trim(),
+    m:String(r['Marca']||'').trim(),cp:String(r['COMPRADOR']||'').trim().toUpperCase(),
+    cl:String(r['Clasificación']||'').trim(),cr:String(r['Clasificacion']||'').trim().toUpperCase(),
+    est:String(r['Clasificacion 2']||'').trim().toUpperCase(),miv:parseFloat(String(r['Meses de inventario']||'').replace(/,/g,''))})).filter(r=>r.f&&r.c&&r.cr!=='NUEVOS'&&r.cr!=='SIN COMPRA');
+  const fechas=[...new Set(rows.map(r=>r.f))].sort();
+  if(!fechas.length)throw new Error('La hoja Historico de faltantes no tiene fechas válidas.');
+  const firstDate=fechas[0],lastDate=fechas[fechas.length-1];
+  const meses=[...new Set(fechas.map(f=>f.slice(0,7)))].sort();
+  const maxDays={},calDays={},labels={};
+  const MESL=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  meses.forEach(mm=>{maxDays[mm]=fechas.filter(f=>f.slice(0,7)===mm).length;
+    const[y,mo]=mm.split('-');calDays[mm]=new Date(+y,+mo,0).getDate();labels[mm]=MESL[+mo-1]+' '+y;});
+  const map={};
+  rows.forEach(r=>{const d=map[r.c]||(map[r.c]={c:r.c,fd:{},prim:null,miUlt:null});
+    d.fd[r.f]=r.est;
+    if(!d.prim||r.f<d.prim.f)d.prim=r;
+    if(r.f===fechas[fechas.length-1])d.miUlt=r.miv;});
+  const data=Object.values(map).map(d=>{
+    const mo={};
+    fechas.forEach(f=>{const e=d.fd[f];if(!e)return;const mm=f.slice(0,7);
+      const v=mo[mm]||(mo[mm]={f:0,r:0,'if':null,lf:null,ir:null,lr:null});
+      if(e==='FALTANTE'){v.f++;if(!v['if'])v['if']=f;v.lf=f;}
+      else if(e==='RIESGO'){v.r++;if(!v.ir)v.ir=f;v.lr=f;}});
+    let gif=null,glf=null,dfa=0,gir=null,glr=null,drfa=0,iLast=-1;
+    const own=fechas.filter(f=>d.fd[f]);
+    for(let i=own.length-1;i>=0;i--){if(d.fd[own[i]]==='FALTANTE'){iLast=i;break;}}
+    if(iLast>=0){
+      glf=own[iLast];let i=iLast;
+      while(i>=0&&d.fd[own[i]]==='FALTANTE'){gif=own[i];dfa++;i--;}
+      while(i>=0&&d.fd[own[i]]==='RIESGO'){if(!glr)glr=own[i];gir=own[i];drfa++;i--;}
+    }
+    let mi=d.miUlt;mi=(mi===undefined||mi===null||isNaN(mi))?null:Math.round(mi*100)/100;
+    return{c:d.c,mo,gir,glr,gif,glf,drfa,dfa,mi,n:d.prim.n.slice(0,60),m:d.prim.m,cp:d.prim.cp,cl:d.prim.cl,cr:d.prim.cr};
+  }).sort((a,b)=>(+a.c||0)-(+b.c||0)||String(a.c).localeCompare(String(b.c)));
+  const uq2=k=>[...new Set(data.map(d=>d[k]).filter(x=>x))].sort();
+  const db={data,compradores:uq2('cp'),marcas:uq2('m'),clasifLetra:uq2('cl'),clasifRot:uq2('cr'),
+    meses,calDays,totalDays:fechas.length,firstDate,lastDate,miDate:lastDate};
+  return{db,maxDays,calDays,labels};
+}
+async function subirBinario(ruta,body,tipo){
+  const up=await sb.storage.from('respaldos').upload(ruta,body,{upsert:true,contentType:tipo||'application/octet-stream'});
+  if(up.error)throw new Error('Storage ('+ruta+'): '+up.error.message);
+}
+async function publicarDataset(clave,meta){
+  const ds=await sb.from('datasets').upsert({clave:clave,payload:meta,actualizado_por:usuarioActual||'admin'});
+  if(ds.error)throw new Error('datasets ('+clave+'): '+ds.error.message);
+}
+async function gzipBlob(str){
+  if(typeof CompressionStream==='undefined')return{body:new Blob([str]),gz:false};
+  const cs=new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'));
+  return{body:await new Response(cs).blob(),gz:true};
+}
+
 // ── Carga del Excel maestro ──
 const drop=document.getElementById('drop');
 ['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
@@ -647,13 +703,59 @@ async function procesarExcel(file){
     if(dr.error)throw new Error('dataset resumen: '+dr.error.message);
     RES.alarmas=null; // forzar recarga de Mi Resumen
 
+    // ── MONITOR DE INVENTARIO ──
+    const wsHist=wb.Sheets['Historico de faltantes'];
+    if(wsHist){
+      log('⚙️ Procesando Historico de faltantes (Monitor)… puede tardar 1-2 min');
+      await new Promise(r=>setTimeout(r,50));
+      const rawH=XLSX.utils.sheet_to_json(wsHist,{raw:false,defval:''});
+      log('   '+rawH.length.toLocaleString()+' filas');
+      const miMap={};payload.detR.forEach(r=>{const cm=String(r.clmov||'').trim().toUpperCase();if(r.fecha===payload.uf&&cm!=='NUEVOS'&&cm!=='SIN COMPRA')miMap[String(r.clave).trim()]=parseFloat(r.meses_inv);});
+      const mon=construirMonitor(rawH,miMap);
+      log('   '+mon.db.data.length.toLocaleString()+' claves · '+mon.db.totalDays+' días ('+mon.db.firstDate+' → '+mon.db.lastDate+')');
+      log('🗜️ Comprimiendo Monitor…');
+      const js=JSON.stringify(mon);
+      const{body:mb,gz:mgz}=await gzipBlob(js);
+      const mruta=mgz?'payloads/monitor.json.gz':'payloads/monitor.json';
+      log('☁️ Subiendo Monitor ('+Math.round(mb.size/1048576*10)/10+' MB)…');
+      await subirBinario(mruta,mb);
+      await publicarDataset('monitor',{version:version,ruta:mruta,uf:mon.db.lastDate,claves:mon.db.data.length});
+      log('✅ Monitor de Inventario publicado');
+    }else{log('⚠️ No se encontró la hoja Historico de faltantes: Monitor no actualizado.');}
+
+    // ── BACK ORDERS (Excel ligero con sus 2 hojas) ──
+    if(wsOC&&wb.Sheets['Productos Incluidos en']){
+      log('📦 Preparando Excel ligero de Back Orders…');
+      const wbBO=XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wbBO,wsOC,'RP01-23 Ordenes de Compra');
+      XLSX.utils.book_append_sheet(wbBO,wb.Sheets['Productos Incluidos en'],'Productos Incluidos en');
+      const boArr=XLSX.write(wbBO,{bookType:'xlsx',type:'array',compression:true});
+      log('☁️ Subiendo Back Orders ('+Math.round(boArr.byteLength/1048576*10)/10+' MB)…');
+      await subirBinario('payloads/backorders.xlsx',new Blob([boArr]),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      await publicarDataset('backorders',{version:version,ruta:'payloads/backorders.xlsx'});
+      log('✅ Estatus Back Orders publicado');
+    }else{log('⚠️ Faltan hojas de Back Orders (RP01-23 / Productos Incluidos en): no actualizado.');}
+
+    // ── INVENTARIO & OTIF (Excel ligero con sus 2 hojas) ──
+    if(wsAs&&wsOt){
+      log('🎯 Preparando Excel ligero de Inventario & OTIF…');
+      const wbOT=XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wbOT,wsAs,'Asignacion');
+      XLSX.utils.book_append_sheet(wbOT,wsOt,'OTIF PEDIDOS');
+      const otArr=XLSX.write(wbOT,{bookType:'xlsx',type:'array',compression:true});
+      log('☁️ Subiendo Inventario & OTIF…');
+      await subirBinario('payloads/otif.xlsx',new Blob([otArr]),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      await publicarDataset('otif',{version:version,ruta:'payloads/otif.xlsx'});
+      log('✅ Inventario & OTIF publicado');
+    }else{log('⚠️ Faltan hojas Asignacion / OTIF PEDIDOS: Inventario & OTIF no actualizado.');}
+
     if(document.getElementById('chk-bk').checked){
       log('💾 Respaldando Excel original ('+Math.round(file.size/1048576)+' MB)…');
       const bk=await sb.storage.from('respaldos').upload('excel/ultimo_respaldo.xlsx',file,{upsert:true,contentType:file.type||'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
       if(bk.error) log('⚠️ Respaldo del Excel: '+bk.error.message); else log('✅ Respaldo guardado');
     }
     log('');
-    log('🎉 LISTO. El dashboard de Histórico Faltantes ya muestra la nueva información para todo el equipo.');
+    log('🎉 LISTO. Los 4 dashboards y las alarmas ya muestran la nueva información para todo el equipo.');
     log('   (Si tenías el dashboard abierto, presiona "☁️ Actualizar desde servidor" o recarga la página.)');
   }catch(e){log('❌ ERROR: '+e.message);}
 }
