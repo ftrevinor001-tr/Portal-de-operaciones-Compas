@@ -3,151 +3,402 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Portal de Operaciones</title>
+<title>Portal de Compras</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f172a;height:100vh;display:flex;flex-direction:column;overflow:hidden}
-
-  /* TOP BAR */
-  .topbar{
-    background:linear-gradient(135deg,#1e3a5f 0%,#1c4587 60%,#1565c0 100%);
-    padding:0 24px;display:flex;align-items:center;justify-content:space-between;
-    height:54px;flex-shrink:0;
-    box-shadow:0 2px 16px rgba(0,0,0,.4);z-index:100;
-  }
+  .topbar{background:linear-gradient(135deg,#1e3a5f 0%,#1c4587 60%,#1565c0 100%);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:54px;flex-shrink:0;box-shadow:0 2px 16px rgba(0,0,0,.4);z-index:100}
   .topbar-left{display:flex;align-items:center;gap:14px}
   .logo{width:36px;height:36px;border-radius:9px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:18px}
   .topbar-title{color:#fff;font-size:15px;font-weight:700;letter-spacing:-.2px}
   .topbar-title span{font-weight:300;opacity:.6;font-size:11px;display:block;text-transform:uppercase;letter-spacing:.08em}
-  .topbar-right{color:rgba(255,255,255,.5);font-size:11px}
-
-  /* TABS */
-  .tabs-bar{
-    background:#1e293b;display:flex;align-items:center;
-    padding:0 16px;gap:4px;height:48px;flex-shrink:0;
-    border-bottom:1px solid rgba(255,255,255,.08);
-  }
-  .tab{
-    display:flex;align-items:center;gap:7px;padding:8px 16px;border-radius:8px;
-    cursor:pointer;transition:all .18s;color:rgba(255,255,255,.5);
-    font-size:13px;font-weight:500;border:1px solid transparent;
-    user-select:none;white-space:nowrap;
-  }
+  .topbar-right{display:flex;align-items:center;gap:12px;color:rgba(255,255,255,.5);font-size:11px}
+  .user-chip{background:rgba(255,255,255,.14);color:#fff;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;display:none;align-items:center;gap:8px}
+  .user-chip button{background:none;border:none;color:rgba(255,255,255,.6);cursor:pointer;font-size:12px}
+  .user-chip button:hover{color:#fff}
+  .tabs-bar{background:#1e293b;display:flex;align-items:center;padding:0 16px;gap:4px;height:48px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.08)}
+  .tab{display:flex;align-items:center;gap:7px;padding:8px 16px;border-radius:8px;cursor:pointer;transition:all .18s;color:rgba(255,255,255,.5);font-size:13px;font-weight:500;border:1px solid transparent;user-select:none;white-space:nowrap}
   .tab:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.8)}
   .tab.active{background:rgba(59,130,246,.18);border-color:rgba(59,130,246,.4);color:#93c5fd}
   .tab-icon{font-size:15px}
-  .tab-dot{width:6px;height:6px;border-radius:50%;background:#3b82f6;flex-shrink:0;display:none}
-  .tab.active .tab-dot{display:block}
-
-  /* FRAMES */
   .frames{flex:1;position:relative;overflow:hidden}
   .frame-wrap{position:absolute;inset:0;display:none}
   .frame-wrap.active{display:block}
   iframe{width:100%;height:100%;border:none;background:#fff}
-
-  /* LOADER */
-  .loader{
-    position:absolute;inset:0;background:#f1f5f9;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:14px;z-index:10;transition:opacity .4s;
-  }
+  .loader{position:absolute;inset:0;background:#f1f5f9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:10;transition:opacity .4s}
   .loader.hidden{opacity:0;pointer-events:none}
   .spinner{width:40px;height:40px;border:3px solid #e2e8f0;border-top-color:#3b82f6;border-radius:50%;animation:spin .7s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
   .loader p{color:#64748b;font-size:13px}
+
+  /* ── PANTALLAS DE ACCESO ── */
+  .gate{position:fixed;inset:0;background:linear-gradient(160deg,#0f172a 0%,#16233f 60%,#1c3358 100%);display:flex;align-items:center;justify-content:center;z-index:500}
+  .gate-card{background:#fff;border-radius:16px;padding:36px 40px;width:min(420px,92vw);box-shadow:0 20px 60px rgba(0,0,0,.5);text-align:center}
+  .gate-card h1{font-size:20px;color:#1a2035;margin-bottom:4px}
+  .gate-card .sub{color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:.1em;margin-bottom:24px}
+  .gate-card input{width:100%;padding:12px 14px;border:1.5px solid #d7dce6;border-radius:10px;font-size:15px;margin-bottom:14px;outline:none}
+  .gate-card input:focus{border-color:#3b82f6}
+  .gate-btn{width:100%;padding:12px;background:#1c4587;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}
+  .gate-btn:hover{background:#1565c0}
+  .gate-btn:disabled{opacity:.6;cursor:wait}
+  .gate-err{color:#c0392b;font-size:13px;margin-top:12px;display:none}
+  .pick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:6px;max-height:52vh;overflow:auto}
+  .pick-btn{padding:14px 8px;border:1.5px solid #d7dce6;border-radius:10px;background:#f8fafc;cursor:pointer;font-size:13px;font-weight:600;color:#1a2035;transition:all .15s}
+  .pick-btn:hover{border-color:#3b82f6;background:#eef4ff}
+  .pick-btn .tag{display:block;font-size:10px;font-weight:400;color:#64748b;margin-top:3px;text-transform:uppercase;letter-spacing:.05em}
+  .gate-wide{width:min(680px,94vw)}
+
+  /* ── ADMIN ── */
+  .admin-body{position:absolute;inset:0;background:#f1f5f9;overflow:auto;padding:28px}
+  .admin-card{background:#fff;border-radius:14px;padding:24px 28px;max-width:860px;margin:0 auto 20px;box-shadow:0 2px 10px rgba(15,23,42,.06)}
+  .admin-card h2{font-size:16px;color:#1a2035;margin-bottom:6px}
+  .admin-card p.desc{color:#64748b;font-size:13px;margin-bottom:16px}
+  .drop{border:2px dashed #b9c4d6;border-radius:12px;padding:34px;text-align:center;color:#64748b;cursor:pointer;font-size:14px;transition:all .15s}
+  .drop:hover,.drop.over{border-color:#3b82f6;background:#eef4ff}
+  .prog{font-family:ui-monospace,Consolas,monospace;font-size:12px;background:#0f172a;color:#a5d6a7;border-radius:10px;padding:14px 16px;margin-top:16px;max-height:260px;overflow:auto;display:none;white-space:pre-wrap}
+  .chkrow{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;color:#334155}
+  table.mtx{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+  table.mtx th{background:#f1f5f9;color:#334155;text-align:left;padding:8px 10px;border-bottom:2px solid #e2e8f0}
+  table.mtx td{padding:7px 10px;border-bottom:1px solid #eef2f7;color:#1a2035}
+  .abtn{padding:9px 16px;background:#1c4587;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-top:12px}
+  .abtn:hover{background:#1565c0}
 </style>
 </head>
 <body>
 
+<!-- ════ PASO 1: CONTRASEÑA GENERAL ════ -->
+<div class="gate" id="gate-pass">
+  <div class="gate-card">
+    <div style="font-size:34px;margin-bottom:10px">📊</div>
+    <h1>Portal de Compras</h1>
+    <div class="sub">Supply Chain Dashboards</div>
+    <input type="password" id="pw" placeholder="Contraseña de acceso" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="gate-btn" id="pw-btn" onclick="doLogin()">Entrar</button>
+    <div class="gate-err" id="pw-err"></div>
+  </div>
+</div>
+
+<!-- ════ PASO 2: SELECCIÓN DE USUARIO ════ -->
+<div class="gate" id="gate-user" style="display:none">
+  <div class="gate-card gate-wide">
+    <h1>¿Quién está entrando?</h1>
+    <div class="sub">Selecciona tu nombre</div>
+    <div class="pick-grid" id="pick-grid"><div style="grid-column:1/-1;color:#64748b">Cargando usuarios…</div></div>
+  </div>
+</div>
+
+<!-- ════ PORTAL ════ -->
 <div class="topbar">
   <div class="topbar-left">
     <div class="logo">📊</div>
-    <div class="topbar-title">
-      Portal de Operaciones
-      <span>Supply Chain Dashboards</span>
-    </div>
+    <div class="topbar-title">Portal de Compras<span>Supply Chain Dashboards</span></div>
   </div>
-  <div class="topbar-right" id="clock"></div>
+  <div class="topbar-right">
+    <div class="user-chip" id="user-chip"><span id="user-name"></span><button onclick="doLogout()" title="Cerrar sesión">✕ Salir</button></div>
+    <span id="clock"></span>
+  </div>
 </div>
 
 <div class="tabs-bar">
-  <div class="tab active" onclick="switchTab(0)" id="tab-0"><span class="tab-icon">📉</span>Histórico Faltantes<span class="tab-dot"></span></div>
-  <div class="tab" onclick="switchTab(1)" id="tab-1"><span class="tab-icon">📦</span>Monitor de Inventario<span class="tab-dot"></span></div>
-  <div class="tab" onclick="switchTab(2)" id="tab-2"><span class="tab-icon">🔄</span>Estatus Back Orders<span class="tab-dot"></span></div>
-  <div class="tab" onclick="switchTab(3)" id="tab-3"><span class="tab-icon">🎯</span>Inventario &amp; OTIF<span class="tab-dot"></span></div>
+  <div class="tab active" onclick="switchTab(0)"><span class="tab-icon">📉</span>Histórico Faltantes</div>
+  <div class="tab" onclick="switchTab(1)"><span class="tab-icon">📦</span>Monitor de Inventario</div>
+  <div class="tab" onclick="switchTab(2)"><span class="tab-icon">🔄</span>Estatus Back Orders</div>
+  <div class="tab" onclick="switchTab(3)"><span class="tab-icon">🎯</span>Inventario &amp; OTIF</div>
+  <div class="tab" onclick="switchTab(4)" id="tab-admin"><span class="tab-icon">⚙️</span>Admin</div>
 </div>
 
 <div class="frames">
-
-  <!-- 0: Histórico Faltantes → GitHub Pages (data.json actualizado por Actions) -->
-  <div class="frame-wrap active" id="frame-wrap-0">
-    <div class="loader" id="loader-0"><div class="spinner"></div><p>Cargando Histórico Faltantes…</p></div>
-    <iframe id="frame-0" src="https://ftrevinor001-tr.github.io/dashboard-faltantes/" onload="hideLoader(0)"></iframe>
+  <div class="frame-wrap active" id="fw-0">
+    <div class="loader" id="ld-0"><div class="spinner"></div><p>Cargando Histórico Faltantes…</p></div>
+    <iframe id="fr-0" onload="hideLd(0)"></iframe>
+  </div>
+  <div class="frame-wrap" id="fw-1">
+    <div class="loader" id="ld-1"><div class="spinner"></div><p>Cargando Monitor de Inventario…</p></div>
+    <iframe id="fr-1" onload="hideLd(1)"></iframe>
+  </div>
+  <div class="frame-wrap" id="fw-2">
+    <div class="loader" id="ld-2"><div class="spinner"></div><p>Cargando Estatus Back Orders…</p></div>
+    <iframe id="fr-2" onload="hideLd(2)"></iframe>
+  </div>
+  <div class="frame-wrap" id="fw-3">
+    <div class="loader" id="ld-3"><div class="spinner"></div><p>Cargando Inventario &amp; OTIF…</p></div>
+    <iframe id="fr-3" onload="hideLd(3)"></iframe>
   </div>
 
-  <!-- 1: Monitor de Inventario → GitHub Pages (actualizar_dashboard.py genera index.html con datos embebidos) -->
-  <div class="frame-wrap" id="frame-wrap-1">
-    <div class="loader" id="loader-1"><div class="spinner"></div><p>Cargando Monitor de Inventario…</p></div>
-    <iframe id="frame-1" onload="hideLoader(1)"></iframe>
-  </div>
+  <!-- ════ ADMIN ════ -->
+  <div class="frame-wrap" id="fw-4">
+    <div class="admin-body">
+      <div class="admin-card" id="adm-lock">
+        <h2>🔒 Panel de administración</h2>
+        <p class="desc">Ingresa la contraseña de administrador para cargar información o descargar la base de datos.</p>
+        <input type="password" id="apw" placeholder="Contraseña de administrador" style="width:100%;padding:11px 13px;border:1.5px solid #d7dce6;border-radius:9px;font-size:14px" onkeydown="if(event.key==='Enter')adminLogin()">
+        <button class="abtn" onclick="adminLogin()">Desbloquear</button>
+        <div class="gate-err" id="apw-err"></div>
+      </div>
 
-  <!-- 2: Estatus Back Orders → GitHub Pages (convert_to_json.py + Actions actualiza data/data.json) -->
-  <div class="frame-wrap" id="frame-wrap-2">
-    <div class="loader" id="loader-2"><div class="spinner"></div><p>Cargando Estatus Back Orders…</p></div>
-    <iframe id="frame-2" onload="hideLoader(2)"></iframe>
-  </div>
+      <div id="adm-open" style="display:none">
+        <div class="admin-card">
+          <h2>📤 Cargar Excel maestro</h2>
+          <p class="desc">Sube el archivo <b>Portal_de_compras_Info.xlsx</b>. En este paquete se procesa y publica el dashboard de <b>Histórico Faltantes</b> (hojas: Hoja1 y Detalle). Los demás dashboards se conectan en el siguiente paquete.</p>
+          <div class="drop" id="drop" onclick="document.getElementById('fx').click()">📂 Arrastra aquí el Excel o haz clic para seleccionarlo</div>
+          <input type="file" id="fx" accept=".xlsx,.xlsm" style="display:none">
+          <div class="chkrow"><input type="checkbox" id="chk-bk" checked><label for="chk-bk">Guardar copia del Excel original como respaldo descargable</label></div>
+          <div class="prog" id="prog"></div>
+        </div>
 
-  <!-- 3: Inventario & OTIF → archivo local (sin repositorio) -->
-  <div class="frame-wrap" id="frame-wrap-3">
-    <div class="loader" id="loader-3"><div class="spinner"></div><p>Cargando Inventario &amp; OTIF…</p></div>
-    <iframe id="frame-3" onload="hideLoader(3)"></iframe>
-  </div>
+        <div class="admin-card">
+          <h2>📥 Descargar base de datos</h2>
+          <p class="desc">Descarga el último Excel respaldado y los comentarios acumulados.</p>
+          <button class="abtn" onclick="descargarRespaldo()">⬇ Último Excel respaldado</button>
+          <button class="abtn" onclick="descargarComentarios()" style="background:#4a7c59">⬇ Comentarios (Excel)</button>
+          <div class="gate-err" id="dl-err"></div>
+        </div>
 
+        <div class="admin-card">
+          <h2>📈 Métricas de ingreso</h2>
+          <p class="desc">Cantidad de veces que ha entrado cada persona.</p>
+          <button class="abtn" onclick="cargarMetricas()">🔄 Actualizar métricas</button>
+          <div id="mtx"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
-/*
-  SRCS: URL de cada tab — todos los que tienen repo apuntan a GitHub Pages.
-  ─────────────────────────────────────────────────────────────────────────────
-  Tab 0 · Histórico Faltantes   → github.io/dashboard-faltantes/   (data.json vía Actions)
-  Tab 1 · Monitor de Inventario → github.io/monitor-inventario/    (index.html generado por Actions)
-  Tab 2 · Estatus Back Orders   → github.io/Estatus_BO/            (data/data.json vía Actions)
-  Tab 3 · Inventario & OTIF     → archivo local                    (sin repo)
-  ─────────────────────────────────────────────────────────────────────────────
-*/
-const SRCS = [
-  'https://ftrevinor001-tr.github.io/dashboard-faltantes/',   // 0 · Histórico Faltantes
-  'https://ftrevinor001-tr.github.io/monitor-inventario/',    // 1 · Monitor de Inventario
-  'https://ftrevinor001-tr.github.io/Estatus_BO/',            // 2 · Estatus Back Orders
-  'dashboard_Estatus_inventario_y_OTIF.html'                  // 3 · Inventario & OTIF (local)
-];
+// ═══════════ CONFIGURACIÓN ═══════════
+const SB_URL="https://lyjbuhttdikfhmufunra.supabase.co";
+const SB_KEY="sb_publishable_9CGnUVxR36vOvPLvaToJ7A_ztI7s6yT";
+const EMAIL_EQUIPO="equipo@portalcompras.app";
+const EMAIL_ADMIN="admin@portalcompras.app";
+const sb=window.supabase.createClient(SB_URL,SB_KEY);
+let usuarioActual=sessionStorage.getItem('pc_usuario')||null;
+let esAdmin=false;
 
-// El tab 0 ya carga vía atributo src en el HTML; los demás se cargan lazy al primer clic.
-const loaded = [true, false, false, false];
-
-function hideLoader(i){
-  const l = document.getElementById('loader-' + i);
-  if (l) l.classList.add('hidden');
-}
-
-function switchTab(i){
-  document.querySelectorAll('.tab').forEach((t, j) => t.classList.toggle('active', j === i));
-  document.querySelectorAll('.frame-wrap').forEach((f, j) => f.classList.toggle('active', j === i));
-  if (!loaded[i]){
-    loaded[i] = true;
-    document.getElementById('frame-' + i).src = SRCS[i];
+// ═══════════ FLUJO DE ACCESO ═══════════
+async function init(){
+  const{data:{session}}=await sb.auth.getSession();
+  if(session){
+    esAdmin=(session.user.email===EMAIL_ADMIN);
+    document.getElementById('gate-pass').style.display='none';
+    if(usuarioActual){entrarPortal();}else{mostrarPicker();}
   }
+  tick();setInterval(tick,30000);
+}
+async function doLogin(){
+  const pw=document.getElementById('pw').value;
+  const btn=document.getElementById('pw-btn'),err=document.getElementById('pw-err');
+  if(!pw){err.textContent='Escribe la contraseña.';err.style.display='block';return;}
+  btn.disabled=true;err.style.display='none';btn.textContent='Verificando…';
+  let r=await sb.auth.signInWithPassword({email:EMAIL_EQUIPO,password:pw});
+  if(r.error){
+    const r2=await sb.auth.signInWithPassword({email:EMAIL_ADMIN,password:pw});
+    if(r2.error){
+      btn.disabled=false;btn.textContent='Entrar';
+      err.textContent=(r.error.message||'').includes('confirm')?'El usuario de acceso no está confirmado en Supabase (Authentication → Users).':'Contraseña incorrecta.';
+      err.style.display='block';return;
+    }
+    esAdmin=true;
+  }
+  document.getElementById('gate-pass').style.display='none';
+  mostrarPicker();
+}
+async function mostrarPicker(){
+  document.getElementById('gate-user').style.display='flex';
+  const g=document.getElementById('pick-grid');
+  const{data,error}=await sb.from('usuarios').select('nombre,tipo').eq('activo',true).order('tipo').order('nombre');
+  if(error||!data||!data.length){g.innerHTML='<div style="grid-column:1/-1;color:#c0392b">No se pudo cargar la lista de usuarios: '+(error?error.message:'sin datos')+'</div>';return;}
+  g.innerHTML=data.map(u=>`<button class="pick-btn" onclick="elegirUsuario('${u.nombre.replace(/'/g,"\\'")}')">${u.nombre}<span class="tag">${u.tipo}</span></button>`).join('');
+}
+async function elegirUsuario(nombre){
+  usuarioActual=nombre;
+  sessionStorage.setItem('pc_usuario',nombre);
+  sb.from('ingresos').insert({usuario:nombre}).then(({error})=>{if(error)console.warn('ingreso no registrado:',error.message);});
+  document.getElementById('gate-user').style.display='none';
+  entrarPortal();
+}
+function entrarPortal(){
+  const chip=document.getElementById('user-chip');
+  document.getElementById('user-name').textContent='👤 '+usuarioActual;
+  chip.style.display='flex';
+  loadTab(0);
+}
+async function doLogout(){
+  sessionStorage.removeItem('pc_usuario');
+  await sb.auth.signOut();
+  location.reload();
 }
 
-// Reloj
-function tick(){
-  const now = new Date();
-  document.getElementById('clock').textContent =
-    now.toLocaleDateString('es-MX', {weekday:'short', day:'2-digit', month:'short'}) +
-    ' · ' + now.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'});
+// ═══════════ TABS ═══════════
+const SRCS=[
+  'dash_faltantes.html',
+  'https://ftrevinor001-tr.github.io/monitor-inventario/',
+  'https://ftrevinor001-tr.github.io/Estatus_BO/',
+  'dashboard_Estatus_inventario_y_OTIF.html'
+];
+const loadedTabs=[false,false,false,false];
+function loadTab(i){
+  if(i<4&&!loadedTabs[i]){loadedTabs[i]=true;document.getElementById('fr-'+i).src=SRCS[i];}
 }
-tick();
-setInterval(tick, 30000);
+function switchTab(i){
+  document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('active',j===i));
+  document.querySelectorAll('.frame-wrap').forEach((f,j)=>f.classList.toggle('active',j===i));
+  loadTab(i);
+  if(i===4&&esAdmin){document.getElementById('adm-lock').style.display='none';document.getElementById('adm-open').style.display='block';}
+}
+function hideLd(i){const l=document.getElementById('ld-'+i);if(l)l.classList.add('hidden');}
+function tick(){const now=new Date();document.getElementById('clock').textContent=now.toLocaleDateString('es-MX',{weekday:'short',day:'2-digit',month:'short'})+' · '+now.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});}
+
+// ═══════════ ADMIN ═══════════
+async function adminLogin(){
+  const pw=document.getElementById('apw').value,err=document.getElementById('apw-err');
+  err.style.display='none';
+  const r=await sb.auth.signInWithPassword({email:EMAIL_ADMIN,password:pw});
+  if(r.error){err.textContent='Contraseña de administrador incorrecta.';err.style.display='block';return;}
+  esAdmin=true;
+  document.getElementById('adm-lock').style.display='none';
+  document.getElementById('adm-open').style.display='block';
+}
+function log(msg){const p=document.getElementById('prog');p.style.display='block';p.textContent+=msg+'\n';p.scrollTop=p.scrollHeight;}
+function logClear(){const p=document.getElementById('prog');p.textContent='';p.style.display='block';}
+
+// ── Procesamiento ORIGINAL del dashboard de faltantes (extraído literal) ──
+const EXCL=['PRODUCCION'];
+const CLS=['ALTA ROTACIÓN','MEDIA ROTACIÓN','LENTA ROTACIÓN','SAGRADOS'];
+function pD(v){if(!v)return null;const s=String(v).trim();if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);if(/^\d{2}\/\d{2}\/\d{4}/.test(s)){const p=s.split('/');return`${p[2]}-${p[1]}-${p[0]}`;}const d=new Date(s);return isNaN(d)?null:d.toISOString().slice(0,10);}
+function numX(v){if(v===null||v===undefined||v==='')return 0;if(typeof v==='number')return isNaN(v)?0:v;const s=String(v).replace(/,/g,'').trim();const n=parseFloat(s);return isNaN(n)?0:n;}
+function sBy(rows,fn){const m={};rows.forEach(r=>{const k=fn(r);m[k]=(m[k]||0)+r.claves;});return m;}
+function getSem(r){const e=String(r.estatus||'').toUpperCase(),bo=+r.bo||0,mi=+r.meses_inv||0,te=+r.t_entrega||0,ob=+r.obj_meses||0;if(e==='FALTANTE'&&bo===0)return'ROJO';if(e==='FALTANTE'&&bo>0)return'AMARILLO';if(e==='RIESGO'&&bo===0&&mi<te)return'ROJO';if(mi<te&&bo>0)return'NARANJA';if(mi<ob&&mi>=te)return'MORADO';if(e==='SOBRE INVENTARIO'||mi>(ob+te))return'AZUL';return'VERDE';}
+function buildData(raw,rawD,fn){
+  const rows=raw.map(r=>({fecha:pD(String(r['Fecha']||'')),comprador:String(r['COMPRADOR']||'').trim().toUpperCase(),clasificacion:String(r['Clasificacion']||'').trim().toUpperCase(),mov:String(r['Clasificacion de mov']||'').trim().toUpperCase(),claves:numX(r['Claves'])})).filter(r=>r.fecha&&r.comprador&&!EXCL.includes(r.comprador)&&r.clasificacion&&r.clasificacion!=='(EN BLANCO)');
+  const fechas=[...new Set(rows.map(r=>r.fecha))].sort();
+  const compradores=[...new Set(rows.map(r=>r.comprador))].sort();
+  const falt=rows.filter(r=>r.mov==='FALTANTE');
+  const uf=fechas[fechas.length-1],pf=fechas[0];
+  const mes=[...new Set(fechas.map(f=>f.slice(0,7)))].sort();
+  const mA=mes[mes.length-1],mAn=mes.length>1?mes[mes.length-2]:null;
+  const fU=fechas.filter(f=>f.startsWith(mA));
+  const fMesAnt=mAn?fechas.filter(f=>f.startsWith(mAn)):[];
+  const lastAnt=fMesAnt.length?fMesAnt[fMesAnt.length-1]:pf;
+  const totalByDay=sBy(falt,r=>r.fecha),clavesTotal=sBy(rows,r=>r.fecha);
+  const clasByDay={};CLS.forEach(cl=>{clasByDay[cl]=sBy(falt.filter(r=>r.clasificacion===cl),r=>r.fecha);});
+  const compByDay={};compradores.forEach(c=>{compByDay[c]=sBy(falt.filter(r=>r.comprador===c),r=>r.fecha);});
+  const compClByDay={};compradores.forEach(c=>{compClByDay[c]={};CLS.forEach(cl=>{compClByDay[c][cl]=sBy(falt.filter(r=>r.comprador===c&&r.clasificacion===cl),r=>r.fecha);});});
+  const uni=rows.filter(r=>r.fecha===uf);
+  const uniA=rows.filter(r=>r.fecha===lastAnt);
+  function uS(rows2,c,cl){let f=rows2;if(c)f=f.filter(r=>r.comprador===c);if(cl&&cl!=='TOTAL')f=f.filter(r=>r.clasificacion===cl);return f.reduce((s,r)=>s+r.claves,0);}
+  function st(sk,skA,bd){const f1=bd[lastAnt]||0,f2=bd[uf]||0,pk=Math.max(0,...fU.map(f=>bd[f]||0));return{skus:sk,f1,f2,pico:pk,pct_f1:skA>0?+(f1/skA*100).toFixed(2):0,pct_f2:sk>0?+(f2/sk*100).toFixed(2):0,pct_pico:sk>0?+(pk/sk*100).toFixed(2):0};}
+  const CDATA={};compradores.forEach(c=>{CDATA[c]={};[...CLS,'TOTAL'].forEach(cl=>{CDATA[c][cl]=st(uS(uni,c,cl),uS(uniA,c,cl),cl==='TOTAL'?compByDay[c]:compClByDay[c][cl]);});});
+  const AREA={};[...CLS,'TOTAL'].forEach(cl=>{const fl=falt.filter(r=>cl==='TOTAL'||r.clasificacion===cl);AREA[cl]=st(uS(uni,null,cl),uS(uniA,null,cl),sBy(fl,r=>r.fecha));});
+  const detR=rawD.map(r=>({fecha:pD(String(r['Fecha']||'')),clave:r['Clave']||'',nombre:r['Nombre']||'',marca:r['Marca']||'',unidad:r['Unidad']||'',clasificacion:String(r['Clasificación']||'').trim(),existencias:numX(r['Existencias']),grupo:String(r['GRUPO']||'').trim(),comprador:String(r['COMPRADOR']||'').trim().toUpperCase(),clmov:String(r['Clasificación por movimiento']||'').trim().toUpperCase(),t_entrega:numX(r['Tiempo de entrega']),obj_meses:numX(r['Objetivo_Meses de inventario']),meses_inv:numX(r['Meses de inventario']),estatus:String(r['Clasificacion_estatus de inventario']||'').trim().toUpperCase(),reorden:String(r['Clasificacion_Punto de reorden']||'').trim(),bo:numX(r['Back Order'])})).filter(r=>r.fecha&&r.comprador&&!EXCL.includes(r.comprador));
+  detR.forEach(r=>{r.semaforo=getSem(r);});
+  function uq(f){return[...new Set(detR.map(r=>r[f]))].filter(Boolean).sort();}
+  const ufd=uq('fecha');
+  const detFalt={};
+  if(detR.length){const lf=ufd[ufd.length-1];detR.filter(r=>r.fecha===lf&&r.estatus==='FALTANTE').forEach(r=>{detFalt[r.comprador]=detFalt[r.comprador]||{};detFalt[r.comprador][r.clmov]=detFalt[r.comprador][r.clmov]||[];detFalt[r.comprador][r.clmov].push(r);});}
+  return{fechas,compradores,totalByDay,clavesTotal,clasByDay,compByDay,compClByDay,CDATA,AREA,uf,pf,mA,mAn,fU,totalHoy:totalByDay[uf]||0,clavesHoy:clavesTotal[uf]||0,filename:fn,detR,detF:ufd,detM:uq('marca'),detCM:uq('clmov'),detG:uq('grupo'),detC:uq('comprador'),detE:uq('estatus'),detRd:uq('reorden'),detFalt};
+}
+
+// ── Carga del Excel maestro ──
+const drop=document.getElementById('drop');
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>{if(e.dataTransfer.files.length)procesarExcel(e.dataTransfer.files[0]);});
+document.getElementById('fx').addEventListener('change',e=>{if(e.target.files.length)procesarExcel(e.target.files[0]);});
+
+async function procesarExcel(file){
+  logClear();
+  try{
+    log('📖 Leyendo '+file.name+' ('+Math.round(file.size/1048576)+' MB)…');
+    const buf=await file.arrayBuffer();
+    log('⚙️ Interpretando libro (puede tardar 1-2 minutos con archivos grandes)…');
+    await new Promise(r=>setTimeout(r,50));
+    const wb=XLSX.read(new Uint8Array(buf),{type:'array'});
+    log('✅ Hojas encontradas: '+wb.SheetNames.join(', '));
+
+    const wsH=wb.Sheets['Hoja1']||wb.Sheets[wb.SheetNames[0]];
+    const wsD=wb.Sheets['Detalle'];
+    if(!wsH) throw new Error('No se encontró la hoja Hoja1.');
+    if(!wsD) throw new Error('No se encontró la hoja Detalle.');
+    log('⚙️ Procesando Hoja1…');
+    const raw=XLSX.utils.sheet_to_json(wsH,{raw:false,defval:''});
+    log('   '+raw.length.toLocaleString()+' filas');
+    log('⚙️ Procesando Detalle…');
+    const rawD=XLSX.utils.sheet_to_json(wsD,{raw:false,defval:''});
+    log('   '+rawD.length.toLocaleString()+' filas');
+    log('🧮 Calculando dashboard de Faltantes (lógica original)…');
+    await new Promise(r=>setTimeout(r,50));
+    const payload=buildData(raw,rawD,file.name);
+    if(!payload||!payload.fechas||!payload.fechas.length) throw new Error('El procesamiento no generó fechas. Revisa que Hoja1 tenga las columnas Fecha, COMPRADOR, Clasificacion, Clasificacion de mov y Claves.');
+    log('✅ Periodo: '+payload.pf+' → '+payload.uf+' · '+payload.fechas.length+' días · '+payload.compradores.length+' compradores');
+
+    log('🗜️ Comprimiendo…');
+    const jsonStr=JSON.stringify(payload);
+    let body,ruta;
+    if(typeof CompressionStream!=='undefined'){
+      const cs=new Blob([jsonStr]).stream().pipeThrough(new CompressionStream('gzip'));
+      body=await new Response(cs).blob();
+      ruta='payloads/faltantes.json.gz';
+      log('   '+Math.round(jsonStr.length/1048576*10)/10+' MB → '+Math.round(body.size/1048576*10)/10+' MB');
+    }else{body=new Blob([jsonStr],{type:'application/json'});ruta='payloads/faltantes.json';}
+
+    log('☁️ Subiendo datos a Supabase…');
+    const up=await sb.storage.from('respaldos').upload(ruta,body,{upsert:true,contentType:'application/octet-stream'});
+    if(up.error) throw new Error('Storage: '+up.error.message);
+
+    const version=Date.now().toString();
+    log('📝 Publicando versión…');
+    const meta={version:version,ruta:ruta,uf:payload.uf,pf:payload.pf,dias:payload.fechas.length,archivo:file.name};
+    const ds=await sb.from('datasets').upsert({clave:'faltantes',payload:meta,actualizado_por:usuarioActual||'admin'});
+    if(ds.error) throw new Error('datasets: '+ds.error.message);
+
+    const cg=await sb.from('cargas').insert({archivo:file.name,usuario:usuarioActual||'admin',periodo_inicio:payload.pf,periodo_fin:payload.uf,resumen:{hoja1:raw.length,detalle:rawD.length,dashboard:'faltantes'}});
+    if(cg.error) log('⚠️ Historial de cargas: '+cg.error.message);
+
+    if(document.getElementById('chk-bk').checked){
+      log('💾 Respaldando Excel original ('+Math.round(file.size/1048576)+' MB)…');
+      const bk=await sb.storage.from('respaldos').upload('excel/ultimo_respaldo.xlsx',file,{upsert:true,contentType:file.type||'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      if(bk.error) log('⚠️ Respaldo del Excel: '+bk.error.message); else log('✅ Respaldo guardado');
+    }
+    log('');
+    log('🎉 LISTO. El dashboard de Histórico Faltantes ya muestra la nueva información para todo el equipo.');
+    log('   (Si tenías el dashboard abierto, presiona "☁️ Actualizar desde servidor" o recarga la página.)');
+  }catch(e){log('❌ ERROR: '+e.message);}
+}
+
+// ── Descargas ──
+async function descargarRespaldo(){
+  const err=document.getElementById('dl-err');err.style.display='none';
+  const{data,error}=await sb.storage.from('respaldos').download('excel/ultimo_respaldo.xlsx');
+  if(error){err.textContent='No hay respaldo disponible todavía: '+error.message;err.style.display='block';return;}
+  const a=document.createElement('a');a.href=URL.createObjectURL(data);a.download='Portal_de_compras_respaldo.xlsx';a.click();
+}
+async function descargarComentarios(){
+  const err=document.getElementById('dl-err');err.style.display='none';
+  const{data,error}=await sb.from('comentarios').select('*').order('creado_en',{ascending:false}).limit(10000);
+  if(error){err.textContent=error.message;err.style.display='block';return;}
+  const rows=(data||[]).map(c=>({Fecha:c.creado_en,Usuario:c.usuario,Dashboard:c.dashboard,Referencia:c.referencia,Mes:c.mes,Comentario:c.comentario}));
+  const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{Fecha:'',Usuario:'',Dashboard:'',Referencia:'',Mes:'',Comentario:'(sin comentarios aún)'}]);
+  const wb2=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb2,ws,'Comentarios');
+  XLSX.writeFile(wb2,'Comentarios_portal_compras.xlsx');
+}
+
+// ── Métricas ──
+async function cargarMetricas(){
+  const box=document.getElementById('mtx');box.innerHTML='<p style="color:#64748b;font-size:13px;margin-top:10px">Cargando…</p>';
+  const desde=new Date(Date.now()-90*86400000).toISOString();
+  const{data,error}=await sb.from('ingresos').select('usuario,creado_en').gte('creado_en',desde).order('creado_en',{ascending:false}).limit(5000);
+  if(error){box.innerHTML='<p style="color:#c0392b">'+error.message+'</p>';return;}
+  const agg={};
+  (data||[]).forEach(r=>{const u=r.usuario;agg[u]=agg[u]||{total:0,ultimo:r.creado_en};agg[u].total++;});
+  const filas=Object.entries(agg).sort((a,b)=>b[1].total-a[1].total)
+    .map(([u,v])=>`<tr><td>${u}</td><td>${v.total}</td><td>${new Date(v.ultimo).toLocaleString('es-MX')}</td></tr>`).join('');
+  box.innerHTML='<table class="mtx"><tr><th>Usuario</th><th>Ingresos (90 días)</th><th>Último ingreso</th></tr>'+(filas||'<tr><td colspan=3>Sin ingresos registrados aún</td></tr>')+'</table>';
+}
+
+init();
 </script>
 </body>
 </html>
