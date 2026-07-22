@@ -723,20 +723,22 @@ async function procesarExcel(file){
       log('✅ Monitor de Inventario publicado');
     }else{log('⚠️ No se encontró la hoja Historico de faltantes: Monitor no actualizado.');}
 
-    // ── BACK ORDERS (Excel ligero con sus 2 hojas) ──
+    // ── BACK ORDERS (JSON pre-procesado) ──
     if(wsOC&&wb.Sheets['Productos Incluidos en']){
-      log('📦 Preparando Excel ligero de Back Orders…');
+      log('📦 Preparando datos de Back Orders…');
       const serAFecha=v2=>new Date(Math.round((v2-25569)*86400000)).toISOString().replace('T',' ').slice(0,19);
       const fixFechas=rs=>rs.map(r=>{const o={};Object.keys(r).forEach(k=>{const v2=r[k];
         o[k]=(/fecha/i.test(k)&&typeof v2==='number'&&v2>20000&&v2<80000)?serAFecha(v2):v2;});return o;});
+      const orders=fixFechas(rowsOC).filter(o=>String(o['Folio']||'').trim()!=='');
       const rowsProd=XLSX.utils.sheet_to_json(wb.Sheets['Productos Incluidos en'],{raw:true,defval:''});
-      const wbBO=XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wbBO,XLSX.utils.json_to_sheet(fixFechas(rowsOC)),'RP01-23 Ordenes de Compra');
-      XLSX.utils.book_append_sheet(wbBO,XLSX.utils.json_to_sheet(fixFechas(rowsProd)),'Productos Incluidos en');
-      const boArr=XLSX.write(wbBO,{bookType:'xlsx',type:'array',compression:true});
-      log('☁️ Subiendo Back Orders ('+Math.round(boArr.byteLength/1048576*10)/10+' MB)…');
-      await subirBinario('payloads/backorders.xlsx',new Blob([boArr]),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      await publicarDataset('backorders',{version:version,ruta:'payloads/backorders.xlsx'});
+      const products={};
+      fixFechas(rowsProd).forEach(p=>{const k=String(p['FOLIO OC']||'').trim();if(k)(products[k]=products[k]||[]).push(p);});
+      const boJson=JSON.stringify({orders:orders,products:products,generated:new Date().toISOString()});
+      const{body:bb,gz:bgz}=await gzipBlob(boJson);
+      const bruta=bgz?'payloads/backorders.json.gz':'payloads/backorders.json';
+      log('☁️ Subiendo Back Orders ('+orders.length.toLocaleString()+' OCs, '+Math.round(bb.size/1048576*10)/10+' MB)…');
+      await subirBinario(bruta,bb);
+      await publicarDataset('backorders',{version:version,ruta:bruta});
       log('✅ Estatus Back Orders publicado');
     }else{log('⚠️ Faltan hojas de Back Orders (RP01-23 / Productos Incluidos en): no actualizado.');}
 

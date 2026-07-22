@@ -734,8 +734,12 @@ function onFileTopbar(input){
   r.readAsArrayBuffer(file);
 }
 function sbLoadBO(cb,errCb){
-  window.sbDescargar('backorders','payloads/backorders.xlsx')
-    .then(({buf})=>{ processWorkbook(buf); if(cb)cb(); })
+  window.sbDescargar('backorders','payloads/backorders.json.gz')
+    .then(({buf,ruta})=>{
+      if(ruta.endsWith('.xlsx')){ processWorkbook(buf); }           // compatibilidad con carga anterior
+      else { processJson(JSON.parse(new TextDecoder().decode(buf))); }
+      if(cb)cb();
+    })
     .catch(err=>{ if(errCb)errCb(err); else { hideLoading(); alert('⚠ '+err.message); } });
 }
 function loadFromServer(){
@@ -748,10 +752,8 @@ function refreshNow(){
   $('now-btn').classList.add('spinning');
   showLoading('Actualizando desde servidor…');
   window.idbPut('backorders',null).catch(()=>{}); // forzar re-descarga
-  window.sbDescargar('backorders','payloads/backorders.xlsx')
-    .then(({buf})=>{ processWorkbook(buf); hideLoading(); })
-    .catch(err=>{ hideLoading(); setStatus('⚠ '+err.message); })
-    .finally(()=>{ isRefreshing=false; $('now-btn').classList.remove('spinning'); if(autoActive) startCountdown(); });
+  sbLoadBO(()=>{ hideLoading(); }, err=>{ hideLoading(); setStatus('⚠ '+err.message); });
+  Promise.resolve().then(()=>{ isRefreshing=false; $('now-btn').classList.remove('spinning'); if(autoActive) startCountdown(); });
 }
 
 // ── AUTO-REFRESH ───────────────────────────────────────────────────────────
