@@ -92,6 +92,30 @@
   .alist td{padding:4px 8px;border-bottom:1px solid #f1f5f9;color:#1e293b}
   .empty-res{max-width:700px;margin:60px auto;text-align:center;color:#64748b;font-size:14px;background:#fff;padding:40px;border-radius:14px}
   .chartbox{position:relative;height:230px}
+
+  /* ── Tablas ordenables y redimensionables ── */
+  .alist table{table-layout:fixed;width:100%}
+  .alist th{position:relative;cursor:pointer;user-select:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:20px}
+  .alist th:hover{background:#e8f0fe;color:#1c4587}
+  .alist th .arw{position:absolute;right:8px;opacity:.35;font-size:9px}
+  .alist th.sorted .arw{opacity:1;color:#1c4587}
+  .alist th.sorted{background:#e8f0fe;color:#1c4587;font-weight:700}
+  .alist th .rsz{position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;z-index:5}
+  .alist th .rsz:hover{background:#1c4587;opacity:.45}
+  .alist td{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .alist td.num,.alist th.num{text-align:right}
+  body.rszing{cursor:col-resize;user-select:none}
+
+  table.mtx{table-layout:auto}
+  table.mtx th{position:relative;cursor:pointer;user-select:none;white-space:nowrap;padding-right:20px}
+  table.mtx th:hover{background:#e8f0fe;color:#1c4587}
+  table.mtx th .arw{position:absolute;right:6px;opacity:.35;font-size:9px}
+  table.mtx th.sorted{background:#e8f0fe;color:#1c4587}
+  table.mtx th.sorted .arw{opacity:1}
+  table.mtx th .rsz{position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;z-index:5}
+  table.mtx th .rsz:hover{background:#1c4587;opacity:.45}
+
+
 </style>
 </head>
 <body>
@@ -403,7 +427,7 @@ function renderResumen(){
       body=`<p style="font-size:13px;color:#334155">${d.ocsOk||0} de ${d.total||0} órdenes de compra cumplen Target (<b>${d.pct!=null?d.pct+'%':'—'}</b>).</p>`;
       const its=d.items||[];
       if(its.length){const cols=Object.keys(its[0]);
-        body+='<div class="alist" style="margin-top:8px"><table><tr>'+cols.map(k=>'<th>'+k+'</th>').join('')+'</tr>'+its.map(it=>'<tr>'+cols.map(k=>'<td>'+(it[k]??'')+'</td>').join('')+'</tr>').join('')+'</table></div>';}
+        body+='<div class="alist" style="margin-top:8px">'+tablaHTML(t,cols,its)+'</div>';}
     }
     else{
       if(t==='FALTANTES'&&d.porClmov){
@@ -413,8 +437,7 @@ function renderResumen(){
       if(!items.length){body='<p style="font-size:12px;color:#64748b">Sin registros. ✅</p>';}
       else{
         const cols=Object.keys(items[0]);
-        body='<div class="alist"><table><tr>'+cols.map(k=>'<th>'+k+'</th>').join('')+'</tr>'+
-          items.map(it=>'<tr>'+cols.map(k=>'<td>'+(it[k]??'')+'</td>').join('')+'</tr>').join('')+'</table></div>';
+        body='<div class="alist">'+tablaHTML(t,cols,items)+'</div>';
         if(d.total>items.length)body+=`<p style="font-size:11px;color:#94a3b8;margin-top:6px">Mostrando ${items.length} de ${d.total}. El detalle completo está en el dashboard ${T.dash}.</p>`;
       }
     }
@@ -433,6 +456,61 @@ function pintarChart(comp){
   const serie=fechas.map(f=>comp==='GENERAL'?(RES.resumen.totalByDay[f]||0):((RES.resumen.compByDay[comp]||{})[f]||0));
   if(RES.chart)RES.chart.destroy();
   RES.chart=new Chart(ctx,{type:'line',data:{labels:fechas.map(f=>f.slice(8)+'/'+f.slice(5,7)),datasets:[{label:'Claves en faltante',data:serie,borderColor:'#c0582a',backgroundColor:'rgba(192,88,42,.12)',fill:true,tension:.25,pointRadius:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+}
+
+
+// ── Tablas ordenables y con ancho ajustable ──
+const TBL={};   // estado de orden y anchos por tabla
+function esNumerica(v){
+  if(typeof v==='number')return true;
+  const s=String(v==null?'':v).trim().replace(/[$%,\s]/g,'');
+  return s!==''&&!isNaN(parseFloat(s))&&isFinite(s);
+}
+function valOrden(v,col){
+  const s=String(v==null?'':v).trim();
+  // Fechas dd/mm/aaaa → clave comparable
+  const f=s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if(f)return f[3]+f[2]+f[1];
+  const n=parseFloat(s.replace(/[$%,\s]/g,''));
+  if(s!==''&&!isNaN(n)&&/^[\d\s.,$%-]+$/.test(s))return n;
+  // Texto que EMPIEZA con número (ej. "27 (todo el periodo)"): ordenar por ese número
+  const m2=s.match(/^(-?[\d,]+(?:\.\d+)?)\s*\D/);
+  if(m2){const nn=parseFloat(m2[1].replace(/,/g,''));if(!isNaN(nn))return nn;}
+  return s.toUpperCase();
+}
+function tablaHTML(id,cols,items){
+  const st=TBL[id]||(TBL[id]={col:null,dir:1,anchos:{}});
+  let filas=items.slice();
+  if(st.col&&cols.includes(st.col)){
+    filas.sort((a,b)=>{const x=valOrden(a[st.col],st.col),y=valOrden(b[st.col],st.col);
+      if(x<y)return -st.dir; if(x>y)return st.dir; return 0;});
+  }
+  const numCol={};cols.forEach(k=>{const m=items.filter(i=>i[k]!=null&&i[k]!=='').slice(0,20);
+    numCol[k]=m.length>0&&m.every(i=>esNumerica(i[k]));});
+  const th=cols.map(k=>{
+    const act=st.col===k;
+    const w=st.anchos[k]?` style="width:${st.anchos[k]}px"`:'';
+    const flecha=act?(st.dir===1?'▲':'▼'):'⇅';
+    return `<th class="${act?'sorted':''}${numCol[k]?' num':''}"${w} onclick="ordenarTabla('${id}','${k.replace(/'/g,"\\'")}')" title="Clic para ordenar · arrastra el borde para ajustar ancho">${k}<span class="arw">${flecha}</span><span class="rsz" onmousedown="iniciarResize(event,'${id}','${k.replace(/'/g,"\\'")}')"></span></th>`;
+  }).join('');
+  const tb=filas.map(it=>'<tr>'+cols.map(k=>`<td class="${numCol[k]?'num':''}" title="${String(it[k]??'').replace(/"/g,'&quot;')}">${it[k]??''}</td>`).join('')+'</tr>').join('');
+  return `<table data-tid="${id}"><tr>${th}</tr>${tb}</table>`;
+}
+function ordenarTabla(id,col){
+  const st=TBL[id]||(TBL[id]={col:null,dir:1,anchos:{}});
+  if(st.col===col)st.dir=-st.dir; else{st.col=col;st.dir=1;}
+  renderResumen();
+}
+function iniciarResize(ev,id,col){
+  ev.stopPropagation();ev.preventDefault();
+  const th=ev.target.parentElement;
+  const st=TBL[id]||(TBL[id]={col:null,dir:1,anchos:{}});
+  const x0=ev.clientX, w0=th.offsetWidth;
+  document.body.classList.add('rszing');
+  const mover=e=>{const w=Math.max(50,w0+(e.clientX-x0));th.style.width=w+'px';st.anchos[col]=w;};
+  const soltar=()=>{document.removeEventListener('mousemove',mover);document.removeEventListener('mouseup',soltar);
+    document.body.classList.remove('rszing');};
+  document.addEventListener('mousemove',mover);document.addEventListener('mouseup',soltar);
 }
 
 // ── Exportar Mi Resumen a Excel ──
@@ -951,7 +1029,7 @@ async function descargarComentarios(){
 }
 
 // ── Asignación de comprador a OCs ──
-let ASG={pend:null,mapa:{},comps:[]};
+let ASG={pend:null,mapa:{},comps:[],orden:null,dir:1};
 async function cargarAsignacion(){
   const box=document.getElementById('asg-tabla');
   box.innerHTML='<p style="color:#64748b;font-size:13px">Cargando…</p>';
@@ -973,7 +1051,7 @@ async function cargarAsignacion(){
 function asgVisibles(){
   const filtro=document.getElementById('asg-filtro').value;
   const q=(document.getElementById('asg-buscar').value||'').toUpperCase().trim();
-  return (ASG.pend||[]).filter(r=>{
+  const arr=(ASG.pend||[]).filter(r=>{
     const guardado=ASG.mapa[r.folio];
     const asignado=r.comprador!=='SIN ASIGNAR'||guardado;
     if(filtro==='sin'&&asignado)return false;
@@ -983,6 +1061,27 @@ function asgVisibles(){
       ||String(r.capturista||'').toUpperCase().includes(q)))return false;
     return true;
   });
+  if(ASG.orden){
+    const k=ASG.orden;
+    arr.sort((a,b)=>{let x=a[k],y=b[k];
+      if(k==='importe'){x=typeof x==='number'?x:-1;y=typeof y==='number'?y:-1;}
+      else{x=String(x==null?'':x).toUpperCase();y=String(y==null?'':y).toUpperCase();}
+      if(x<y)return -ASG.dir; if(x>y)return ASG.dir; return 0;});
+  }
+  return arr;
+}
+function ordenarAsignacion(k){
+  if(ASG.orden===k)ASG.dir=-ASG.dir; else{ASG.orden=k;ASG.dir=1;}
+  renderAsignacion();
+}
+function resizeAdmin(ev){
+  ev.stopPropagation();ev.preventDefault();
+  const th=ev.target.parentElement;const x0=ev.clientX,w0=th.offsetWidth;
+  document.body.classList.add('rszing');
+  const mover=e=>{th.style.width=Math.max(50,w0+(e.clientX-x0))+'px';};
+  const soltar=()=>{document.removeEventListener('mousemove',mover);document.removeEventListener('mouseup',soltar);
+    document.body.classList.remove('rszing');};
+  document.addEventListener('mousemove',mover);document.addEventListener('mouseup',soltar);
 }
 function renderAsignacion(){
   if(!ASG.pend)return;
@@ -1009,8 +1108,11 @@ function renderAsignacion(){
         ${ASG.comps.map(x=>`<option ${x===actual?'selected':''}>${x}</option>`).join('')}
       </select></td></tr>`;
   }).join('');
+  const cabAsg=[['folio','Folio'],['fecha','Fecha OC'],['proveedor','Proveedor'],['capturista','Capturó'],['importe','Importe'],['origenComp','Origen']]
+    .map(([k,lbl])=>{const act=ASG.orden===k;
+      return `<th class="${act?'sorted':''}"${k==='importe'?' style="text-align:right"':''} onclick="ordenarAsignacion('${k}')" title="Clic para ordenar">${lbl}<span class="arw">${act?(ASG.dir===1?'▲':'▼'):'⇅'}</span><span class="rsz" onmousedown="resizeAdmin(event)"></span></th>`;}).join('');
   document.getElementById('asg-tabla').innerHTML=
-    '<table class="mtx"><tr><th>Folio</th><th>Fecha OC</th><th>Proveedor</th><th>Capturó</th><th style="text-align:right">Importe</th><th>Origen</th><th>Comprador</th></tr>'+
+    '<table class="mtx"><tr>'+cabAsg+'<th>Comprador</th></tr>'+
     (filas||'<tr><td colspan=7 style="color:#4a7c59">Todas las órdenes visibles ya tienen comprador ✅</td></tr>')+'</table>'+
     (vis.length>400?'<p style="font-size:11px;color:#94a3b8;margin-top:6px">Mostrando 400 de '+vis.length+'. Usa el buscador para acotar.</p>':'');
 }
@@ -1060,7 +1162,7 @@ async function asignarMasivo(){
 }
 
 // ── Métricas ──
-let MET={rows:null,chart:null};
+let MET={rows:null,chart:null,tabla:null,orden:null,dir:-1};
 const PALETA=['#1c4587','#c0582a','#4a7c59','#7b5aa6','#b8860b','#2a7d8c','#c0392b','#5b8dbf','#8a6d3b','#5e8c61','#a05195','#665191'];
 async function cargarMetricas(){
   const box=document.getElementById('mtx');box.innerHTML='<p style="color:#64748b;font-size:13px;margin-top:10px">Cargando…</p>';
@@ -1070,9 +1172,9 @@ async function cargarMetricas(){
   MET.rows=data||[];
   // tabla resumen (todos, incluye visitantes)
   const agg={};MET.rows.forEach(r=>{const u=r.usuario;agg[u]=agg[u]||{total:0,hrs:0,ultimo:r.creado_en};agg[u].total++;agg[u].hrs+=durH(r);if(r.creado_en>agg[u].ultimo)agg[u].ultimo=r.creado_en;});
-  const filas=Object.entries(agg).sort((a,b)=>b[1].total-a[1].total)
-    .map(([u,v])=>`<tr><td>${u}</td><td>${v.total}</td><td>${v.hrs.toFixed(1)} h</td><td>${new Date(v.ultimo).toLocaleString('es-MX')}</td></tr>`).join('');
-  box.innerHTML='<table class="mtx"><tr><th>Usuario</th><th>Ingresos</th><th>Horas conectado</th><th>Último ingreso</th></tr>'+(filas||'<tr><td colspan=4>Sin ingresos registrados aún</td></tr>')+'</table>';
+
+  MET.tabla=Object.entries(agg).map(([u,v2])=>({Usuario:u,Ingresos:v2.total,'Horas conectado':+v2.hrs.toFixed(1),'Último ingreso':v2.ultimo}));
+  renderTablaMetricas();
   // meses disponibles
   const meses=[...new Set(MET.rows.map(r=>r.creado_en.slice(0,7)))].sort();
   const sel=document.getElementById('met-mes');
@@ -1106,6 +1208,24 @@ function renderMetChart(){
       plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:10}}},
         tooltip:{callbacks:{label:c2=>{const n=rows.filter(r=>r.usuario===c2.dataset.label&&r.creado_en.slice(0,10)===dias[c2.dataIndex]).length;return c2.dataset.label+': '+c2.raw+' h ('+n+' ingreso'+(n===1?'':'s')+')';}}}},
       scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,title:{display:true,text:'Horas conectado'}}}}});
+}
+function renderTablaMetricas(){
+  const box=document.getElementById('mtx');
+  const rows=(MET.tabla||[]).slice();
+  const k=MET.orden||'Ingresos', dir=MET.dir||-1;
+  rows.sort((a,b)=>{let x=a[k],y=b[k];
+    if(typeof x==='string'){x=x.toUpperCase();y=String(y).toUpperCase();}
+    if(x<y)return -dir; if(x>y)return dir; return 0;});
+  const cols=['Usuario','Ingresos','Horas conectado','Último ingreso'];
+  const th=cols.map(cl=>{const act=(MET.orden||'Ingresos')===cl;
+    return `<th class="${act?'sorted':''}" onclick="ordenarMetricas('${cl}')">${cl}<span class="arw">${act?(dir===1?'▲':'▼'):'⇅'}</span><span class="rsz" onmousedown="resizeAdmin(event)"></span></th>`;}).join('');
+  box.innerHTML='<table class="mtx"><tr>'+th+'</tr>'+
+    (rows.map(r=>`<tr><td>${r.Usuario}</td><td>${r.Ingresos}</td><td>${r['Horas conectado']} h</td><td>${new Date(r['Último ingreso']).toLocaleString('es-MX')}</td></tr>`).join('')
+      ||'<tr><td colspan=4>Sin ingresos registrados aún</td></tr>')+'</table>';
+}
+function ordenarMetricas(cl){
+  if((MET.orden||'Ingresos')===cl)MET.dir=-(MET.dir||-1); else{MET.orden=cl;MET.dir=1;}
+  renderTablaMetricas();
 }
 async function reiniciarVisitas(){
   if(!confirm('¿Seguro que quieres BORRAR todo el conteo de visitas? Esta acción no se puede deshacer.\n\nSugerencia: descarga antes las métricas si las necesitas.'))return;
