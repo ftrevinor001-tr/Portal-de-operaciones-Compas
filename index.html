@@ -576,6 +576,23 @@ function pDX(v){
 function limpiarClaves(obj){const o={};Object.keys(obj).forEach(k=>o[k.trim()]=obj[k]);return o;}
 function diasEntre(a,b){return Math.round((new Date(b)-new Date(a))/86400000);}
 
+// Detecta cancelación en cualquier columna, evitando falsos positivos como "NO CANCELACION"
+function esCancelada(r){
+  const txt=v=>String(v==null?'':v).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  // 1) Campos de estado: cualquier mención de cancelado descarta la orden
+  for(const k of ['Estatus','Estado OC','Back Order','Status','Estatus OC','ESTATUS']){
+    if(r[k]!==undefined&&/CANCEL/.test(txt(r[k])))return true;
+  }
+  // 2) Campos de texto libre: solo si la mención NO viene negada ("NO CANCELACION", "SIN CANCELACION")
+  for(const k of ['Observaciones','OBSERVACIONES','Referencia Lista']){
+    if(r[k]===undefined)continue;
+    const t=txt(r[k]);
+    if(!/CANCEL/.test(t))continue;
+    if(/\b(NO|SIN)\s+(SE\s+)?(ACEPTA[N]?\s+)?CANCEL/.test(t))continue;   // condición comercial, no cancelación
+    return true;
+  }
+  return false;
+}
 function normNom(s){return String(s==null?'':s).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();}
 // Resuelve el comprador de una OC: 1) columna COMPRADOR  2) asignación manual guardada  3) nombre del capturista
 function resolverComprador(r,compsSet,mapaManual){
@@ -617,10 +634,10 @@ function computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif,mapaManual){
   const ocs=rowsOC.map(r=>{const res=resolverComprador(r,compsSet,mapaManual);
     return{folio:String(r['Folio']||'').trim(),fecha:pDX(r['Fecha']),proveedor:String(r['Proveedor']||'').trim(),
     estatus:String(r['Estatus']||'').trim().toUpperCase(),estadoOC:String(r['Estado OC']||'').trim().toUpperCase(),
-    backorder:String(r['Back Order']||'').trim().toUpperCase(),importe:r['Importe'],
+    backorder:String(r['Back Order']||'').trim().toUpperCase(),importe:r['Importe'],cancelada:esCancelada(r),
     capturista:String(r['Comprador Capturo']||'').trim(),
     comprador:res.comp,origenComp:res.origen};})
-    .filter(r=>r.folio&&r.fecha&&r.estatus!=='CANCELADO');   // nunca considerar órdenes canceladas
+    .filter(r=>r.folio&&r.fecha&&!r.cancelada);   // descarta cualquier marca de cancelación
   window.__OCS_PEND=ocs.filter(r=>r.backorder==='PENDIENTE');   // para el panel de asignación
   function lim3m(f){const d=new Date(uf);d.setMonth(d.getMonth()-3);return f<d.toISOString().slice(0,10);}
   function lim1s(f){const d=new Date(uf);d.setDate(d.getDate()-7);return f<d.toISOString().slice(0,10);}
@@ -816,6 +833,8 @@ async function procesarExcel(file){
     log('   '+Object.keys(mapaManual).length+' asignaciones guardadas');
     const res=computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif,mapaManual);
     const pend=window.__OCS_PEND||[];
+    const canc=rowsOC.filter(r=>esCancelada(r)).length;
+    log('   Órdenes canceladas descartadas: '+canc);
     const sinAsg=pend.filter(r=>r.comprador==='SIN ASIGNAR').length;
     log('   OCs con Back Order pendiente: '+pend.length+' · con comprador: '+(pend.length-sinAsg)+' · sin asignar: '+sinAsg);
     log('   '+res.alarmas.length+' alarmas calculadas para '+([...new Set(res.alarmas.map(a=>a.comprador))].length-1)+' compradores + GENERAL');
