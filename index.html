@@ -202,11 +202,13 @@
 
         <div class="admin-card">
           <h2>👤 Asignar comprador a OCs pendientes</h2>
-          <p class="desc">Órdenes con Back Order PENDIENTE que no traen comprador en el reporte. La asignación se guarda y se conserva en todas las cargas futuras: cada orden se asigna una sola vez.</p>
+          <p class="desc">Órdenes con Back Order PENDIENTE. La app infiere el comprador del nombre de quien capturó la OC; <b>cualquier asignación puede corregirse aquí</b> y la corrección manual siempre gana. Todo se guarda y se conserva en las cargas futuras.</p>
           <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px">
             <button class="abtn" style="margin-top:0" onclick="cargarAsignacion()">🔄 Cargar pendientes</button>
             <select id="asg-filtro" onchange="renderAsignacion()" style="padding:7px 10px;border:1.5px solid #d7dce6;border-radius:8px;font-size:13px">
               <option value="sin">Solo sin asignar</option>
+              <option value="capturista">Revisar inferidas por capturista</option>
+              <option value="manual">Solo asignadas a mano</option>
               <option value="todas">Todas las pendientes</option>
             </select>
             <input id="asg-buscar" oninput="renderAsignacion()" placeholder="Buscar folio o proveedor…" style="padding:7px 10px;border:1.5px solid #d7dce6;border-radius:8px;font-size:13px;flex:1;min-width:180px">
@@ -964,9 +966,13 @@ function asgVisibles(){
   const filtro=document.getElementById('asg-filtro').value;
   const q=(document.getElementById('asg-buscar').value||'').toUpperCase().trim();
   return (ASG.pend||[]).filter(r=>{
-    const asignado=r.comprador!=='SIN ASIGNAR'||ASG.mapa[r.folio];
+    const guardado=ASG.mapa[r.folio];
+    const asignado=r.comprador!=='SIN ASIGNAR'||guardado;
     if(filtro==='sin'&&asignado)return false;
-    if(q&&!(r.folio.toUpperCase().includes(q)||String(r.proveedor).toUpperCase().includes(q)))return false;
+    if(filtro==='capturista'&&!(r.origenComp==='capturista'&&!guardado))return false;
+    if(filtro==='manual'&&!guardado)return false;
+    if(q&&!(r.folio.toUpperCase().includes(q)||String(r.proveedor).toUpperCase().includes(q)
+      ||String(r.capturista||'').toUpperCase().includes(q)))return false;
     return true;
   });
 }
@@ -974,21 +980,23 @@ function renderAsignacion(){
   if(!ASG.pend)return;
   const vis=asgVisibles();
   const sin=ASG.pend.filter(r=>r.comprador==='SIN ASIGNAR'&&!ASG.mapa[r.folio]).length;
-  document.getElementById('asg-info').textContent=ASG.pend.length+' pendientes · '+sin+' sin asignar · '+vis.length+' visibles';
+  const infer=ASG.pend.filter(r=>r.origenComp==='capturista'&&!ASG.mapa[r.folio]).length;
+  const man=ASG.pend.filter(r=>ASG.mapa[r.folio]).length;
+  document.getElementById('asg-info').innerHTML=ASG.pend.length+' pendientes · <b style="color:#c0392b">'+sin+'</b> sin asignar · <b style="color:#b8860b">'+infer+'</b> por capturista · <b style="color:#4a7c59">'+man+'</b> manuales · '+vis.length+' visibles';
   const fmt=n2=>typeof n2==='number'?'$'+n2.toLocaleString('es-MX',{maximumFractionDigits:0}):'';
   const filas=vis.slice(0,400).map(r=>{
     const guardado=ASG.mapa[r.folio];
     const actual=guardado?guardado.comp:(r.comprador!=='SIN ASIGNAR'?r.comprador:'');
     const fuente=guardado?'Manual':(r.origenComp==='capturista'?'Por capturista':(r.origenComp==='directo'?'Del reporte':'—'));
-    const bloqueado=r.origenComp==='directo'&&!guardado;
+
     return `<tr>
       <td><b>${r.folio}</b></td>
       <td>${r.fecha.split('-').reverse().join('/')}</td>
       <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.proveedor}">${r.proveedor}</td>
       <td style="font-size:11px;color:#64748b;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.capturista||''}">${r.capturista||'—'}</td>
       <td style="text-align:right">${fmt(r.importe)}</td>
-      <td style="font-size:11px;color:${fuente==='—'?'#c0392b':'#64748b'}">${fuente}</td>
-      <td><select onchange="guardarAsignacion('${r.folio}',this.value,this)" ${bloqueado?'disabled':''} style="padding:5px 8px;border:1.5px solid ${actual?'#c9d4f0':'#f1948a'};border-radius:7px;font-size:12px;min-width:150px">
+      <td style="font-size:11px;color:${fuente==='—'?'#c0392b':(guardado?'#4a7c59':'#64748b')}">${guardado?'✏️ Manual':fuente}${guardado&&r.origenComp==='capturista'?`<br><a href="#" onclick="revertirAsignacion('${r.folio}');return false;" style="font-size:10px;color:#1c4587">↩ volver a "${r.comprador}"</a>`:''}</td>
+      <td><select onchange="guardarAsignacion('${r.folio}',this.value,this)" title="Puedes cambiarlo si la asignación automática es incorrecta" style="padding:5px 8px;border:1.5px solid ${guardado?'#4a7c59':(actual?'#c9d4f0':'#f1948a')};border-radius:7px;font-size:12px;min-width:150px">
         <option value="">— sin asignar —</option>
         ${ASG.comps.map(x=>`<option ${x===actual?'selected':''}>${x}</option>`).join('')}
       </select></td></tr>`;
@@ -1016,6 +1024,14 @@ async function guardarAsignacion(folio,comp,el){
   }
   const sin=ASG.pend.filter(r=>r.comprador==='SIN ASIGNAR'&&!ASG.mapa[r.folio]).length;
   document.getElementById('asg-info').textContent=ASG.pend.length+' pendientes · '+sin+' sin asignar';
+}
+async function revertirAsignacion(folio){
+  const msg=document.getElementById('asg-msg');
+  const{error}=await sb.from('oc_compradores').delete().eq('folio',folio);
+  if(error){msg.style.color='#c0392b';msg.textContent='No se pudo revertir: '+error.message;return;}
+  delete ASG.mapa[folio];
+  msg.style.color='#64748b';msg.textContent='↩ Folio '+folio+' vuelve a la asignación automática por capturista.';
+  renderAsignacion();
 }
 async function asignarMasivo(){
   const comp=document.getElementById('asg-masivo').value;
