@@ -201,6 +201,27 @@
         </div>
 
         <div class="admin-card">
+          <h2>👤 Asignar comprador a OCs pendientes</h2>
+          <p class="desc">Órdenes con Back Order PENDIENTE que no traen comprador en el reporte. La asignación se guarda y se conserva en todas las cargas futuras: cada orden se asigna una sola vez.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px">
+            <button class="abtn" style="margin-top:0" onclick="cargarAsignacion()">🔄 Cargar pendientes</button>
+            <select id="asg-filtro" onchange="renderAsignacion()" style="padding:7px 10px;border:1.5px solid #d7dce6;border-radius:8px;font-size:13px">
+              <option value="sin">Solo sin asignar</option>
+              <option value="todas">Todas las pendientes</option>
+            </select>
+            <input id="asg-buscar" oninput="renderAsignacion()" placeholder="Buscar folio o proveedor…" style="padding:7px 10px;border:1.5px solid #d7dce6;border-radius:8px;font-size:13px;flex:1;min-width:180px">
+            <span id="asg-info" style="font-size:12px;color:#64748b"></span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px">
+            <label style="font-size:12px;color:#64748b">Asignación rápida a los visibles:</label>
+            <select id="asg-masivo" style="padding:7px 10px;border:1.5px solid #d7dce6;border-radius:8px;font-size:13px"></select>
+            <button class="abtn" style="margin-top:0;background:#4a7c59" onclick="asignarMasivo()">Aplicar a los visibles</button>
+          </div>
+          <div id="asg-tabla" style="max-height:420px;overflow:auto"></div>
+          <div id="asg-msg" style="font-size:12px;color:#4a7c59;margin-top:8px"></div>
+        </div>
+
+        <div class="admin-card">
           <h2>📈 Métricas de ingreso</h2>
           <p class="desc">Ingresos diarios de los compradores (no incluye visitantes) y horas conectados. El tiempo se mide mientras la pestaña del portal permanece abierta.</p>
           <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:8px">
@@ -555,7 +576,18 @@ function pDX(v){
 function limpiarClaves(obj){const o={};Object.keys(obj).forEach(k=>o[k.trim()]=obj[k]);return o;}
 function diasEntre(a,b){return Math.round((new Date(b)-new Date(a))/86400000);}
 
-function computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif){
+function normNom(s){return String(s==null?'':s).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();}
+// Resuelve el comprador de una OC: 1) columna COMPRADOR  2) asignación manual guardada  3) nombre del capturista
+function resolverComprador(r,compsSet,mapaManual){
+  const directo=normNom(r['COMPRADOR']);
+  if(directo)return{comp:directo,origen:'directo'};
+  const folio=String(r['Folio']||'').trim();
+  if(mapaManual&&mapaManual[folio])return{comp:mapaManual[folio],origen:'manual'};
+  const cap=normNom(r['Comprador Capturo']);
+  if(cap){for(const cn of compsSet){if(cap===cn||cap.startsWith(cn+' '))return{comp:cn,origen:'capturista'};}}
+  return{comp:'SIN ASIGNAR',origen:'ninguno'};
+}
+function computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif,mapaManual){
   const detR=payload.detR, ufd=payload.detF, uf=ufd[ufd.length-1], primera=ufd[0];
   const mes=uf.slice(0,7);
   const hoyISO=uf;
@@ -581,9 +613,15 @@ function computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif){
   }
 
   // OC preprocesadas
-  const ocs=rowsOC.map(r=>({folio:String(r['Folio']||'').trim(),fecha:pDX(r['Fecha']),proveedor:String(r['Proveedor']||'').trim(),
+  const compsSet=[...new Set(hoyRows.map(r=>normNom(r.comprador)))].filter(x=>x);
+  const ocs=rowsOC.map(r=>{const res=resolverComprador(r,compsSet,mapaManual);
+    return{folio:String(r['Folio']||'').trim(),fecha:pDX(r['Fecha']),proveedor:String(r['Proveedor']||'').trim(),
     estatus:String(r['Estatus']||'').trim().toUpperCase(),estadoOC:String(r['Estado OC']||'').trim().toUpperCase(),
-    comprador:String(r['COMPRADOR']||'').trim().toUpperCase()||'SIN ASIGNAR'})).filter(r=>r.folio&&r.fecha);
+    backorder:String(r['Back Order']||'').trim().toUpperCase(),importe:r['Importe'],
+    capturista:String(r['Comprador Capturo']||'').trim(),
+    comprador:res.comp,origenComp:res.origen};})
+    .filter(r=>r.folio&&r.fecha&&r.estatus!=='CANCELADO');   // nunca considerar órdenes canceladas
+  window.__OCS_PEND=ocs.filter(r=>r.backorder==='PENDIENTE');   // para el panel de asignación
   function lim3m(f){const d=new Date(uf);d.setMonth(d.getMonth()-3);return f<d.toISOString().slice(0,10);}
   function lim1s(f){const d=new Date(uf);d.setDate(d.getDate()-7);return f<d.toISOString().slice(0,10);}
 
@@ -597,7 +635,9 @@ function computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif){
     enTiempo:String(r['EN TIEMPO']||'').trim().toUpperCase(),oc:nrm(r['OC']),proveedor:String(r['PROVEEDOR']||'').trim()})).filter(r=>r.clave);
   otif.forEach(r=>{r.comprador=claveComp[r.clave]||'SIN ASIGNAR';});
 
-  for(const comp of ['GENERAL',...comps]){
+  const compsAll=[...comps];
+  if(ocs.some(r=>r.comprador==='SIN ASIGNAR'))compsAll.push('SIN ASIGNAR');
+  for(const comp of ['GENERAL',...compsAll]){
     const mine=r=>comp==='GENERAL'||r.comprador===comp;
     const hoyC=hoyRows.filter(mine);
 
@@ -627,11 +667,11 @@ function computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif){
     const mineOC=ocs.filter(r=>comp==='GENERAL'||r.comprador===comp);
     const oc3=mineOC.filter(r=>['PENDIENTE RECIBIR','RECIBIDO PARCIALMENTE'].includes(r.estadoOC)&&lim3m(r.fecha))
       .map(r=>({Folio:r.folio,Proveedor:r.proveedor,'Fecha OC':r.fecha.split('-').reverse().join('/'),Estado:r.estadoOC}));
-    push(comp,'backorders','OC_3_MESES',oc3,oc3.length,'Lógica: órdenes de compra con Estado OC = PENDIENTE RECIBIR o RECIBIDO PARCIALMENTE cuya fecha de colocación es anterior a 3 meses contados desde el corte ('+uf.split('-').reverse().join('/')+'). Es material solicitado que sigue sin llegar completo.');
+    push(comp,'backorders','OC_3_MESES',oc3,oc3.length,'Lógica: órdenes de compra con Estado OC = PENDIENTE RECIBIR o RECIBIDO PARCIALMENTE cuya fecha de colocación es anterior a 3 meses contados desde el corte ('+uf.split('-').reverse().join('/')+'). Es material solicitado que sigue sin llegar completo. Excluye órdenes canceladas.');
 
-    const ocap=mineOC.filter(r=>r.estadoOC==='PENDIENTE APLICAR'&&lim1s(r.fecha))
-      .map(r=>({Folio:r.folio,Proveedor:r.proveedor,'Fecha OC':r.fecha.split('-').reverse().join('/')}));
-    push(comp,'backorders','OC_SIN_APLICAR',ocap,ocap.length,'Órdenes con Estado OC = PENDIENTE APLICAR y más de 7 días desde su colocación.');
+    const ocap=mineOC.filter(r=>r.backorder==='PENDIENTE'&&lim1s(r.fecha))
+      .map(r=>({Folio:r.folio,Proveedor:r.proveedor,'Fecha OC':r.fecha.split('-').reverse().join('/'),Asignación:({directo:'Del reporte',manual:'Manual',capturista:'Por capturista',ninguno:'—'})[r.origenComp]}));
+    push(comp,'backorders','OC_SIN_APLICAR',ocap,ocap.length,'Órdenes cuyo Back Order sigue en PENDIENTE (material aún no disponible) con más de 7 días desde su colocación. Excluye canceladas. El comprador se toma del reporte; si no viene, de la asignación manual del Admin o del nombre del capturista.');
 
     const ped=asig.filter(r=>r.directriz==='LEVANTAR PEDIDO'&&mine(r))
       .map(r=>({Clave:r.clave,Descripción:r.descripcion,'Cant. a pedir':r.cantidad,Proveedor:r.proveedor,'Fecha sugerida':r.fechaLev?r.fechaLev.split('-').reverse().join('/'):''}));
@@ -770,7 +810,14 @@ async function procesarExcel(file){
     if(!wsOC)log('⚠️ No se encontró la hoja RP01-23 Ordenes de Compra: alarmas de Back Orders vacías.');
     if(!wsAs)log('⚠️ No se encontró la hoja Asignacion: pedidos propuestos vacíos.');
     if(!wsOt)log('⚠️ No se encontró la hoja OTIF PEDIDOS: indicador OTIF vacío.');
-    const res=computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif);
+    log('🔎 Leyendo asignaciones manuales de OCs…');
+    const asgOC=await sb.from('oc_compradores').select('folio,comprador');
+    const mapaManual={};if(!asgOC.error&&asgOC.data)asgOC.data.forEach(x=>{mapaManual[String(x.folio).trim()]=x.comprador;});
+    log('   '+Object.keys(mapaManual).length+' asignaciones guardadas');
+    const res=computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif,mapaManual);
+    const pend=window.__OCS_PEND||[];
+    const sinAsg=pend.filter(r=>r.comprador==='SIN ASIGNAR').length;
+    log('   OCs con Back Order pendiente: '+pend.length+' · con comprador: '+(pend.length-sinAsg)+' · sin asignar: '+sinAsg);
     log('   '+res.alarmas.length+' alarmas calculadas para '+([...new Set(res.alarmas.map(a=>a.comprador))].length-1)+' compradores + GENERAL');
     log('☁️ Publicando alarmas…');
     const del=await sb.from('alarmas').delete().gte('id',0);
@@ -872,6 +919,101 @@ async function descargarComentarios(){
   const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{Fecha:'',Usuario:'',Dashboard:'',Referencia:'',Mes:'',Comentario:'(sin comentarios aún)'}]);
   const wb2=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb2,ws,'Comentarios');
   XLSX.writeFile(wb2,'Comentarios_portal_compras.xlsx');
+}
+
+// ── Asignación de comprador a OCs ──
+let ASG={pend:null,mapa:{},comps:[]};
+async function cargarAsignacion(){
+  const box=document.getElementById('asg-tabla');
+  box.innerHTML='<p style="color:#64748b;font-size:13px">Cargando…</p>';
+  if(!window.__OCS_PEND||!window.__OCS_PEND.length){
+    box.innerHTML='<p style="color:#b8860b;font-size:13px">Primero sube el Excel maestro en esta misma sesión: el listado de OCs pendientes se genera durante la carga.</p>';
+    return;
+  }
+  const[a,u]=await Promise.all([
+    sb.from('oc_compradores').select('folio,comprador,origen'),
+    sb.from('usuarios').select('nombre').eq('tipo','comprador').order('nombre')
+  ]);
+  if(a.error){box.innerHTML='<p style="color:#c0392b">'+a.error.message+'</p>';return;}
+  ASG.mapa={};(a.data||[]).forEach(x=>{ASG.mapa[String(x.folio).trim()]={comp:x.comprador,origen:x.origen};});
+  ASG.comps=(u.data||[]).map(x=>x.nombre);
+  ASG.pend=window.__OCS_PEND.slice().sort((x,y)=>x.fecha.localeCompare(y.fecha));
+  document.getElementById('asg-masivo').innerHTML='<option value="">— elige comprador —</option>'+ASG.comps.map(x=>`<option>${x}</option>`).join('');
+  renderAsignacion();
+}
+function asgVisibles(){
+  const filtro=document.getElementById('asg-filtro').value;
+  const q=(document.getElementById('asg-buscar').value||'').toUpperCase().trim();
+  return (ASG.pend||[]).filter(r=>{
+    const asignado=r.comprador!=='SIN ASIGNAR'||ASG.mapa[r.folio];
+    if(filtro==='sin'&&asignado)return false;
+    if(q&&!(r.folio.toUpperCase().includes(q)||String(r.proveedor).toUpperCase().includes(q)))return false;
+    return true;
+  });
+}
+function renderAsignacion(){
+  if(!ASG.pend)return;
+  const vis=asgVisibles();
+  const sin=ASG.pend.filter(r=>r.comprador==='SIN ASIGNAR'&&!ASG.mapa[r.folio]).length;
+  document.getElementById('asg-info').textContent=ASG.pend.length+' pendientes · '+sin+' sin asignar · '+vis.length+' visibles';
+  const fmt=n2=>typeof n2==='number'?'$'+n2.toLocaleString('es-MX',{maximumFractionDigits:0}):'';
+  const filas=vis.slice(0,400).map(r=>{
+    const guardado=ASG.mapa[r.folio];
+    const actual=guardado?guardado.comp:(r.comprador!=='SIN ASIGNAR'?r.comprador:'');
+    const fuente=guardado?'Manual':(r.origenComp==='capturista'?'Por capturista':(r.origenComp==='directo'?'Del reporte':'—'));
+    const bloqueado=r.origenComp==='directo'&&!guardado;
+    return `<tr>
+      <td><b>${r.folio}</b></td>
+      <td>${r.fecha.split('-').reverse().join('/')}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.proveedor}">${r.proveedor}</td>
+      <td style="font-size:11px;color:#64748b;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.capturista||''}">${r.capturista||'—'}</td>
+      <td style="text-align:right">${fmt(r.importe)}</td>
+      <td style="font-size:11px;color:${fuente==='—'?'#c0392b':'#64748b'}">${fuente}</td>
+      <td><select onchange="guardarAsignacion('${r.folio}',this.value,this)" ${bloqueado?'disabled':''} style="padding:5px 8px;border:1.5px solid ${actual?'#c9d4f0':'#f1948a'};border-radius:7px;font-size:12px;min-width:150px">
+        <option value="">— sin asignar —</option>
+        ${ASG.comps.map(x=>`<option ${x===actual?'selected':''}>${x}</option>`).join('')}
+      </select></td></tr>`;
+  }).join('');
+  document.getElementById('asg-tabla').innerHTML=
+    '<table class="mtx"><tr><th>Folio</th><th>Fecha OC</th><th>Proveedor</th><th>Capturó</th><th style="text-align:right">Importe</th><th>Origen</th><th>Comprador</th></tr>'+
+    (filas||'<tr><td colspan=7 style="color:#4a7c59">Todas las órdenes visibles ya tienen comprador ✅</td></tr>')+'</table>'+
+    (vis.length>400?'<p style="font-size:11px;color:#94a3b8;margin-top:6px">Mostrando 400 de '+vis.length+'. Usa el buscador para acotar.</p>':'');
+}
+async function guardarAsignacion(folio,comp,el){
+  const msg=document.getElementById('asg-msg');
+  if(el)el.style.borderColor='#b8860b';
+  if(!comp){
+    const{error}=await sb.from('oc_compradores').delete().eq('folio',folio);
+    if(error){msg.style.color='#c0392b';msg.textContent='No se pudo borrar: '+error.message;return;}
+    delete ASG.mapa[folio];
+    if(el)el.style.borderColor='#f1948a';
+    msg.style.color='#64748b';msg.textContent='Asignación del folio '+folio+' eliminada.';
+  }else{
+    const{error}=await sb.from('oc_compradores').upsert({folio:folio,comprador:comp,origen:'manual',asignado_por:usuarioActual||'admin',actualizado_en:new Date().toISOString()});
+    if(error){msg.style.color='#c0392b';msg.textContent='No se pudo guardar: '+error.message+(error.message.includes('row-level')?' — ¿ejecutaste el SQL 03_sql_asignacion_oc.sql?':'');return;}
+    ASG.mapa[folio]={comp:comp,origen:'manual'};
+    if(el)el.style.borderColor='#4a7c59';
+    msg.style.color='#4a7c59';msg.textContent='✓ Folio '+folio+' asignado a '+comp+'. Se aplicará en la próxima carga del Excel.';
+  }
+  const sin=ASG.pend.filter(r=>r.comprador==='SIN ASIGNAR'&&!ASG.mapa[r.folio]).length;
+  document.getElementById('asg-info').textContent=ASG.pend.length+' pendientes · '+sin+' sin asignar';
+}
+async function asignarMasivo(){
+  const comp=document.getElementById('asg-masivo').value;
+  const msg=document.getElementById('asg-msg');
+  if(!comp){msg.style.color='#c0392b';msg.textContent='Elige un comprador para la asignación rápida.';return;}
+  const vis=asgVisibles().filter(r=>r.origenComp!=='directo');
+  if(!vis.length){msg.textContent='No hay órdenes visibles para asignar.';return;}
+  if(!confirm('¿Asignar '+vis.length+' orden(es) visibles a '+comp+'?'))return;
+  msg.style.color='#64748b';msg.textContent='Guardando '+vis.length+'…';
+  const filas=vis.map(r=>({folio:r.folio,comprador:comp,origen:'manual',asignado_por:usuarioActual||'admin',actualizado_en:new Date().toISOString()}));
+  for(let i=0;i<filas.length;i+=100){
+    const{error}=await sb.from('oc_compradores').upsert(filas.slice(i,i+100));
+    if(error){msg.style.color='#c0392b';msg.textContent='Error: '+error.message;return;}
+  }
+  filas.forEach(f2=>{ASG.mapa[f2.folio]={comp:comp,origen:'manual'};});
+  msg.style.color='#4a7c59';msg.textContent='✓ '+filas.length+' órdenes asignadas a '+comp+'. Se aplicarán en la próxima carga del Excel.';
+  renderAsignacion();
 }
 
 // ── Métricas ──
