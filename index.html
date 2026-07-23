@@ -597,12 +597,20 @@ function esCancelada(r){
 }
 function normNom(s){return String(s==null?'':s).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();}
 // Resuelve el comprador de una OC: 1) columna COMPRADOR  2) asignación manual guardada  3) nombre del capturista
+// Valores que NO son un nombre real (celdas vacías leídas como texto)
+function nombreValido(s){
+  const t=normNom(s);
+  return t&&t!=='NAN'&&t!=='NULL'&&t!=='UNDEFINED'&&t!=='-'&&t!=='N/A'&&t!=='#N/A'&&t!=='0'?t:'';
+}
 function resolverComprador(r,compsSet,mapaManual){
-  const directo=normNom(r['COMPRADOR']);
-  if(directo)return{comp:directo,origen:'directo'};
   const folio=String(r['Folio']||'').trim();
-  if(mapaManual&&mapaManual[folio])return{comp:mapaManual[folio],origen:'manual'};
-  const cap=normNom(r['Comprador Capturo']);
+  // 1) La corrección manual del Admin SIEMPRE gana
+  if(mapaManual&&mapaManual[folio])return{comp:normNom(mapaManual[folio]),origen:'manual'};
+  // 2) Columna COMPRADOR del reporte, solo si trae un nombre real
+  const directo=nombreValido(r['COMPRADOR']);
+  if(directo)return{comp:directo,origen:'directo'};
+  // 3) Inferencia por el nombre de quien capturó la OC
+  const cap=nombreValido(r['Comprador Capturo']);
   if(cap){for(const cn of compsSet){if(cap===cn||cap.startsWith(cn+' '))return{comp:cn,origen:'capturista'};}}
   return{comp:'SIN ASIGNAR',origen:'ninguno'};
 }
