@@ -814,7 +814,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
         <button class="export-btn" onclick="exportPrecision()" style="margin-left:auto">⬇ Exportar Excel</button>
       </div>
       <div style="padding:8px 16px;background:var(--sf2);border-bottom:1px solid var(--brd);font-size:10.5px;color:var(--tx2)">
-        💡 El campo <b>Motivo</b> es editable: selecciona una opción y se guarda automáticamente en este navegador.
+        💡 Los campos <b>Motivo</b> y <b>Comentario</b> son editables y se guardan en la base de datos: quedan disponibles para todo el equipo, con el nombre de quien los registró.
         Para que el cambio quede en tu archivo fuente, usa <b>⬇ Exportar Excel</b> y sube ese archivo a tu repositorio.
       </div>
       <div class="tbl-scroll" style="max-height:calc(100vh - 420px);min-height:350px">
@@ -831,6 +831,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
             <th data-pcol="resultado">Resultado<span class="psarr">↕</span></th>
             <th data-pcol="motivo" style="min-width:180px">Motivo<span class="psarr">↕</span></th>
             <th data-pcol="resp">Responsable<span class="psarr">↕</span></th>
+            <th style="min-width:170px">Comentario</th>
           </tr></thead>
           <tbody id="prec-tbody"></tbody>
         </table>
@@ -943,6 +944,7 @@ async function autoLoadFromRepo(){
   manualEl.style.display='none';
   try{
     msgEl.textContent='Conectando con el servidor…';
+    await cargarMotivosServidor();
     msgEl.textContent='Descargando datos…';
     const {buf:buffer}=await window.sbDescargar('otif','payloads/otif.xlsx');
     msgEl.textContent='Procesando Excel…';
@@ -1528,15 +1530,46 @@ let precSortCol='', precSortDir=1;
 let precRespChart=null;
 let ocMotivos=loadMotivos();
 
-function loadMotivos(){
+// Los motivos se guardan en la base de datos (visibles para todo el equipo)
+let MOT_COMENT=new Map();   // clave_registro → comentario libre
+function loadMotivos(){ return new Map(); }   // se llenan al cargar desde el servidor
+async function cargarMotivosServidor(){
   try{
-    const raw=localStorage.getItem('precisionMotivos_v1');
-    return raw?new Map(Object.entries(JSON.parse(raw))):new Map();
-  }catch(e){ return new Map(); }
+    const sb=window.sbGet();
+    const{data,error}=await sb.from('motivos_precision').select('clave_registro,motivo,comentario,usuario,actualizado_en');
+    if(error){console.warn('motivos:',error.message);return;}
+    ocMotivos=new Map();MOT_COMENT=new Map();
+    (data||[]).forEach(r=>{
+      if(r.motivo)ocMotivos.set(r.clave_registro,r.motivo);
+      if(r.comentario)MOT_COMENT.set(r.clave_registro,{txt:r.comentario,quien:r.usuario||'',cuando:r.actualizado_en});
+    });
+  }catch(e){console.warn('motivos:',e.message);}
 }
-function saveMotivos(){
-  try{ localStorage.setItem('precisionMotivos_v1', JSON.stringify(Object.fromEntries(ocMotivos))); }
-  catch(e){ /* storage unavailable — edits stay in memory only */ }
+function saveMotivos(){ /* el guardado se hace por fila en updateMotivo/guardarComentarioPrec */ }
+function usuarioPortal(){
+  try{ return window.parent&&window.parent!==window&&window.parent.sessionStorage
+        ? (window.parent.sessionStorage.getItem('pc_usuario')||'') : (sessionStorage.getItem('pc_usuario')||''); }
+  catch(e){ return ''; }
+}
+function datosDeFila(key){
+  const r=(typeof buildPrecisionRows==='function'?buildPrecisionRows():[]).find(x=>x.key===key);
+  if(!r)return{clave:'',oc:'',mes:null};
+  const f=r.foc instanceof Date&&!isNaN(r.foc)?r.foc:(r.fechaPropuesta instanceof Date&&!isNaN(r.fechaPropuesta)?r.fechaPropuesta:null);
+  return{clave:String(r.clave||''),oc:r.oc&&r.oc!=='—'?String(r.oc):'',
+         mes:f?f.getFullYear()+'-'+String(f.getMonth()+1).padStart(2,'0'):null};
+}
+async function guardarMotivoServidor(key,motivo,comentario){
+  const sb=window.sbGet();
+  const d=datosDeFila(key);
+  const fila={clave_registro:key,clave:d.clave,oc:d.oc,mes:d.mes,
+    motivo:motivo||'',comentario:comentario||null,
+    usuario:usuarioPortal()||'(sin identificar)',actualizado_en:new Date().toISOString()};
+  if(!motivo&&!comentario){
+    const{error}=await sb.from('motivos_precision').delete().eq('clave_registro',key);
+    return error?error.message:null;
+  }
+  const{error}=await sb.from('motivos_precision').upsert(fila);
+  return error?error.message:null;
 }
 
 // Build one row PER CLAVE within each OC (a single OC can have some
@@ -1632,8 +1665,31 @@ function buildPrecMonthOptions(allRows){
 }
 function updateMotivo(key,val){
   if(val) ocMotivos.set(key,val); else ocMotivos.delete(key);
-  saveMotivos();
   renderPrecisionTab();
+  const com=MOT_COMENT.get(key);
+  guardarMotivoServidor(key,val,com?com.txt:null).then(err=>{
+    if(err)showPrecToast('⚠ No se pudo guardar: '+err);
+    else showPrecToast('✓ Motivo guardado');
+  });
+}
+function showPrecToast(msg){
+  let t=document.getElementById('prec-toast');
+  if(!t){t=document.createElement('div');t.id='prec-toast';
+    t.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a2035;color:#fff;padding:9px 20px;border-radius:10px;font-size:13px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.3);transition:opacity .3s';
+    document.body.appendChild(t);}
+  t.textContent=msg;t.style.opacity='1';
+  clearTimeout(window.__ptt);window.__ptt=setTimeout(()=>{t.style.opacity='0';},2600);
+}
+async function guardarComentarioPrec(key){
+  const actual=MOT_COMENT.get(key);
+  const txt=prompt('Comentario para esta propuesta\n(explica por qué se pidió de más o de menos):',actual?actual.txt:'');
+  if(txt===null)return;
+  const limpio=txt.trim();
+  if(limpio)MOT_COMENT.set(key,{txt:limpio,quien:usuarioPortal(),cuando:new Date().toISOString()});
+  else MOT_COMENT.delete(key);
+  renderPrecisionTab();
+  const err=await guardarMotivoServidor(key,ocMotivos.get(key)||'',limpio);
+  showPrecToast(err?('⚠ No se pudo guardar: '+err):'✓ Comentario guardado');
 }
 
 function buildPrecProvOptions(){
@@ -1747,6 +1803,17 @@ function renderPrecisionTab(){
     if(s==='no_colocada')return'<span class="chip-nocolocada">✗ No colocada</span>';
     return'<span class="chip-sindato">Sin dato</span>';
   };
+  const comentarioCell=r=>{
+    const c=MOT_COMENT.get(r.key);
+    const editable=(r.status==='desviada'||r.status==='no_colocada'||r.status==='pendiente');
+    if(!editable&&!c)return '<span class="dash">—</span>';
+    if(c){
+      const quien=c.quien?c.quien+' · ':'';
+      const cuando=c.cuando?new Date(c.cuando).toLocaleDateString('es-MX'):'';
+      return `<div onclick="guardarComentarioPrec('${r.key}')" title="Clic para editar — ${quien}${cuando}" style="cursor:pointer;white-space:normal;word-break:break-word;line-height:1.35;color:var(--tx);border-left:2px solid var(--navy);padding-left:6px">${c.txt}<br><span style="font-size:9px;color:var(--tx3)">${quien}${cuando}</span></div>`;
+    }
+    return `<button onclick="guardarComentarioPrec('${r.key}')" style="font-size:10px;padding:3px 9px;border:1px dashed var(--brd2);background:none;border-radius:6px;cursor:pointer;color:var(--tx2)">✏️ Agregar</button>`;
+  };
   const MOTIVO_OPTS=['','ERROR DE CALCULO','NO CUMPLE CANTIDAD MINIMA','VARIACION DE PRECIO','DECISION DE GERENCIA','OTRO'];
   const motivoLbl={'':'— Seleccionar —','ERROR DE CALCULO':'Error de cálculo','NO CUMPLE CANTIDAD MINIMA':'No cumple cant. mínima','VARIACION DE PRECIO':'Variación de precio','DECISION DE GERENCIA':'Decisión de gerencia','OTRO':'Otro'};
 
@@ -1772,14 +1839,15 @@ function renderPrecisionTab(){
       <td>${statusChip(r.status)}</td>
       <td>${motivoCell}</td>
       <td style="font-size:10px;color:var(--tx2)">${resp}</td>
+      <td style="font-size:10px;max-width:190px">${comentarioCell(r)}</td>
     </tr>`;
-  }).join('')||'<tr><td colspan="11" class="no-data">Sin claves para los filtros aplicados.</td></tr>';
+  }).join('')||'<tr><td colspan="12" class="no-data">Sin claves para los filtros aplicados.</td></tr>';
 }
 
 function exportPrecision(){
   if(!OTIF_DATA.length){alert('No hay datos para exportar.');return;}
   const rows0=buildPrecisionRows();
-  const headers=['OC','Clave','Descripción','Proveedor','Mes Propuesta','Fecha Efectiva','Cant. Propuesta','Cant. Real','Desv. %','Resultado','Motivo','Responsable'];
+  const headers=['OC','Clave','Descripción','Proveedor','Mes Propuesta','Fecha Efectiva','Cant. Propuesta','Cant. Real','Desv. %','Resultado','Motivo','Responsable','Comentario','Registró','Fecha comentario'];
   const rows=[headers,...rows0.map(r=>[
     r.oc, r.clave, r.desc, r.prov,
     r.fechaPropuesta?mLabel(mKey(r.fechaPropuesta)):'',
@@ -1790,10 +1858,13 @@ function exportPrecision(){
     r.status==='acertada'?'Acertada':r.status==='desviada'?'Desviada':r.status==='no_colocada'?'No colocada':'',
     r.motivo||'',
     MOTIVO_RESP[(r.motivo||'').toUpperCase()]||'',
+    (MOT_COMENT.get(r.key)||{}).txt||'',
+    (MOT_COMENT.get(r.key)||{}).quien||'',
+    (MOT_COMENT.get(r.key)||{}).cuando?new Date(MOT_COMENT.get(r.key).cuando).toLocaleDateString('es-MX'):'',
   ])];
   const wb=XLSX.utils.book_new();
   const ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=[{wch:9},{wch:9},{wch:40},{wch:14},{wch:12},{wch:14},{wch:14},{wch:12},{wch:10},{wch:14},{wch:24},{wch:14}];
+  ws['!cols']=[{wch:9},{wch:9},{wch:40},{wch:14},{wch:12},{wch:14},{wch:14},{wch:12},{wch:10},{wch:14},{wch:24},{wch:14},{wch:46},{wch:16},{wch:14}];
   XLSX.utils.book_append_sheet(wb, ws, 'Precision Pedido');
   const ts=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'-');
   XLSX.writeFile(wb, `Precision_Pedido_${ts}.xlsx`);
