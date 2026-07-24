@@ -195,15 +195,17 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
 
   <div id="panel-resumen" class="panel">
     <div class="card">
-      <h2>Comparativo de Faltantes</h2><p>Cierre mes anterior vs mes actual · sin PRODUCCION</p>
+      <h2>Comparativo de Faltantes</h2><p id="res-sub">Cierre mes anterior vs mes actual · sin PRODUCCION</p>
       <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:16px;padding:14px;background:#f5f6fa;border-radius:10px;border:1px solid #e2e6ed">
         <div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">👤 Comprador</label>
           <select id="r-comp" onchange="renderRes()"><option value="TODOS">— Todos —</option><option value="__A__">▶ Área General</option></select></div>
         <div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">📂 Clasificación</label>
           <select id="r-clas" onchange="renderRes()"><option value="TODAS">— Todas —</option><option value="TOTAL">Global</option><option value="SAGRADOS">Sagrados</option><option value="ALTA ROTACIÓN">Alta Rotación</option><option value="MEDIA ROTACIÓN">Media Rotación</option><option value="LENTA ROTACIÓN">Lenta Rotación</option></select></div>
+        <div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">📅 Mes de análisis</label>
+          <select id="r-mes" onchange="renderRes()"></select></div>
         <div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">🎯 Objetivo</label>
           <select id="r-obj" onchange="renderRes()"><option value="si">Mostrar</option><option value="no">Ocultar</option></select></div>
-        <button onclick="document.getElementById('r-comp').value='TODOS';document.getElementById('r-clas').value='TODAS';renderRes()" style="padding:7px 12px;background:#fff;border:1.5px solid #c9d4f0;border-radius:7px;color:#1e3a5f;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">↺ Limpiar</button>
+        <button onclick="document.getElementById('r-comp').value='TODOS';document.getElementById('r-clas').value='TODAS';document.getElementById('r-mes').value=G.mA;renderRes()" style="padding:7px 12px;background:#fff;border:1.5px solid #c9d4f0;border-radius:7px;color:#1e3a5f;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">↺ Limpiar</button>
         <div id="r-cnt" style="margin-left:auto;font-size:12px;color:#6b7a99"></div>
       </div>
       <div style="overflow-x:auto"><table class="rt" style="min-width:860px">
@@ -802,7 +804,7 @@ function buildData(raw,rawD,fn){
   const ufd=uq('fecha');
   const detFalt={};
   if(detR.length){const lf=ufd[ufd.length-1];detR.filter(r=>r.fecha===lf&&r.estatus==='FALTANTE').forEach(r=>{detFalt[r.comprador]=detFalt[r.comprador]||{};detFalt[r.comprador][r.clmov]=detFalt[r.comprador][r.clmov]||[];detFalt[r.comprador][r.clmov].push(r);});}
-  return{fechas,compradores,totalByDay,clavesTotal,clasByDay,compByDay,compClByDay,CDATA,AREA,uf,pf,mA,mAn,fU,totalHoy:totalByDay[uf]||0,clavesHoy:clavesTotal[uf]||0,filename:fn,detR,detF:ufd,detM:uq('marca'),detCM:uq('clmov'),detG:uq('grupo'),detC:uq('comprador'),detE:uq('estatus'),detRd:uq('reorden'),detFalt};
+  return{fechas,compradores,totalByDay,clavesTotal,clasByDay,compByDay,compClByDay,CDATA,AREA,uf,pf,mA,mAn,fU,meses:mes,rowsRes:rows,totalHoy:totalByDay[uf]||0,clavesHoy:clavesTotal[uf]||0,filename:fn,detR,detF:ufd,detM:uq('marca'),detCM:uq('clmov'),detG:uq('grupo'),detC:uq('comprador'),detE:uq('estatus'),detRd:uq('reorden'),detFalt};
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────────────
@@ -818,6 +820,7 @@ function render(){
   document.getElementById('th-ant').textContent=mAn?`Cierre ${MN[+mAn.split('-')[1]]}`:'Inicio';
   document.getElementById('th-act').textContent=MN[+mA.split('-')[1]];
   // Populate comprador selector
+  llenarMesesRes();
   const sc=document.getElementById('r-comp');
   sc.innerHTML='<option value="TODOS">— Todos —</option><option value="__A__">▶ Área General</option>';
   compradores.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sc.appendChild(o);});
@@ -867,9 +870,60 @@ function renderPills(){
 function togSub(k){aS[k]=aS[k].size===G.compradores.length?new Set():new Set(G.compradores);renderPills();renderSC(k);updateKPIs(null,null);}
 
 // ── TABLA RESUMEN ─────────────────────────────────────────────────────────────
+// Recalcula la tabla resumen para el mes seleccionado
+function calcResMes(mSel){
+  const rows=G.rowsRes;
+  if(!rows||!rows.length)return null;
+  const CLSL=['SAGRADOS','ALTA ROTACIÓN','MEDIA ROTACIÓN','LENTA ROTACIÓN'];
+  const fechas=G.fechas, compradores=G.compradores;
+  const falt=rows.filter(r=>r.mov==='FALTANTE');
+  const fMes=fechas.filter(x=>x.startsWith(mSel));
+  if(!fMes.length)return null;
+  const cierre=fMes[fMes.length-1];                       // último día con datos del mes elegido
+  const meses=G.meses||[...new Set(fechas.map(x=>x.slice(0,7)))].sort();
+  const idx=meses.indexOf(mSel);
+  const mPrev=idx>0?meses[idx-1]:null;
+  const fPrev=mPrev?fechas.filter(x=>x.startsWith(mPrev)):[];
+  const cierrePrev=fPrev.length?fPrev[fPrev.length-1]:G.pf;
+  const uni=rows.filter(r=>r.fecha===cierre);             // SKU's al cierre del mes elegido
+  const uniA=rows.filter(r=>r.fecha===cierrePrev);
+  const sByL=(arr,fn)=>{const o={};arr.forEach(r=>{const k=fn(r);o[k]=(o[k]||0)+r.claves;});return o;};
+  const uS2=(rows2,c,cl)=>{let x=rows2;if(c)x=x.filter(r=>r.comprador===c);
+    if(cl&&cl!=='TOTAL')x=x.filter(r=>r.clasificacion===cl);return x.reduce((s,r)=>s+r.claves,0);};
+  const st2=(sk,skA,bd)=>{const f1=bd[cierrePrev]||0,f2=bd[cierre]||0,pk=Math.max(0,...fMes.map(x=>bd[x]||0));
+    return{skus:sk,f1,f2,pico:pk,pct_f1:skA>0?+(f1/skA*100).toFixed(2):0,
+      pct_f2:sk>0?+(f2/sk*100).toFixed(2):0,pct_pico:sk>0?+(pk/sk*100).toFixed(2):0};};
+  const CD={};compradores.forEach(c=>{CD[c]={};[...CLSL,'TOTAL'].forEach(cl=>{
+    const fl=falt.filter(r=>r.comprador===c&&(cl==='TOTAL'||r.clasificacion===cl));
+    CD[c][cl]=st2(uS2(uni,c,cl),uS2(uniA,c,cl),sByL(fl,r=>r.fecha));});});
+  const AR={};[...CLSL,'TOTAL'].forEach(cl=>{
+    const fl=falt.filter(r=>cl==='TOTAL'||r.clasificacion===cl);
+    AR[cl]=st2(uS2(uni,null,cl),uS2(uniA,null,cl),sByL(fl,r=>r.fecha));});
+  return{CDATA:CD,AREA:AR,cierre,cierrePrev,mSel,mPrev};
+}
+function mesLbl(m){if(!m)return '—';const MN2=['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const p=m.split('-');return MN2[+p[1]]+' '+p[0];}
+function llenarMesesRes(){
+  const sel=document.getElementById('r-mes');
+  if(!sel||!G.meses)return;
+  sel.innerHTML=G.meses.slice().reverse().map(m=>`<option value="${m}">${mesLbl(m)}</option>`).join('');
+  sel.value=G.mA;
+}
 function renderRes(){
   if(!G.compradores) return;
-  const{compradores,CDATA,AREA}=G;
+  const selMes=document.getElementById('r-mes');
+  const mSel=(selMes&&selMes.value)||G.mA;
+  const calc=(mSel===G.mA&&!G.rowsRes)?null:calcResMes(mSel);
+  const compradores=G.compradores;
+  const CDATA=calc?calc.CDATA:G.CDATA, AREA=calc?calc.AREA:G.AREA;
+  // Encabezados dinámicos según el mes elegido
+  if(calc){
+    const thA=document.getElementById('th-ant'),thH=document.getElementById('th-act');
+    if(thA)thA.textContent=calc.mPrev?'Cierre '+mesLbl(calc.mPrev):'Inicio';
+    if(thH)thH.textContent=mesLbl(calc.mSel).split(' ')[0].toUpperCase();
+    const sub=document.getElementById('res-sub');
+    if(sub)sub.textContent='Cierre '+(calc.mPrev?mesLbl(calc.mPrev):'inicio')+' ('+calc.cierrePrev.split('-').reverse().join('/')+') vs '+mesLbl(calc.mSel)+' · cierre al '+calc.cierre.split('-').reverse().join('/')+' · sin PRODUCCION';
+  }
   const sC=document.getElementById('r-comp').value,sCl=document.getElementById('r-clas').value;
   const showObj=document.getElementById('r-obj').value==='si';
   document.getElementById('th-obj').style.display=showObj?'':'none';
