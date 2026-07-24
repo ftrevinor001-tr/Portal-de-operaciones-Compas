@@ -797,6 +797,22 @@ function buildData(raw,rawD,fn){
   const uniA=rows.filter(r=>r.fecha===lastAnt);
   function uS(rows2,c,cl){let f=rows2;if(c)f=f.filter(r=>r.comprador===c);if(cl&&cl!=='TOTAL')f=f.filter(r=>r.clasificacion===cl);return f.reduce((s,r)=>s+r.claves,0);}
   function st(sk,skA,bd){const f1=bd[lastAnt]||0,f2=bd[uf]||0,pk=Math.max(0,...fU.map(f=>bd[f]||0));return{skus:sk,f1,f2,pico:pk,pct_f1:skA>0?+(f1/skA*100).toFixed(2):0,pct_f2:sk>0?+(f2/sk*100).toFixed(2):0,pct_pico:sk>0?+(pk/sk*100).toFixed(2):0};}
+  // SKU's al cierre de cada mes (desde Hoja1, fuente oficial de la tabla resumen)
+  const skuMes={};
+  mes.forEach(m=>{
+    const fm=fechas.filter(x=>x.startsWith(m));
+    if(!fm.length)return;
+    const cierreM=fm[fm.length-1];
+    const filas=rows.filter(r=>r.fecha===cierreM);
+    const mp={};
+    filas.forEach(r=>{
+      mp[r.comprador+'||TOTAL']=(mp[r.comprador+'||TOTAL']||0)+r.claves;
+      mp[r.comprador+'||'+r.clasificacion]=(mp[r.comprador+'||'+r.clasificacion]||0)+r.claves;
+      mp['__A__||TOTAL']=(mp['__A__||TOTAL']||0)+r.claves;
+      mp['__A__||'+r.clasificacion]=(mp['__A__||'+r.clasificacion]||0)+r.claves;
+    });
+    skuMes[m]=mp;
+  });
   const CDATA={};compradores.forEach(c=>{CDATA[c]={};[...CLS,'TOTAL'].forEach(cl=>{CDATA[c][cl]=st(uS(uni,c,cl),uS(uniA,c,cl),cl==='TOTAL'?compByDay[c]:compClByDay[c][cl]);});});
   const AREA={};[...CLS,'TOTAL'].forEach(cl=>{const fl=falt.filter(r=>cl==='TOTAL'||r.clasificacion===cl);AREA[cl]=st(uS(uni,null,cl),uS(uniA,null,cl),sBy(fl,r=>r.fecha));});
   const detR=rawD.map(r=>({fecha:pD(String(r['Fecha']||'')),clave:r['Clave']||'',nombre:r['Nombre']||'',marca:r['Marca']||'',unidad:r['Unidad']||'',clasificacion:String(r['Clasificación']||'').trim(),existencias:numX(r['Existencias']),grupo:String(r['GRUPO']||'').trim(),comprador:String(r['COMPRADOR']||'').trim().toUpperCase(),clmov:String(r['Clasificación por movimiento']||'').trim().toUpperCase(),t_entrega:numX(r['Tiempo de entrega']),obj_meses:numX(r['Objetivo_Meses de inventario']),meses_inv:numX(r['Meses de inventario']),estatus:String(r['Clasificacion_estatus de inventario']||'').trim().toUpperCase(),reorden:String(r['Clasificacion_Punto de reorden']||'').trim(),bo:numX(r['Back Order'])})).filter(r=>r.fecha&&r.comprador&&!EXCL.includes(r.comprador));
@@ -805,7 +821,7 @@ function buildData(raw,rawD,fn){
   const ufd=uq('fecha');
   const detFalt={};
   if(detR.length){const lf=ufd[ufd.length-1];detR.filter(r=>r.fecha===lf&&r.estatus==='FALTANTE').forEach(r=>{detFalt[r.comprador]=detFalt[r.comprador]||{};detFalt[r.comprador][r.clmov]=detFalt[r.comprador][r.clmov]||[];detFalt[r.comprador][r.clmov].push(r);});}
-  return{fechas,compradores,totalByDay,clavesTotal,clasByDay,compByDay,compClByDay,CDATA,AREA,uf,pf,mA,mAn,fU,meses:mes,rowsRes:rows,totalHoy:totalByDay[uf]||0,clavesHoy:clavesTotal[uf]||0,filename:fn,detR,detF:ufd,detM:uq('marca'),detCM:uq('clmov'),detG:uq('grupo'),detC:uq('comprador'),detE:uq('estatus'),detRd:uq('reorden'),detFalt};
+  return{fechas,compradores,totalByDay,clavesTotal,clasByDay,compByDay,compClByDay,CDATA,AREA,uf,pf,mA,mAn,fU,meses:mes,skuMes,rowsRes:rows,totalHoy:totalByDay[uf]||0,clavesHoy:clavesTotal[uf]||0,filename:fn,detR,detF:ufd,detM:uq('marca'),detCM:uq('clmov'),detG:uq('grupo'),detC:uq('comprador'),detE:uq('estatus'),detRd:uq('reorden'),detFalt};
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────────────
@@ -914,15 +930,34 @@ function calcResMesDesdeSeries(mSel){
   const mPrev=idx>0?meses[idx-1]:null;
   const fPrev=mPrev?fechas.filter(x=>x.startsWith(mPrev)):[];
   const cierrePrev=fPrev.length?fPrev[fPrev.length-1]:(G.pf||fechas[0]);
-  // SKU's del mes: si no hay serie por clasificación, se usa el dato ya calculado
-  const skTot=(G.clavesTotal&&G.clavesTotal[cierre])||0;
-  const skTotA=(G.clavesTotal&&G.clavesTotal[cierrePrev])||0;
+  // SKU's al cierre de cada mes, calculados desde el detalle diario (detR) si está disponible
+  // SKU's al cierre del mes: 1) publicados por la carga (exactos)  2) desde el detalle diario
+  let mapSku=(G.skuMes&&G.skuMes[mSel])||null;
+  let hayDet=!!mapSku;
+  if(!mapSku){
+    mapSku={};
+    const detR=G.detR||[];
+    const enFecha=detR.filter(r=>r.fecha===cierre);
+    if(enFecha.length){
+      hayDet=true;
+      enFecha.forEach(r=>{
+        const c=String(r.comprador||'').trim().toUpperCase();
+        const cl=String(r.clmov||'').trim().toUpperCase();
+        if(!c||c==='PRODUCCION')return;
+        mapSku[c+'||TOTAL']=(mapSku[c+'||TOTAL']||0)+1;
+        if(cl)mapSku[c+'||'+cl]=(mapSku[c+'||'+cl]||0)+1;
+        mapSku['__A__||TOTAL']=(mapSku['__A__||TOTAL']||0)+1;
+        if(cl)mapSku['__A__||'+cl]=(mapSku['__A__||'+cl]||0)+1;
+      });
+    }
+  }
   const st2=(sk,skA,bd)=>{const f1=(bd&&bd[cierrePrev])||0,f2=(bd&&bd[cierre])||0,
     pk=bd?Math.max(0,...fMes.map(x=>bd[x]||0)):0;
     return{skus:sk,f1,f2,pico:pk,pct_f1:skA>0?+(f1/skA*100).toFixed(2):0,
       pct_f2:sk>0?+(f2/sk*100).toFixed(2):0,pct_pico:sk>0?+(pk/sk*100).toFixed(2):0};};
   // proporción de SKU's por comprador/clasificación tomada del cálculo original (estructura estable)
   const propor=(comp,cl)=>{
+    if(hayDet){const k=(comp||'__A__')+'||'+cl;return mapSku[k]||0;}
     const base=comp?((G.CDATA[comp]||{})[cl]||{}):((G.AREA||{})[cl]||{});
     return base.skus||0;
   };
@@ -932,7 +967,7 @@ function calcResMesDesdeSeries(mSel){
   const AR={};[...CLSL,'TOTAL'].forEach(cl=>{
     const bd=cl==='TOTAL'?G.totalByDay:(G.clasByDay||{})[cl];
     AR[cl]=st2(propor(null,cl),propor(null,cl),bd);});
-  return{CDATA:CD,AREA:AR,cierre,cierrePrev,mSel,mPrev,aprox:true};
+  return{CDATA:CD,AREA:AR,cierre,cierrePrev,mSel,mPrev,aprox:!hayDet};
 }
 function mesLbl(m){if(!m)return '—';const MN2=['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   const p=m.split('-');return MN2[+p[1]]+' '+p[0];}
@@ -949,16 +984,16 @@ function renderRes(){
   if(!G.compradores) return;
   const selMes=document.getElementById('r-mes');
   const mSel=(selMes&&selMes.value)||G.mA;
-  const calc=(mSel===G.mA&&!G.rowsRes)?null:calcResMes(mSel);
+  const calc=calcResMes(mSel)||{CDATA:G.CDATA,AREA:G.AREA,cierre:G.uf,cierrePrev:null,mSel:G.mA,mPrev:G.mAn};
   const compradores=G.compradores;
   const CDATA=calc?calc.CDATA:G.CDATA, AREA=calc?calc.AREA:G.AREA;
   // Encabezados dinámicos según el mes elegido
-  if(calc){
+  if(calc&&calc.cierre){
     const thA=document.getElementById('th-ant'),thH=document.getElementById('th-act');
     if(thA)thA.textContent=calc.mPrev?'Cierre '+mesLbl(calc.mPrev):'Inicio';
     if(thH)thH.textContent=mesLbl(calc.mSel).split(' ')[0].toUpperCase();
     const sub=document.getElementById('res-sub');
-    if(sub)sub.textContent='Cierre '+(calc.mPrev?mesLbl(calc.mPrev):'inicio')+' ('+calc.cierrePrev.split('-').reverse().join('/')+') vs '+mesLbl(calc.mSel)+' · cierre al '+calc.cierre.split('-').reverse().join('/')+' · sin PRODUCCION'+(calc.aprox?' · (Total SKU\'s del mes vigente: vuelve a cargar el Excel en Admin para el dato histórico exacto)':'');
+    if(sub)sub.textContent='Cierre '+(calc.mPrev?mesLbl(calc.mPrev):'inicio')+(calc.cierrePrev?' ('+calc.cierrePrev.split('-').reverse().join('/')+')':'')+' vs '+mesLbl(calc.mSel)+' · cierre al '+calc.cierre.split('-').reverse().join('/')+' · sin PRODUCCION'+(calc.aprox?' · Total SKU\'s aproximado (recarga el Excel en Admin para el histórico exacto)':'');
   }
   const sC=document.getElementById('r-comp').value,sCl=document.getElementById('r-clas').value;
   const showObj=document.getElementById('r-obj').value==='si';
