@@ -797,20 +797,21 @@ function buildData(raw,rawD,fn){
   const uniA=rows.filter(r=>r.fecha===lastAnt);
   function uS(rows2,c,cl){let f=rows2;if(c)f=f.filter(r=>r.comprador===c);if(cl&&cl!=='TOTAL')f=f.filter(r=>r.clasificacion===cl);return f.reduce((s,r)=>s+r.claves,0);}
   function st(sk,skA,bd){const f1=bd[lastAnt]||0,f2=bd[uf]||0,pk=Math.max(0,...fU.map(f=>bd[f]||0));return{skus:sk,f1,f2,pico:pk,pct_f1:skA>0?+(f1/skA*100).toFixed(2):0,pct_f2:sk>0?+(f2/sk*100).toFixed(2):0,pct_pico:sk>0?+(pk/sk*100).toFixed(2):0};}
-  // SKU's al cierre de cada mes (desde Hoja1, fuente oficial de la tabla resumen)
+  // SKU's al cierre de cada mes — misma fuente y mismo filtro que la tarjeta "Claves analizadas"
   const skuMes={};
   mes.forEach(m=>{
     const fm=fechas.filter(x=>x.startsWith(m));
     if(!fm.length)return;
     const cierreM=fm[fm.length-1];
-    const filas=rows.filter(r=>r.fecha===cierreM);
     const mp={};
-    filas.forEach(r=>{
-      mp[r.comprador+'||TOTAL']=(mp[r.comprador+'||TOTAL']||0)+r.claves;
-      mp[r.comprador+'||'+r.clasificacion]=(mp[r.comprador+'||'+r.clasificacion]||0)+r.claves;
-      mp['__A__||TOTAL']=(mp['__A__||TOTAL']||0)+r.claves;
-      mp['__A__||'+r.clasificacion]=(mp['__A__||'+r.clasificacion]||0)+r.claves;
+    rows.filter(r=>r.fecha===cierreM).forEach(r=>{
+      const c=r.comprador, cl=r.clasificacion, n2=r.claves;
+      mp[c+'||TOTAL']=(mp[c+'||TOTAL']||0)+n2;
+      mp[c+'||'+cl]=(mp[c+'||'+cl]||0)+n2;
+      mp['__A__||TOTAL']=(mp['__A__||TOTAL']||0)+n2;
+      mp['__A__||'+cl]=(mp['__A__||'+cl]||0)+n2;
     });
+    mp.__cierre=cierreM;
     skuMes[m]=mp;
   });
   const CDATA={};compradores.forEach(c=>{CDATA[c]={};[...CLS,'TOTAL'].forEach(cl=>{CDATA[c][cl]=st(uS(uni,c,cl),uS(uniA,c,cl),cl==='TOTAL'?compByDay[c]:compClByDay[c][cl]);});});
@@ -931,33 +932,19 @@ function calcResMesDesdeSeries(mSel){
   const fPrev=mPrev?fechas.filter(x=>x.startsWith(mPrev)):[];
   const cierrePrev=fPrev.length?fPrev[fPrev.length-1]:(G.pf||fechas[0]);
   // SKU's al cierre de cada mes, calculados desde el detalle diario (detR) si está disponible
-  // SKU's al cierre del mes: 1) publicados por la carga (exactos)  2) desde el detalle diario
-  let mapSku=(G.skuMes&&G.skuMes[mSel])||null;
-  let hayDet=!!mapSku;
-  if(!mapSku){
-    mapSku={};
-    const detR=G.detR||[];
-    const enFecha=detR.filter(r=>r.fecha===cierre);
-    if(enFecha.length){
-      hayDet=true;
-      enFecha.forEach(r=>{
-        const c=String(r.comprador||'').trim().toUpperCase();
-        const cl=String(r.clmov||'').trim().toUpperCase();
-        if(!c||c==='PRODUCCION')return;
-        mapSku[c+'||TOTAL']=(mapSku[c+'||TOTAL']||0)+1;
-        if(cl)mapSku[c+'||'+cl]=(mapSku[c+'||'+cl]||0)+1;
-        mapSku['__A__||TOTAL']=(mapSku['__A__||TOTAL']||0)+1;
-        if(cl)mapSku['__A__||'+cl]=(mapSku['__A__||'+cl]||0)+1;
-      });
-    }
-  }
+  // SKU's al cierre del mes: publicados por la carga (Hoja1, misma fuente que la tarjeta)
+  const mapSku=(G.skuMes&&G.skuMes[mSel])||null;
+  const hayDet=!!mapSku;
+  // Respaldo mientras no se recargue el Excel: total del área desde clavesTotal (serie de la tarjeta)
+  const totalArea=(G.clavesTotal&&G.clavesTotal[cierre])||0;
   const st2=(sk,skA,bd)=>{const f1=(bd&&bd[cierrePrev])||0,f2=(bd&&bd[cierre])||0,
     pk=bd?Math.max(0,...fMes.map(x=>bd[x]||0)):0;
     return{skus:sk,f1,f2,pico:pk,pct_f1:skA>0?+(f1/skA*100).toFixed(2):0,
       pct_f2:sk>0?+(f2/sk*100).toFixed(2):0,pct_pico:sk>0?+(pk/sk*100).toFixed(2):0};};
   // proporción de SKU's por comprador/clasificación tomada del cálculo original (estructura estable)
   const propor=(comp,cl)=>{
-    if(hayDet){const k=(comp||'__A__')+'||'+cl;return mapSku[k]||0;}
+    if(hayDet)return mapSku[(comp||'__A__')+'||'+cl]||0;
+    if(!comp&&cl==='TOTAL'&&totalArea)return totalArea;   // el total del área sí es exacto
     const base=comp?((G.CDATA[comp]||{})[cl]||{}):((G.AREA||{})[cl]||{});
     return base.skus||0;
   };
