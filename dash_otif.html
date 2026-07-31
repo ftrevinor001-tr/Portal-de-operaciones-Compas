@@ -11,9 +11,10 @@ window.sbGet=function(){return window.__SB||(window.__SB=window.supabase.createC
 window.idbGet=function(key){return new Promise((res,rej)=>{const r=indexedDB.open('portal_compras',1);r.onupgradeneeded=e=>e.target.result.createObjectStore('cache');r.onerror=()=>rej(r.error);r.onsuccess=()=>{const db=r.result;const g=db.transaction('cache','readonly').objectStore('cache').get(key);g.onsuccess=()=>{res(g.result);db.close();};g.onerror=()=>{rej(g.error);db.close();};};});};
 window.idbPut=function(key,val){return new Promise((res,rej)=>{const r=indexedDB.open('portal_compras',1);r.onupgradeneeded=e=>e.target.result.createObjectStore('cache');r.onerror=()=>rej(r.error);r.onsuccess=()=>{const db=r.result;const tx=db.transaction('cache','readwrite');tx.objectStore('cache').put(val,key);tx.oncomplete=()=>{res();db.close();};tx.onerror=()=>{rej(tx.error);db.close();};};});};
 // Descarga un archivo binario versionado desde Supabase con caché local
+async function esperarSesion(sb,n){for(let i=0;i<(n||8);i++){const{data:{session}}=await sb.auth.getSession();if(session)return session;await new Promise(r=>setTimeout(r,400));}return null;}
 window.sbDescargar=async function(claveDS,defRuta){
   const sb=window.sbGet();
-  const{data:{session}}=await sb.auth.getSession();
+  const session=await esperarSesion(sb);
   if(!session)throw new Error('Sin sesión activa. Entra al portal con tu contraseña desde la pantalla de ingreso.');
   const{data:meta,error:e1}=await sb.from('datasets').select('payload').eq('clave',claveDS).maybeSingle();
   if(e1)throw new Error('Consultando servidor: '+e1.message);
@@ -65,7 +66,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 
 /* ── HEADER ── */
 #app{display:none}
-header{background:var(--navy);color:#fff;padding:13px 26px;display:flex;align-items:center;justify-content:space-between;gap:16px;position:sticky;top:0;z-index:300;box-shadow:0 2px 10px rgba(0,0,0,.22)}
+header{background:var(--navy);color:#fff;padding:9px 26px;display:flex;align-items:center;justify-content:space-between;gap:16px;position:sticky;top:0;z-index:300;box-shadow:0 2px 10px rgba(0,0,0,.22)}
 .hdr-l{display:flex;flex-direction:column;gap:2px}
 .hdr-title{font-size:15px;font-weight:700}
 .hdr-sub{font-size:10px;opacity:.5;letter-spacing:.06em;text-transform:uppercase}
@@ -248,10 +249,11 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
   cursor:pointer;transition:all .15s;white-space:nowrap;flex-shrink:0;
 }
 .export-btn:hover{background:var(--green);color:#fff}
-.main-tabs{display:flex;background:var(--navy);padding:0 26px;gap:4px}
-.main-tab{font-size:12px;font-weight:600;padding:9px 20px;cursor:pointer;color:rgba(255,255,255,.55);border-bottom:3px solid transparent;background:none;border-top:none;border-left:none;border-right:none;transition:all .15s;letter-spacing:.02em}
+.main-tabs{display:flex;background:#eef1f7;padding:6px 20px 0;gap:4px;border-bottom:1px solid #d7dce6}
+.main-tab{font-size:13px;font-weight:600;padding:10px 22px;cursor:pointer;color:#6b7a99;border-bottom:3px solid transparent;background:none;border-top:none;border-left:none;border-right:none;transition:all .15s;letter-spacing:.02em}
 .main-tab:hover{color:rgba(255,255,255,.85)}
-.main-tab.on{color:#fff;border-bottom-color:#fff}
+.main-tab:hover{color:#1c4587}
+.main-tab.on{color:#1c4587;border-bottom-color:#1c4587;background:#fff}
 
 /* ── OTIF table header fix (single row → top:0) ── */
 #tab-otif .tbl-scroll{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 120px);min-height:400px;border-radius:0 0 10px 10px}
@@ -434,16 +436,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
 
 <!-- APP -->
 <div id="app">
-  <header>
-    <div class="hdr-l">
-      <div class="hdr-title">Estatus del inventario e indicadores</div>
-      <div class="hdr-sub" id="file-tag">—</div>
-    </div>
-    <div class="hdr-r">
-      <button class="hdr-btn" id="refresh-btn" title="Recarga datos.xlsx del repositorio sin recargar la página">🔄 Actualizar datos</button>
-      <button class="hdr-btn" id="reload-btn">📂 Cargar de Excel</button>
-    </div>
-  </header>
+  <header style="display:none"><div id="file-tag" style="display:none">—</div></header>
 
   <!-- Main tab navigation -->
   <div class="main-tabs">
@@ -913,7 +906,7 @@ document.getElementById('drop-zone').addEventListener('dragover',e=>{e.preventDe
 document.getElementById('drop-zone').addEventListener('dragleave',e=>e.currentTarget.classList.remove('over'));
 document.getElementById('drop-zone').addEventListener('drop',e=>{e.preventDefault();e.currentTarget.classList.remove('over');if(e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0])});
 document.getElementById('file-input').addEventListener('change',e=>{if(e.target.files[0])loadFile(e.target.files[0])});
-document.getElementById('refresh-btn').addEventListener('click',async()=>{
+document.getElementById('refresh-btn')?.addEventListener('click',async()=>{
   const btn=document.getElementById('refresh-btn');
   const orig=btn.textContent;
   btn.textContent='⏳ Actualizando…';
@@ -924,7 +917,7 @@ document.getElementById('refresh-btn').addEventListener('click',async()=>{
   btn.textContent=orig;
   btn.disabled=false;
 });
-document.getElementById('reload-btn').addEventListener('click',()=>{
+document.getElementById('reload-btn')?.addEventListener('click',()=>{
   document.getElementById('app').style.display='none';
   document.getElementById('drop-screen').style.display='flex';
   document.getElementById('file-input').value='';
@@ -980,7 +973,7 @@ function processWorkbook(wb, filename){
     // Attach ltEstimado from Asignacion to each OTIF row by clave
     OTIF_DATA.forEach(d=>{d.ltEstimado=window._ltMap.get(String(d.clave))||window._ltMap.get(d.clave)||null;});
     }else{OTIF_DATA=[];}
-    document.getElementById('file-tag').textContent=filename+' · '+sn;
+    document.getElementById('file-tag').textContent=(OTIF_DATA.length?OTIF_DATA.length.toLocaleString()+' pedidos · ':'')+ALL.filter(d=>d.isMain).length.toLocaleString()+' claves';
     document.getElementById('drop-screen').style.display='none';
     document.getElementById('app').style.display='block';
     activeGroup='';activeProv='';activeTermMonth='';activePedMonth='';
