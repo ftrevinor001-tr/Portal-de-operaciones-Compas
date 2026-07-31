@@ -587,14 +587,14 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
         <span class="tb-lbl">Estatus:</span>
         <select class="msel" id="otif-status-sel"><option value="">Todos</option></select>
         <div class="filter-sep"></div>
-        <span id="filtro-mes-oc" style="display:flex;align-items:center;gap:5px">
-          <span class="tb-lbl" title="Filtra por mes de colocación de la OC">🎯 Mes OC <span style="font-weight:400;opacity:.65;font-size:9px">(Ctrl+clic · vacío = todos)</span></span>
-          <select class="msel" id="otif-month-sel" multiple size="3" style="min-width:130px;font-size:11px" title="Ctrl/Cmd+clic para varios meses; sin selección muestra todos"></select>
+        <span id="filtro-mes-oc" style="display:flex;align-items:center;gap:6px">
+          <span class="tb-lbl" title="Filtra por mes de colocación real de la OC (Fecha de OC)">🎯 Mes OC</span>
+          <select id="otif-month-sel" onchange="otifMonth=this.value?[this.value]:[];renderOTIF()" style="min-width:140px;font-size:12px;padding:5px 8px;border:1.5px solid #c9d4f0;border-radius:6px"></select>
         </span>
         <div class="filter-sep"></div>
-        <span id="filtro-mes-recep" style="display:flex;align-items:center;gap:5px">
-          <span class="tb-lbl" title="Filtra por mes de recepción real (ETA Real)">📦 Mes Recepción <span style="font-weight:400;opacity:.65;font-size:9px">(Ctrl+clic · vacío = todos)</span></span>
-          <select class="msel" id="otif-month-recep-sel" multiple size="3" style="min-width:130px;font-size:11px" title="Ctrl/Cmd+clic para varios meses; sin selección muestra todos"></select>
+        <span id="filtro-mes-recep" style="display:flex;align-items:center;gap:6px">
+          <span class="tb-lbl" title="Filtra por mes de llegada real (ETA Real)">📦 Mes Recepción</span>
+          <select id="otif-month-recep-sel" onchange="otifMonthRecep=this.value?[this.value]:[];renderOTIF()" style="min-width:140px;font-size:12px;padding:5px 8px;border:1.5px solid #c9d4f0;border-radius:6px"></select>
         </span>
         <button class="clear-btn" id="otif-clear-top" style="margin-left:8px">✕ Limpiar</button>
       </div>
@@ -1963,15 +1963,34 @@ function parseOTIF(raw){
 }
 
 // Step 1: filter by prov+status (for OC cards and detail table)
-function otifByProvStatus(){
+// Base OTIF-Proveedor: proveedor + estatus + Mes RECEPCIÓN (etaR)
+function baseOtifProv(){
   return OTIF_DATA.filter(d=>{
     if(otifProv&&d.prov!==otifProv)return false;
     if(otifStatus&&d.estatus!==otifStatus)return false;
-    if(otifMonth.length&&!otifMonth.includes(mKey(d.foc)))return false;
-    if(otifMonthRecep.length&&d.etaR&&!otifMonthRecep.includes(mKey(d.etaR)))return false;
+    // Con mes seleccionado: la orden debe tener llegada real (etaR) en ESE mes.
+    if(otifMonthRecep.length){
+      if(!d.etaR)return false;
+      if(!otifMonthRecep.includes(mKey(d.etaR)))return false;
+    }
     return true;
   });
 }
+// Base Target-Comprador: proveedor + estatus + Mes OC (foc)
+function baseTarget(){
+  return OTIF_DATA.filter(d=>{
+    if(otifProv&&d.prov!==otifProv)return false;
+    if(otifStatus&&d.estatus!==otifStatus)return false;
+    // Con mes seleccionado: la orden debe tener fecha de colocación real (foc) en ESE mes.
+    if(otifMonth.length){
+      if(!d.foc)return false;
+      if(!otifMonth.includes(mKey(d.foc)))return false;
+    }
+    return true;
+  });
+}
+// La tabla de detalle vive en OTIF-Proveedor → usa la base de proveedor
+function otifByProvStatus(){ return baseOtifProv(); }
 // Step 2: + OC (for clave options)
 function otifByOC(){
   return otifByProvStatus().filter(d=>!otifOC||d.oc===otifOC);
@@ -1982,20 +2001,13 @@ function filteredOTIF(){
 }
 // Target data: all orders filtered by month of foc (fecha OC)
 function targetData(){
-  return OTIF_DATA.filter(d=>{
-    if(otifProv&&d.prov!==otifProv)return false;
-    if(otifMonth.length&&!otifMonth.includes(mKey(d.foc)))return false;
-    return true;
-  });
+  // KPI de Target = misma base que su tabla y tendencia (filtra por Mes OC / foc)
+  return baseTarget();
 }
 // OTIF Proveedor data: RECIBIDO orders filtered by month of etaR
 function otifProvData(){
-  return OTIF_DATA.filter(d=>{
-    if(otifProv&&d.prov!==otifProv)return false;
-    if(d.estatus!=='RECIBIDO')return false;
-    if(otifMonthRecep.length&&d.etaR&&!otifMonthRecep.includes(mKey(d.etaR)))return false;
-    return true;
-  });
+  // KPI de OTIF = solo órdenes RECIBIDAS, con la misma base de mes de recepción que su tabla
+  return baseOtifProv().filter(d=>d.estatus==='RECIBIDO');
 }
 
 function updateOTIFStatusOptions(){
@@ -2008,39 +2020,44 @@ function updateOTIFStatusOptions(){
 }
 function toggleOtifMonthFilter(){/* checkboxes eliminados: el filtro de mes se controla solo con el selector */}
 function updateOTIFMonthOptions(){
-  // Combine months from foc and etaR
+  // Meses de colocación (foc), en cascada con proveedor y estatus ya elegidos
   const keys=new Set();
-  OTIF_DATA.filter(d=>!otifProv||d.prov===otifProv).forEach(d=>{
-    if(d.foc)keys.add(mKey(d.foc)); // foc only — etaR handled by updateOTIFMonthRecepOptions
+  OTIF_DATA.filter(d=>(!otifProv||d.prov===otifProv)&&(!otifStatus||d.estatus===otifStatus)).forEach(d=>{
+    if(d.foc)keys.add(mKey(d.foc));
   });
   const sorted=[...keys].filter(Boolean).sort();
-  // Auto-select last month on first load
+  // Preseleccionar mes actual si existe; si no, el más reciente
   if(!otifMonthInited){
-    otifMonth=sorted.length?[sorted[sorted.length-1]]:[];
+    const cur=curMonthKey();
+    const sel=sorted.includes(cur)?cur:(sorted.length?sorted[sorted.length-1]:'');
+    otifMonth=sel?[sel]:[];
     otifMonthInited=true;
   } else {
     otifMonth=otifMonth.filter(k=>sorted.includes(k));
   }
   const ms=document.getElementById('otif-month-sel');
-  ms.innerHTML=sorted.map(k=>`<option value="${k}"${otifMonth.includes(k)?' selected':''}>${mLabel(k)}</option>`).join('');
-  ms.onchange=()=>{otifMonth=Array.from(ms.selectedOptions).map(o=>o.value);ms.className='msel'+(otifMonth.length?' msel-active':'');renderOTIF();};
-  ms.className='msel'+(otifMonth.length?' msel-active':'');
+  if(!ms)return;
+  ms.innerHTML='<option value="">— Todos los meses —</option>'+sorted.map(k=>`<option value="${k}"${otifMonth[0]===k?' selected':''}>${mLabel(k)}</option>`).join('');
 }
 
 function updateOTIFMonthRecepOptions(){
+  // Meses de llegada real (etaR), en cascada con proveedor y estatus
   const keys=new Set();
   OTIF_DATA.filter(d=>(!otifProv||d.prov===otifProv)&&d.estatus==='RECIBIDO').forEach(d=>{
     if(d.etaR)keys.add(mKey(d.etaR));
   });
   const sorted=[...keys].filter(Boolean).sort();
-  // Sin preselección: vacío = todos los meses
-  otifMonthRecep=otifMonthRecep.filter(k=>sorted.includes(k));
-  otifMonthRecepInited=true;
+  if(!otifMonthRecepInited){
+    const cur=curMonthKey();
+    const sel=sorted.includes(cur)?cur:(sorted.length?sorted[sorted.length-1]:'');
+    otifMonthRecep=sel?[sel]:[];
+    otifMonthRecepInited=true;
+  } else {
+    otifMonthRecep=otifMonthRecep.filter(k=>sorted.includes(k));
+  }
   const ms=document.getElementById('otif-month-recep-sel');
   if(!ms)return;
-  ms.innerHTML=sorted.map(k=>`<option value="${k}"${otifMonthRecep.includes(k)?' selected':''}>${mLabel(k)}</option>`).join('');
-  ms.onchange=()=>{otifMonthRecep=Array.from(ms.selectedOptions).map(o=>o.value);ms.className='msel'+(otifMonthRecep.length?' msel-active':'');renderOTIF();};
-  ms.className='msel'+(otifMonthRecep.length?' msel-active':'');
+  ms.innerHTML='<option value="">— Todos los meses —</option>'+sorted.map(k=>`<option value="${k}"${otifMonthRecep[0]===k?' selected':''}>${mLabel(k)}</option>`).join('');
 }
 function updateOTIFDetailCascade(){
   const byPS=otifByProvStatus();
@@ -2087,8 +2104,8 @@ function toggleTargetTrend(){
 
 function renderTargetTrend(){
   if(!OTIF_DATA.length)return;
-  // Use shared filter (prov + status) — month not applied so trend shows full history
-  const base=otifByProvStatus();
+  // Tendencia de Target: filtra por proveedor, estatus y Mes OC
+  const base=baseTarget();
 
   // Build OC-level results
   const ocMap=new Map();
@@ -2221,11 +2238,17 @@ function renderOTIF(){
   renderOTIFKPIs();
   renderTargetTrend();
   // OC cards: filter by prov + status + month of foc
+  // OC's vigentes: filtro según la pestaña activa.
+  // Target-Comprador → filtra por Mes OC (foc). OTIF-Proveedor → filtra por Mes Recepción (etaR).
+  const esTarget=(currentMainTab==='target');
   renderOCCards(OTIF_DATA.filter(d=>{
     if(otifProv&&d.prov!==otifProv)return false;
     if(otifStatus&&d.estatus!==otifStatus)return false;
-    if(otifMonth.length&&!otifMonth.includes(mKey(d.foc)))return false;
-    if(otifMonthRecep.length&&d.etaR&&!otifMonthRecep.includes(mKey(d.etaR)))return false;
+    if(esTarget){
+      if(otifMonth.length&&!otifMonth.includes(mKey(d.foc)))return false;
+    }else{
+      if(otifMonthRecep.length&&d.etaR&&!otifMonthRecep.includes(mKey(d.etaR)))return false;
+    }
     return true;
   }));
   if(!ocVisible){const g=document.getElementById('oc-cards');if(g)g.style.display='none';}
