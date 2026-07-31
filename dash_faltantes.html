@@ -132,7 +132,7 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
   <div class="header" style="padding:10px 20px;margin-bottom:12px">
     <div class="htop">
       <div class="sub" id="sub" style="margin:0"></div>
-      <span class="badge" id="bdg"></span><span style="font-size:9px;color:#c9d4f0;margin-left:6px">v-tabs2</span>
+      <span class="badge" id="bdg"></span>
     </div>
     <div class="date-bar">
       <span style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase;letter-spacing:.6px">📅 Rango</span>
@@ -194,7 +194,31 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
       <div class="card"><h2>Ranking Sagrados</h2><div style="position:relative;height:200px"><canvas id="c-rk-sagr"></canvas></div></div>
       
     </div>
-  </div>
+    </div><!-- fin cn-falt -->
+<div id="cn-sob" style="display:none">
+      <div class="fbox" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+        <div><div class="flbl">Comprador</div><select id="sob-comp" onchange="renderSobreInv()" style="font-size:13px;padding:6px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:160px"></select></div>
+        <div><div class="flbl">Familia (GRUPO)</div><select id="sob-fam" onchange="renderSobreInv()" style="font-size:13px;padding:6px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:180px"></select></div>
+        <div><div class="flbl">Rotación</div><select id="sob-rot" onchange="renderSobreInv()" style="font-size:13px;padding:6px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:150px"></select></div>
+        <div><div class="flbl">Marca</div><input id="sob-marca" list="sob-marca-list" oninput="renderSobreInv()" placeholder="Todas las marcas" style="font-size:13px;padding:6px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:170px"><datalist id="sob-marca-list"></datalist></div>
+        <div style="align-self:flex-end"><button class="bsm" onclick="limpiarSobreInv()" style="padding:7px 14px">↺ Limpiar filtros</button></div>
+      </div>
+      <div id="sob-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:14px 0"></div>
+      <div class="card"><h2>Exceso por familia de materiales</h2><div style="font-size:11px;color:#6b7a99;margin:-6px 0 8px">Ordenado por meses-clave acumulados · la barra muestra el n.º de claves · color = severidad promedio</div>
+      <div id="sev-leyenda" style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;font-size:11px;color:#4a5568">
+        <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:13px;height:13px;border-radius:3px;background:#1baf7a;display:inline-block"></span>Leve (&lt;4 meses prom.)</span>
+        <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:13px;height:13px;border-radius:3px;background:#fab219;display:inline-block"></span>Moderado (4–5)</span>
+        <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:13px;height:13px;border-radius:3px;background:#eb6834;display:inline-block"></span>Alto (5–7)</span>
+        <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:13px;height:13px;border-radius:3px;background:#d03b3b;display:inline-block"></span>Grave (7+)</span>
+      </div>
+      <div style="position:relative;height:360px"><canvas id="sob-fam-chart"></canvas></div></div>
+      <div class="card"><h2>Dónde se concentra: comprador × familia</h2><div style="font-size:11px;color:#6b7a99;margin:-6px 0 8px">Meses-clave de exceso acumulado en cada cruce · entre más oscura la celda, más inventario detenido ahí</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:11px;color:#4a5568"><span>Menos</span><span style="width:22px;height:12px;background:rgba(153,60,29,.14);display:inline-block;border:.5px solid #edf0f7"></span><span style="width:22px;height:12px;background:rgba(153,60,29,.43);display:inline-block"></span><span style="width:22px;height:12px;background:rgba(153,60,29,.72);display:inline-block"></span><span style="width:22px;height:12px;background:rgba(153,60,29,.86);display:inline-block"></span><span>Más</span></div>
+      <div id="sob-heat" style="overflow-x:auto"></div></div>
+      <div class="card"><h2>Severidad del exceso</h2><div style="font-size:11px;color:#6b7a99;margin:-6px 0 8px">Cuántos meses-clave de exceso viven en cada rango de gravedad por clave</div><div style="position:relative;height:250px"><canvas id="sob-sev-chart"></canvas></div></div>
+      <div class="card"><h2>Promedio de exceso por comprador</h2><div style="font-size:11px;color:#6b7a99;margin:-6px 0 8px">Meses que cada clave supera su objetivo, en promedio (día actual)</div><div style="position:relative;height:320px"><canvas id="sob-prom-chart"></canvas></div></div>
+    </div>
+  </div><!-- fin panel-clasif -->
 
   <div id="panel-resumen" class="panel">
     <div class="card">
@@ -543,30 +567,7 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
   </div>
 
   <div class="footer" id="ftr"></div>
-    </div><!-- fin cn-falt -->
-    <div id="cn-sob" style="display:none">
-      <div class="fbox" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
-        <div><div class="flbl">Comprador</div><select id="sob-comp" onchange="renderSobreInv()" style="font-size:13px;padding:6px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:160px"></select></div>
-        <div><div class="flbl">Familia (GRUPO)</div><select id="sob-fam" onchange="renderSobreInv()" style="font-size:13px;padding:6px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:180px"></select></div>
-        <div><div class="flbl">Rotación</div><select id="sob-rot" onchange="renderSobreInv()" style="font-size:13px;padding:6px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:150px"></select></div>
-        <div><div class="flbl">Marca</div><input id="sob-marca" list="sob-marca-list" oninput="renderSobreInv()" placeholder="Todas las marcas" style="font-size:13px;padding:6px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:170px"><datalist id="sob-marca-list"></datalist></div>
-        <div style="align-self:flex-end"><button class="bsm" onclick="limpiarSobreInv()" style="padding:7px 14px">↺ Limpiar filtros</button></div>
-      </div>
-      <div id="sob-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:14px 0"></div>
-      <div class="card"><h2>Exceso por familia de materiales</h2><div style="font-size:11px;color:#6b7a99;margin:-6px 0 8px">Ordenado por meses-clave acumulados · la barra muestra el n.º de claves · color = severidad promedio</div>
-      <div id="sev-leyenda" style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;font-size:11px;color:#4a5568">
-        <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:13px;height:13px;border-radius:3px;background:#1baf7a;display:inline-block"></span>Leve (&lt;4 meses prom.)</span>
-        <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:13px;height:13px;border-radius:3px;background:#fab219;display:inline-block"></span>Moderado (4–5)</span>
-        <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:13px;height:13px;border-radius:3px;background:#eb6834;display:inline-block"></span>Alto (5–7)</span>
-        <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:13px;height:13px;border-radius:3px;background:#d03b3b;display:inline-block"></span>Grave (7+)</span>
-      </div>
-      <div style="position:relative;height:360px"><canvas id="sob-fam-chart"></canvas></div></div>
-      <div class="card"><h2>Dónde se concentra: comprador × familia</h2><div style="font-size:11px;color:#6b7a99;margin:-6px 0 8px">Meses-clave de exceso acumulado en cada cruce · entre más oscura la celda, más inventario detenido ahí</div>
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:11px;color:#4a5568"><span>Menos</span><span style="width:22px;height:12px;background:rgba(153,60,29,.14);display:inline-block;border:.5px solid #edf0f7"></span><span style="width:22px;height:12px;background:rgba(153,60,29,.43);display:inline-block"></span><span style="width:22px;height:12px;background:rgba(153,60,29,.72);display:inline-block"></span><span style="width:22px;height:12px;background:rgba(153,60,29,.86);display:inline-block"></span><span>Más</span></div>
-      <div id="sob-heat" style="overflow-x:auto"></div></div>
-      <div class="card"><h2>Severidad del exceso</h2><div style="font-size:11px;color:#6b7a99;margin:-6px 0 8px">Cuántos meses-clave de exceso viven en cada rango de gravedad por clave</div><div style="position:relative;height:250px"><canvas id="sob-sev-chart"></canvas></div></div>
-      <div class="card"><h2>Promedio de exceso por comprador</h2><div style="font-size:11px;color:#6b7a99;margin:-6px 0 8px">Meses que cada clave supera su objetivo, en promedio (día actual)</div><div style="position:relative;height:320px"><canvas id="sob-prom-chart"></canvas></div></div>
-    </div>
+
 </div>
 
 <script>
