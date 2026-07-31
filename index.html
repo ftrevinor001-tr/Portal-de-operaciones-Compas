@@ -173,6 +173,8 @@
         <select id="res-comp" onchange="renderResumen()"></select>
         <span id="res-meses"></span>
         <button class="abtn" style="margin-top:0" id="res-dl" onclick="descargarResumenExcel()">⬇ Descargar Excel</button>
+        <button class="abtn" style="margin-top:0;background:#1c4587" id="res-refresh" onclick="actualizarTodo()">🔄 Actualizar</button>
+        <button class="abtn" style="margin-top:0;background:#b8860b;display:none" id="res-upload" onclick="document.getElementById('fx').click()">📂 Cargar Excel (Admin)</button>
       </div>
       <div id="res-content"><div class="empty-res">Cargando resumen…</div></div>
     </div>
@@ -180,19 +182,19 @@
 
   <div class="frame-wrap" id="fw-1">
     <div class="loader" id="ld-1"><div class="spinner"></div><p>Cargando Histórico Faltantes…</p></div>
-    <iframe id="fr-1" onload="hideLd(1)"></iframe>
+    <iframe id="fr-1" onload="window.hideLd&&window.hideLd(1)"></iframe>
   </div>
   <div class="frame-wrap" id="fw-2">
     <div class="loader" id="ld-2"><div class="spinner"></div><p>Cargando Monitor de Inventario…</p></div>
-    <iframe id="fr-2" onload="hideLd(2)"></iframe>
+    <iframe id="fr-2" onload="window.hideLd&&window.hideLd(2)"></iframe>
   </div>
   <div class="frame-wrap" id="fw-3">
     <div class="loader" id="ld-3"><div class="spinner"></div><p>Cargando Estatus Back Orders…</p></div>
-    <iframe id="fr-3" onload="hideLd(3)"></iframe>
+    <iframe id="fr-3" onload="window.hideLd&&window.hideLd(3)"></iframe>
   </div>
   <div class="frame-wrap" id="fw-4">
     <div class="loader" id="ld-4"><div class="spinner"></div><p>Cargando Inventario &amp; OTIF…</p></div>
-    <iframe id="fr-4" onload="hideLd(4)"></iframe>
+    <iframe id="fr-4" onload="window.hideLd&&window.hideLd(4)"></iframe>
   </div>
 
   <!-- ════ ADMIN ════ -->
@@ -351,10 +353,11 @@ function switchTab(i){
   document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('active',j===i));
   document.querySelectorAll('.frame-wrap').forEach((f,j)=>f.classList.toggle('active',j===i));
   loadTab(i);
-  if(i===0) cargarResumen();
+  if(i===0){ cargarResumen(); ajustarBotonesResumen(); }
   if(i===5&&esAdmin){document.getElementById('adm-lock').style.display='none';document.getElementById('adm-open').style.display='block';}
 }
 function hideLd(i){const l=document.getElementById('ld-'+i);if(l)l.classList.add('hidden');}
+window.hideLd=hideLd;
 function tick(){const now=new Date();document.getElementById('clock').textContent=now.toLocaleDateString('es-MX',{weekday:'short',day:'2-digit',month:'short'})+' · '+now.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});}
 
 
@@ -372,6 +375,29 @@ const TIPOS={
 };
 let RES={alarmas:null,resumen:null,mesesSel:new Set(),chart:null};
 
+// Botón único: actualiza los datos de Mi Resumen desde el servidor (para todos)
+async function actualizarTodo(){
+  const btn=document.getElementById('res-refresh');
+  const orig=btn.textContent; btn.disabled=true; btn.textContent='⏳ Actualizando…';
+  try{
+    await cargarResumen();
+    // marcar los 4 dashboards para que recarguen sus datos al abrirse de nuevo
+    for(let i=1;i<=4;i++){
+      loadedTabs[i-1]=false;   // forzar recarga la próxima vez que se abra la pestaña
+      const fr=document.getElementById('fr-'+i);
+      if(fr&&fr.src){try{fr.contentWindow.location.reload();}catch(e){fr.src=fr.src;}}
+    }
+    btn.textContent='✓ Actualizado';
+    setTimeout(()=>{btn.textContent=orig;btn.disabled=false;},2000);
+  }catch(e){
+    btn.textContent='⚠ Error'; setTimeout(()=>{btn.textContent=orig;btn.disabled=false;},2500);
+  }
+}
+// Mostrar el botón de cargar Excel solo al administrador
+function ajustarBotonesResumen(){
+  const up=document.getElementById('res-upload');
+  if(up)up.style.display=(typeof esAdmin!=='undefined'&&esAdmin)?'':'none';
+}
 async function cargarResumen(){
   const cont=document.getElementById('res-content');
   if(RES.alarmas){renderResumen();return;}
@@ -659,7 +685,47 @@ function buildData(raw,rawD,fn){
   const ufd=uq('fecha');
   const detFalt={};
   if(detR.length){const lf=ufd[ufd.length-1];detR.filter(r=>r.fecha===lf&&r.estatus==='FALTANTE').forEach(r=>{detFalt[r.comprador]=detFalt[r.comprador]||{};detFalt[r.comprador][r.clmov]=detFalt[r.comprador][r.clmov]||[];detFalt[r.comprador][r.clmov].push(r);});}
-  return{fechas,compradores,totalByDay,clavesTotal,clasByDay,compByDay,compClByDay,CDATA,AREA,uf,pf,mA,mAn,fU,meses:mes,skuMes,rowsRes:rows,totalHoy:totalByDay[uf]||0,clavesHoy:clavesTotal[uf]||0,filename:fn,detR,detF:ufd,detM:uq('marca'),detCM:uq('clmov'),detG:uq('grupo'),detC:uq('comprador'),detE:uq('estatus'),detRd:uq('reorden'),detFalt};
+
+
+
+  // Pre-agregado de SOBRE INVENTARIO (día más reciente): promedios, acumulados,
+  // matriz comprador×familia y severidad. Exceso = max(0, meses_inv - objetivo).
+  const sobreInv={grupos:[],prom:{},cnt:{},tot:{},fam:{},heat:{},sev:{},kpi:{},cierre:null};
+  (function(){
+    const cierre=ufd[ufd.length-1];
+    sobreInv.cierre=cierre;
+    const grupos=new Set();
+    const prom={},cnt={},tot={};          // clave: comp||rot||grupo  (grupo puede ser __ALL__)
+    const acc={};
+    const famTot={};                      // grupo -> {s,n}
+    const heat={};                        // comp -> grupo -> suma
+    const sevBins={'0-3':0,'3-6':0,'6-12':0,'12-24':0,'24+':0};
+    let totalClaves=0,totalExc=0,criticas=0;
+    detR.forEach(x=>{
+      if(x.fecha!==cierre||x.estatus!=='SOBRE INVENTARIO')return;
+      const c=String(x.comprador||'').trim().toUpperCase();if(!c||c==='PRODUCCION')return;
+      const rot=String(x.clmov||'').trim().toUpperCase();if(!rot||rot==='SIN COMPRA')return;
+      const g=String(x.grupo||'').trim().toUpperCase()||'(SIN GRUPO)';
+      const ex=Math.max(0,(+x.meses_inv||0)-(+x.obj_meses||0));
+      grupos.add(g);totalClaves++;totalExc+=ex;
+      if(ex>=24)criticas++;
+      // promedios por comp×rot×(grupo y ALL)
+      [g,'__ALL__'].forEach(gg=>{const k=c+'||'+rot+'||'+gg;(acc[k]=acc[k]||{s:0,n:0});acc[k].s+=ex;acc[k].n++;});
+      // familia total
+      (famTot[g]=famTot[g]||{s:0,n:0});famTot[g].s+=ex;famTot[g].n++;
+      // heat comp×familia
+      (heat[c]=heat[c]||{});heat[c][g]=(heat[c][g]||0)+ex;
+      // severidad
+      const b=ex<3?'0-3':ex<6?'3-6':ex<12?'6-12':ex<24?'12-24':'24+';
+      sevBins[b]+=ex;
+    });
+    Object.keys(acc).forEach(k=>{prom[k]=+(acc[k].s/acc[k].n).toFixed(2);cnt[k]=acc[k].n;tot[k]=+acc[k].s.toFixed(1);});
+    const fam={};Object.keys(famTot).forEach(g=>{fam[g]={tot:+famTot[g].s.toFixed(1),n:famTot[g].n,prom:+(famTot[g].s/famTot[g].n).toFixed(2)};});
+    sobreInv.grupos=[...grupos].sort();
+    sobreInv.prom=prom;sobreInv.cnt=cnt;sobreInv.tot=tot;sobreInv.fam=fam;sobreInv.heat=heat;sobreInv.sev=sevBins;
+    sobreInv.kpi={claves:totalClaves,exceso:+totalExc.toFixed(0),prom:totalClaves?+(totalExc/totalClaves).toFixed(1):0,criticas};
+  })();
+  return{fechas,compradores,totalByDay,clavesTotal,clasByDay,compByDay,compClByDay,CDATA,AREA,uf,pf,mA,mAn,fU,meses:mes,skuMes,sobreInv,rowsRes:rows,totalHoy:totalByDay[uf]||0,clavesHoy:clavesTotal[uf]||0,filename:fn,detR,detF:ufd,detM:uq('marca'),detCM:uq('clmov'),detG:uq('grupo'),detC:uq('comprador'),detE:uq('estatus'),detRd:uq('reorden'),detFalt};
 }
 
 

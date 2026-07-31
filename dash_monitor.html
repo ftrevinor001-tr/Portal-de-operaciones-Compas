@@ -11,9 +11,10 @@ window.sbGet=function(){return window.__SB||(window.__SB=window.supabase.createC
 window.idbGet=function(key){return new Promise((res,rej)=>{const r=indexedDB.open('portal_compras',1);r.onupgradeneeded=e=>e.target.result.createObjectStore('cache');r.onerror=()=>rej(r.error);r.onsuccess=()=>{const db=r.result;const g=db.transaction('cache','readonly').objectStore('cache').get(key);g.onsuccess=()=>{res(g.result);db.close();};g.onerror=()=>{rej(g.error);db.close();};};});};
 window.idbPut=function(key,val){return new Promise((res,rej)=>{const r=indexedDB.open('portal_compras',1);r.onupgradeneeded=e=>e.target.result.createObjectStore('cache');r.onerror=()=>rej(r.error);r.onsuccess=()=>{const db=r.result;const tx=db.transaction('cache','readwrite');tx.objectStore('cache').put(val,key);tx.oncomplete=()=>{res();db.close();};tx.onerror=()=>{rej(tx.error);db.close();};};});};
 // Descarga un archivo binario versionado desde Supabase con caché local
+async function esperarSesion(sb,n){for(let i=0;i<(n||8);i++){const{data:{session}}=await sb.auth.getSession();if(session)return session;await new Promise(r=>setTimeout(r,400));}return null;}
 window.sbDescargar=async function(claveDS,defRuta){
   const sb=window.sbGet();
-  const{data:{session}}=await sb.auth.getSession();
+  const session=await esperarSesion(sb);
   if(!session)throw new Error('Sin sesión activa. Entra al portal con tu contraseña desde la pantalla de ingreso.');
   const{data:meta,error:e1}=await sb.from('datasets').select('payload').eq('clave',claveDS).maybeSingle();
   if(e1)throw new Error('Consultando servidor: '+e1.message);
@@ -191,14 +192,8 @@ td{padding:8px 13px;vertical-align:middle;}
 <div id="toast"></div>
 
 <div class="shell">
-  <header>
-    <div class="hd-left">
-      <div class="hd-icon">📦</div>
-      <div>
-        <h1>Monitor de Inventario</h1>
-        <p id="periodo-txt">Cargando...</p>
-      </div>
-    </div>
+  <header style="padding:10px 20px">
+    <p id="periodo-txt" style="margin:0;font-size:13px;color:var(--muted)">Cargando...</p>
     <div class="hd-right">
       <button class="hd-btn btn-export" onclick="exportExcel()">↓ Exportar Excel</button>
     </div>
