@@ -923,15 +923,11 @@ function render(){
   // Init date filter (sets ffDates)
   resetDates();
   // Render all sections
-  const _rf=(nm,fn)=>{try{fn();}catch(e){console.error('❌ RENDER '+nm+':',e.message,e.stack);window.__renderErrors=window.__renderErrors||[];window.__renderErrors.push(nm+': '+e.message);}};
+  const _rf=(nm,fn)=>{try{fn();}catch(e){console.error('render '+nm+':',e);}};
   _rf('charts',renderCharts);_rf('pills',renderPills);_rf('res',renderRes);
   _rf('initDet',initDet);_rf('det',renderDet);_rf('initCmp',initCmp);_rf('cmp',renderCmp);
   _rf('initRsk',initRsk);_rf('rsk',renderRsk);setTimeout(()=>_rf('colResize',initColResize),100);
-  if(window.__renderErrors&&window.__renderErrors.length){
-    let b=document.getElementById('__errbanner');
-    if(!b){b=document.createElement('div');b.id='__errbanner';b.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#c0392b;color:#fff;padding:8px 16px;font-size:12px;z-index:99999;font-family:monospace';document.body.appendChild(b);}
-    b.textContent='⚠ Errores de render: '+window.__renderErrors.join(' | ');
-  }
+
 }
 
 // ── CHARTS ────────────────────────────────────────────────────────────────────
@@ -1863,30 +1859,17 @@ function expRskExcelAll(){
 
 // ── TABS ──────────────────────────────────────────────────────────────────────
 function showTab(id,btn){
-  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.panel').forEach(p=>{p.classList.remove('on');p.style.display='';});
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
   const panel=document.getElementById('panel-'+id);
   if(!panel){console.error('Panel no encontrado: panel-'+id);return;}
   panel.classList.add('on');
-  panel.style.display='block';   // forzar visibilidad por si el CSS falla
   if(btn)btn.classList.add('on');
-  // Re-render de la sección al mostrarla (por si no se dibujó al cargar)
-  try{
-    if(id==='resumen'&&typeof renderRes==='function')renderRes();
-    if(id==='detalle'){if(typeof initDet==='function')initDet();if(typeof renderDet==='function')renderDet();}
-    if(id==='comp'){if(typeof initCmp==='function')initCmp();if(typeof renderCmp==='function')renderCmp();}
-    if(id==='clasif'){if(typeof renderRsk==='function')renderRsk();}
-  }catch(e){console.error('re-render '+id+':',e);}
 }
 window.showTab=showTab;
 function showSub(id,btn){document.querySelectorAll('#cn-falt .spanel').forEach(p=>p.classList.remove('on'));document.querySelectorAll('#cn-falt .subtabs .stab').forEach(b=>b.classList.remove('on'));document.getElementById('sp-'+id).classList.add('on');btn.classList.add('on');}
 
 // ── AUTO-INIT ─────────────────────────────────────────────────────────────────
-window.addEventListener('error',function(ev){
-  let b=document.getElementById('__errbanner');
-  if(!b){b=document.createElement('div');b.id='__errbanner';b.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#c0392b;color:#fff;padding:8px 16px;font-size:12px;z-index:99999;font-family:monospace;max-height:80px;overflow:auto';document.body.appendChild(b);}
-  b.textContent='⚠ Error JS: '+ev.message+' ('+(ev.filename||'').split('/').pop()+':'+ev.lineno+')';
-});
 window.addEventListener('load',async function(){
   if(window.__SNAP){applyData(window.__SNAP);return;}
   await loadServer();
