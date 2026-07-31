@@ -441,8 +441,9 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
   <!-- Main tab navigation -->
   <div class="main-tabs">
     <button class="main-tab on" id="tab-btn-inv" onclick="switchMainTab('inv')">Estatus del inventario</button>
-    <button class="main-tab" id="tab-btn-otif" onclick="switchMainTab('otif')">OTIF y Target</button>
-    <button class="main-tab" id="tab-btn-prec" onclick="switchMainTab('prec')">Precisión de Pedido</button>
+    <button class="main-tab" id="tab-btn-prec" onclick="switchMainTab('prec')">Pedidos propuestos</button>
+    <button class="main-tab" id="tab-btn-otif" onclick="switchMainTab('otif')">OTIF- Proveedor</button>
+    <button class="main-tab" id="tab-btn-target" onclick="switchMainTab('target')">Target- Comprador</button>
   </div>
 
   <main>
@@ -586,17 +587,21 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
         <span class="tb-lbl">Estatus:</span>
         <select class="msel" id="otif-status-sel"><option value="">Todos</option></select>
         <div class="filter-sep"></div>
+        <span id="filtro-mes-oc" style="display:flex;align-items:center;gap:5px">
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
           <input type="checkbox" id="chk-month-oc" checked onchange="toggleOtifMonthFilter('oc',this.checked);renderOTIF()" style="width:14px;height:14px;accent-color:var(--navy)">
           <span class="tb-lbl" style="cursor:pointer" title="Filtra por mes de colocación de la OC — Target de Comprador">🎯 Mes OC <span style="font-weight:400;opacity:.65;font-size:9px">(Ctrl+clic)</span></span>
         </label>
         <select class="msel" id="otif-month-sel" multiple size="3" style="min-width:130px;font-size:11px" title="Ctrl/Cmd+clic para varios meses"></select>
+        </span>
         <div class="filter-sep"></div>
+        <span id="filtro-mes-recep" style="display:flex;align-items:center;gap:5px">
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
           <input type="checkbox" id="chk-month-recep" checked onchange="toggleOtifMonthFilter('recep',this.checked);renderOTIF()" style="width:14px;height:14px;accent-color:var(--navy)">
           <span class="tb-lbl" style="cursor:pointer" title="Filtra por mes de recepción real ETA Real — OTIF de Proveedor">📦 Mes Recepción <span style="font-weight:400;opacity:.65;font-size:9px">(Ctrl+clic)</span></span>
         </label>
         <select class="msel" id="otif-month-recep-sel" multiple size="3" style="min-width:130px;font-size:11px" title="Ctrl/Cmd+clic para varios meses"></select>
+        </span>
         <button class="clear-btn" id="otif-clear-top" style="margin-left:8px">✕ Limpiar</button>
       </div>
     </div>
@@ -644,7 +649,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
     <div class="oc-grid" id="oc-cards"></div>
 
     <!-- Detail table -->
-    <div class="tbl-card">
+    <div class="tbl-card" id="otif-detalle-wrap">
       <div class="tbl-top">
         <h3>Detalle de Líneas de Pedido</h3>
         <span id="otif-row-count"></span>
@@ -709,7 +714,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
     </div>
     <div class="footer" id="otif-footer"></div>
     <!-- OTIF Methodology note -->
-    <div style="margin-top:14px;background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:16px 20px;font-size:11px;color:var(--tx2);line-height:1.7">
+    <div id="otif-metodologia" style="margin-top:14px;background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:16px 20px;font-size:11px;color:var(--tx2);line-height:1.7">
       <div style="font-size:12px;font-weight:700;color:var(--tx);margin-bottom:10px;border-bottom:1px solid var(--brd);padding-bottom:6px">📐 Metodología de cálculo</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
         <div>
@@ -1863,15 +1868,43 @@ function exportPrecision(){
   XLSX.writeFile(wb, `Precision_Pedido_${ts}.xlsx`);
 }
 
+// Muestra las secciones correctas según el lado: 'otif' (proveedor) o 'target' (comprador)
+function aplicarVistaOtif(tab){
+  const esTarget=(tab==='target');
+  const esOtif=(tab==='otif');
+  const show=(id,v)=>{const e=document.getElementById(id);if(e)e.style.display=v?'':'none';};
+  // KPIs
+  show('kpi-target-box',esTarget);
+  show('kpi-otif-box',esOtif);
+  // Sección de tendencia (Target de Comprador)
+  show('target-trend-section',esTarget);
+  // Tarjetas de OC (OTIF de Proveedor): ocultar en Target
+  const occ=document.getElementById('oc-cards');if(occ&&esTarget)occ.style.display='none';
+  // Nota de metodología OTIF: solo en OTIF-Proveedor
+  show('otif-metodologia',esOtif);
+  const ocToggle=document.getElementById('oc-toggle-btn');if(ocToggle)ocToggle.style.display=esOtif?'':'none';
+  // Filtros de mes: mostrar solo el que aplica a cada lado
+  const filaOC=document.getElementById('filtro-mes-oc');
+  const filaRecep=document.getElementById('filtro-mes-recep');
+  if(filaOC)filaOC.style.display=esTarget?'':'none';
+  if(filaRecep)filaRecep.style.display=esOtif?'':'none';
+  // Tabla de detalle de líneas: solo en OTIF-Proveedor
+  const detalle=document.getElementById('otif-detalle-wrap');
+  if(detalle)detalle.style.display=esOtif?'':'none';
+}
 function switchMainTab(tab){
   currentMainTab=tab;
+  const isOtifSide=(tab==='otif'||tab==='target');
   document.getElementById('tab-inv').style.display=tab==='inv'?'block':'none';
-  document.getElementById('tab-otif').style.display=tab==='otif'?'block':'none';
+  document.getElementById('tab-otif').style.display=isOtifSide?'block':'none';
   document.getElementById('tab-prec').style.display=tab==='prec'?'block':'none';
   document.getElementById('tab-btn-inv').classList.toggle('on',tab==='inv');
   document.getElementById('tab-btn-otif').classList.toggle('on',tab==='otif');
+  const bt=document.getElementById('tab-btn-target');if(bt)bt.classList.toggle('on',tab==='target');
   document.getElementById('tab-btn-prec').classList.toggle('on',tab==='prec');
-  if(tab==='otif'&&OTIF_DATA.length){if(!document.getElementById('otif-prov-sel').dataset.built)buildOTIFFilters();renderOTIF();}
+  // Mostrar/ocultar las secciones según el lado (OTIF-Proveedor vs Target-Comprador)
+  aplicarVistaOtif(tab);
+  if(isOtifSide&&OTIF_DATA.length){if(!document.getElementById('otif-prov-sel').dataset.built)buildOTIFFilters();renderOTIF();}
   if(tab==='prec'&&OTIF_DATA.length){
     if(!document.getElementById('prec-prov-sel').dataset.built){
       document.getElementById('prec-prov-sel').dataset.built='1';
@@ -2317,20 +2350,19 @@ function renderOTIFKPIs(){
   const otifOk=[...otifByOC.values()].filter(o=>o.total>0&&o.both/o.total>=0.95).length;
 
   document.getElementById('otif-kpis').innerHTML=`
-  <div style="display:grid;grid-template-columns:1fr 3fr;gap:12px;margin-bottom:20px">
-    <div style="background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:14px">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx2);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--brd)">🎯 Target de Comprador${mesLbl}</div>
-      ${kpi('Target de Comprador',pct(tOk,tTotal),`${tOk} de ${tTotal} órdenes`,col(tOk,tTotal,70,40))}
-    </div>
-    <div style="background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:14px">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx2);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--brd)">📦 OTIF de Proveedor${mesLbl}</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
-        ${kpi('On Time (Entrega)',pct(otOk,otTotal),`${otOk} de ${otTotal} órdenes`,col(otOk,otTotal,80,50))}
-        ${kpi('In Full (Completo)',pct(fOk,fTotal),`${fOk} de ${fTotal} claves`,col(fOk,fTotal,80,50))}
-        ${kpi('OTIF (On Time + In Full)',pct(otifOk,otifTotal),'',col(otifOk,otifTotal,70,40))}
-      </div>
+  <div id="kpi-target-box" style="background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:14px;margin-bottom:20px">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx2);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--brd)">🎯 Target de Comprador${mesLbl}</div>
+    ${kpi('Target de Comprador',pct(tOk,tTotal),`${tOk} de ${tTotal} órdenes`,col(tOk,tTotal,70,40))}
+  </div>
+  <div id="kpi-otif-box" style="background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:14px;margin-bottom:20px">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx2);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--brd)">📦 OTIF de Proveedor${mesRecepLbl}</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+      ${kpi('On Time (Entrega)',pct(otOk,otTotal),`${otOk} de ${otTotal} órdenes`,col(otOk,otTotal,80,50))}
+      ${kpi('In Full (Completo)',pct(fOk,fTotal),`${fOk} de ${fTotal} claves`,col(fOk,fTotal,80,50))}
+      ${kpi('OTIF (On Time + In Full)',pct(otifOk,otifTotal),'',col(otifOk,otifTotal,70,40))}
     </div>
   </div>`;
+  if(typeof aplicarVistaOtif==='function')aplicarVistaOtif(currentMainTab);
 }
 function renderOCCards(data){
   const ocMap=new Map();

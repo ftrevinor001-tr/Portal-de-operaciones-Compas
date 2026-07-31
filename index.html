@@ -158,7 +158,7 @@
   <div class="tab" onclick="switchTab(1)"><span class="tab-icon">📉</span>Histórico Faltantes</div>
   <div class="tab" onclick="switchTab(2)"><span class="tab-icon">📦</span>Monitor de Inventario</div>
   <div class="tab" onclick="switchTab(3)"><span class="tab-icon">🔄</span>Estatus Back Orders</div>
-  <div class="tab" onclick="switchTab(4)"><span class="tab-icon">🎯</span>Inventario &amp; OTIF</div>
+  <div class="tab" onclick="switchTab(4)"><span class="tab-icon">🎯</span>Indicadores</div>
   <div class="tab" onclick="switchTab(5)" id="tab-admin"><span class="tab-icon">⚙️</span>Admin</div>
 </div>
 
@@ -193,7 +193,7 @@
     <iframe id="fr-3" onload="window.hideLd&&window.hideLd(3)"></iframe>
   </div>
   <div class="frame-wrap" id="fw-4">
-    <div class="loader" id="ld-4"><div class="spinner"></div><p>Cargando Inventario &amp; OTIF…</p></div>
+    <div class="loader" id="ld-4"><div class="spinner"></div><p>Cargando Indicadores…</p></div>
     <iframe id="fr-4" onload="window.hideLd&&window.hideLd(4)"></iframe>
   </div>
 
@@ -996,8 +996,29 @@ async function procesarExcel(file){
     const wsAs=wb.Sheets['Asignacion'];
     const wsOt=wb.Sheets['OTIF PEDIDOS'];
     const rowsOC=wsOC?XLSX.utils.sheet_to_json(wsOC,{raw:true,defval:''}):[];
-    const rowsAsig=wsAs?XLSX.utils.sheet_to_json(wsAs,{raw:true,defval:'',range:1}):[];
-    const rowsOtif=wsOt?XLSX.utils.sheet_to_json(wsOt,{raw:true,defval:'',range:2}):[];
+    // Lectura robusta: algunas hojas no empiezan en A1 (p.ej. Asignacion arranca en A2),
+    // lo que descuadra el 'range' numérico. Detectamos la fila de encabezado por su contenido.
+    const leerHoja=(ws,marcadores)=>{
+      if(!ws)return [];
+      const full=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
+      // buscar la fila que contenga alguno de los marcadores de encabezado
+      let hdr=-1;
+      for(let i=0;i<Math.min(full.length,10);i++){
+        const fila=full[i].map(x=>String(x).trim().toUpperCase());
+        if(marcadores.some(m=>fila.includes(m))){hdr=i;break;}
+      }
+      if(hdr<0)return XLSX.utils.sheet_to_json(ws,{raw:true,defval:''}); // respaldo
+      const cols=full[hdr].map(x=>String(x).trim());
+      const out=[];
+      for(let i=hdr+1;i<full.length;i++){
+        const obj={};let vacia=true;
+        cols.forEach((c2,j)=>{if(c2){obj[c2]=full[i][j]!==undefined?full[i][j]:'';if(String(obj[c2]).trim())vacia=false;}});
+        if(!vacia)out.push(obj);
+      }
+      return out;
+    };
+    const rowsAsig=leerHoja(wsAs,['ID IND.','DIRECTRIZ DE PEDIDO','LEVANTAR PEDIDO']);
+    const rowsOtif=leerHoja(wsOt,['ESTATUS','CLAVE','EN TIEMPO','OC']);
     if(!wsOC)log('⚠️ No se encontró la hoja RP01-23 Ordenes de Compra: alarmas de Back Orders vacías.');
     if(!wsAs)log('⚠️ No se encontró la hoja Asignacion: pedidos propuestos vacíos.');
     if(!wsOt)log('⚠️ No se encontró la hoja OTIF PEDIDOS: indicador OTIF vacío.');
