@@ -588,28 +588,32 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
   <div id="tab-otif" style="display:none">
 
     <!-- KPI sections: Target de Comprador | OTIF de Proveedor -->
-    <div style="display:flex;gap:16px;align-items:stretch;flex-wrap:wrap;margin-bottom:16px">
-      <div id="otif-kpis" style="flex:2 1 440px;min-width:340px"></div>
+    <div style="display:flex;gap:16px;align-items:stretch;flex-wrap:wrap;justify-content:flex-start;margin-bottom:16px">
+      <div id="otif-kpis" style="flex:0 1 auto;min-width:0;display:flex;align-items:stretch"></div>
       <!-- Filters al lado de las tarjetas -->
-      <div class="filter-section" id="otif-filtros-box" style="margin-bottom:0;flex:1 1 240px;min-width:230px;max-width:340px;display:flex;align-items:stretch;background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:14px 16px">
-      <div class="filter-row" style="flex-direction:column;align-items:stretch;gap:12px;width:100%">
-        <label style="display:flex;flex-direction:column;gap:4px">
-          <span class="tb-lbl">Proveedor</span>
-          <select class="msel" id="otif-prov-sel" style="width:100%"><option value="">Todos los proveedores</option></select>
-        </label>
-        <label style="display:flex;flex-direction:column;gap:4px">
-          <span class="tb-lbl">Estatus</span>
-          <select class="msel" id="otif-status-sel" style="width:100%"><option value="">Todos los estatus</option></select>
-        </label>
-        <label id="filtro-mes-oc" style="display:flex;flex-direction:column;gap:4px">
-          <span class="tb-lbl" title="Filtra por mes de colocación real de la OC (Fecha de OC)">🎯 Mes OC</span>
-          <select id="otif-month-sel" onchange="otifMonth=this.value?[this.value]:[];renderOTIF()" style="width:100%;font-size:12px;padding:6px 8px;border:1.5px solid #c9d4f0;border-radius:6px"></select>
-        </label>
-        <label id="filtro-mes-recep" style="display:flex;flex-direction:column;gap:4px">
-          <span class="tb-lbl" title="Filtra por mes de llegada real (ETA Real)">📦 Mes Recepción</span>
-          <select id="otif-month-recep-sel" onchange="otifMonthRecep=this.value?[this.value]:[];renderOTIF()" style="width:100%;font-size:12px;padding:6px 8px;border:1.5px solid #c9d4f0;border-radius:6px"></select>
-        </label>
-        <button class="clear-btn" id="otif-clear-top" style="align-self:flex-start;margin-top:2px">✕ Limpiar</button>
+      <div class="filter-section" id="otif-filtros-box" style="margin-bottom:0;flex:0 0 460px;width:460px;display:flex;align-items:center;background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:14px 18px">
+      <div class="filter-row" style="flex-direction:column;align-items:stretch;gap:10px;width:100%">
+        <div style="display:flex;gap:12px;align-items:flex-end">
+          <label style="display:flex;flex-direction:column;gap:4px;flex:1">
+            <span class="tb-lbl">Proveedor</span>
+            <select class="msel" id="otif-prov-sel" style="width:100%"><option value="">Todos los proveedores</option></select>
+          </label>
+          <label id="filtro-mes-oc" style="display:flex;flex-direction:column;gap:4px;flex:1">
+            <span class="tb-lbl" title="Filtra por mes de colocación real de la OC (Fecha de OC)">🎯 Mes OC</span>
+            <select id="otif-month-sel" onchange="otifMonth=this.value?[this.value]:[];renderOTIF()" style="width:100%;font-size:12px;padding:6px 8px;border:1.5px solid #c9d4f0;border-radius:6px"></select>
+          </label>
+          <label id="filtro-mes-recep" style="display:flex;flex-direction:column;gap:4px;flex:1">
+            <span class="tb-lbl" title="Filtra por mes de llegada real (ETA Real)">📦 Mes Recepción</span>
+            <select id="otif-month-recep-sel" onchange="otifMonthRecep=this.value?[this.value]:[];renderOTIF()" style="width:100%;font-size:12px;padding:6px 8px;border:1.5px solid #c9d4f0;border-radius:6px"></select>
+          </label>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-end">
+          <label style="display:flex;flex-direction:column;gap:4px;flex:1">
+            <span class="tb-lbl">Estatus</span>
+            <select class="msel" id="otif-status-sel" style="width:100%"><option value="">Todos los estatus</option></select>
+          </label>
+          <button class="clear-btn" id="otif-clear-top" style="flex:0 0 auto;height:34px">✕ Limpiar</button>
+        </div>
       </div>
     </div>
     </div><!-- fin wrapper KPIs+filtros -->
@@ -2378,11 +2382,11 @@ function renderOTIFKPIs(){
   const otifOk=[...otifByOC.values()].filter(o=>o.total>0&&o.both/o.total>=0.95).length;
 
   document.getElementById('otif-kpis').innerHTML=`
-  <div id="kpi-target-box" style="background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:12px;margin-bottom:0;flex:0 0 auto;min-width:220px">
+  <div id="kpi-target-box" style="background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:12px;margin-bottom:0;width:280px;max-width:280px;display:flex;flex-direction:column;justify-content:center">
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx2);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--brd)">🎯 Target de Comprador${mesLbl}</div>
     ${kpi('Target de Comprador',pct(tOk,tTotal),`${tOk} de ${tTotal} órdenes`,col(tOk,tTotal,70,40))}
   </div>
-  <div id="kpi-otif-box" style="background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:12px;margin-bottom:0;flex:1 1 auto;min-width:340px">
+  <div id="kpi-otif-box" style="background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:12px;margin-bottom:0;width:600px;max-width:600px;display:flex;flex-direction:column;justify-content:center">
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx2);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--brd)">📦 OTIF de Proveedor${mesRecepLbl}</div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
       ${kpi('On Time (Entrega)',pct(otOk,otTotal),`${otOk} de ${otTotal} órdenes`,col(otOk,otTotal,80,50))}
