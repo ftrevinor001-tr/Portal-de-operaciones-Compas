@@ -863,6 +863,7 @@ function computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif,mapaManual){
 
     const ped=asig.filter(r=>r.directriz==='LEVANTAR PEDIDO'&&mine(r))
       .map(r=>({Clave:r.clave,Descripción:r.descripcion,'Cant. a pedir':r.cantidad,Proveedor:r.proveedor,'Fecha sugerida':r.fechaLev?r.fechaLev.split('-').reverse().join('/'):''}));
+    if(comp==='GENERAL')log('🛒 Pedidos propuestos (LEVANTAR PEDIDO): '+ped.length+' · filas Asignacion: '+asig.length);
     push(comp,'otif','PEDIDO_PROPUESTO',ped,ped.length);
 
     const mineOt=otif.filter(mine);
@@ -870,6 +871,7 @@ function computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif,mapaManual){
     const ocsT=Object.keys(porOC);
     const itemsT=ocsT.map(oc=>({OC:oc,Partidas:porOC[oc].t,'En tiempo':porOC[oc].ok,Cumple:(porOC[oc].ok/porOC[oc].t>=0.95)?'✓':'✗'}));
     const okT=itemsT.filter(i=>i.Cumple==='✓').length;
+    if(comp==='GENERAL')log('🎯 Target: '+ocsT.length+' OCs · '+okT+' cumplen · filas OTIF: '+otif.length+' · en tiempo: '+otif.filter(r=>r.enTiempo==='EN TIEMPO').length);
     push(comp,'otif','TARGET',itemsT,ocsT.length,'Lógica del dashboard Inventario & OTIF: una OC cumple Target cuando el 95% o más de sus partidas llegaron EN TIEMPO; el Target del comprador es el % de sus OCs que cumplen.',{ocsOk:okT,pct:ocsT.length?Math.round(okT/ocsT.length*100):null});
   }
   return {alarmas,mes,uf};
