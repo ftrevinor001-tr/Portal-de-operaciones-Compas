@@ -11,10 +11,9 @@ window.sbGet=function(){return window.__SB||(window.__SB=window.supabase.createC
 window.idbGet=function(key){return new Promise((res,rej)=>{const r=indexedDB.open('portal_compras',1);r.onupgradeneeded=e=>e.target.result.createObjectStore('cache');r.onerror=()=>rej(r.error);r.onsuccess=()=>{const db=r.result;const g=db.transaction('cache','readonly').objectStore('cache').get(key);g.onsuccess=()=>{res(g.result);db.close();};g.onerror=()=>{rej(g.error);db.close();};};});};
 window.idbPut=function(key,val){return new Promise((res,rej)=>{const r=indexedDB.open('portal_compras',1);r.onupgradeneeded=e=>e.target.result.createObjectStore('cache');r.onerror=()=>rej(r.error);r.onsuccess=()=>{const db=r.result;const tx=db.transaction('cache','readwrite');tx.objectStore('cache').put(val,key);tx.oncomplete=()=>{res();db.close();};tx.onerror=()=>{rej(tx.error);db.close();};};});};
 // Descarga un archivo binario versionado desde Supabase con caché local
-async function esperarSesion(sb,n){for(let i=0;i<(n||8);i++){const{data:{session}}=await sb.auth.getSession();if(session)return session;await new Promise(r=>setTimeout(r,400));}return null;}
 window.sbDescargar=async function(claveDS,defRuta){
   const sb=window.sbGet();
-  const session=await esperarSesion(sb);
+  const{data:{session}}=await sb.auth.getSession();
   if(!session)throw new Error('Sin sesión activa. Entra al portal con tu contraseña desde la pantalla de ingreso.');
   const{data:meta,error:e1}=await sb.from('datasets').select('payload').eq('clave',claveDS).maybeSingle();
   if(e1)throw new Error('Consultando servidor: '+e1.message);
@@ -269,11 +268,36 @@ tr.detail-row td{padding:0;background:#F0F7FF;border-bottom:2px solid var(--sky-
 </div>
 
 <!-- TOPBAR -->
-<div class="topbar" style="display:none;padding-top:8px;padding-bottom:8px" id="topbar">
-  <div class="topbar-left"></div>
+<div class="topbar" style="display:none" id="topbar">
+  <div class="topbar-left">
+    <div class="topbar-icon"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg></div>
+    <h1>Dashboard de Órdenes de Compra<span>Sistema de Control de Back Orders — SANVER</span></h1>
+  </div>
   <div class="topbar-right">
     <div id="status-pill"><div class="dot" id="status-dot"></div><span id="last-update">Sin datos</span></div>
-
+    <div class="refresh-cluster">
+      <button id="auto-btn" onclick="toggleAuto()">
+        <div class="toggle-track" id="toggle-track"><div class="toggle-thumb"></div></div>
+        <span id="auto-label">Auto</span>
+      </button>
+      <select id="interval-sel" onchange="changeInterval()">
+        <option value="60">1 min</option><option value="300" selected>5 min</option>
+        <option value="600">10 min</option><option value="1800">30 min</option><option value="3600">1 hora</option>
+      </select>
+      <div class="rc-divider"></div>
+      <div id="countdown-wrap" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span id="countdown-text">—</span>
+      </div>
+    </div>
+    <button id="now-btn" onclick="refreshNow()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      Actualizar ahora
+    </button>
+    <button id="file-btn" onclick="document.getElementById('file-topbar').click()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+      Subir Excel
+    </button>
     <input type="file" id="file-topbar" accept=".xlsx,.xls" style="display:none" onchange="onFileTopbar(this)">
   </div>
 </div>
@@ -731,11 +755,11 @@ function loadFromServer(){
 function refreshNow(){
   if(isRefreshing) return;
   isRefreshing=true; stopCountdown();
-  $('now-btn')?.classList.add('spinning');
+  $('now-btn').classList.add('spinning');
   showLoading('Actualizando desde servidor…');
   window.idbPut('backorders',null).catch(()=>{}); // forzar re-descarga
   sbLoadBO(()=>{ hideLoading(); }, err=>{ hideLoading(); setStatus('⚠ '+err.message); });
-  Promise.resolve().then(()=>{ isRefreshing=false; $('now-btn')?.classList.remove('spinning'); if(autoActive) startCountdown(); });
+  Promise.resolve().then(()=>{ isRefreshing=false; $('now-btn').classList.remove('spinning'); if(autoActive) startCountdown(); });
 }
 
 // ── AUTO-REFRESH ───────────────────────────────────────────────────────────
@@ -748,13 +772,12 @@ function toggleAuto(){
 }
 function changeInterval(){ intervalSec=parseInt($('interval-sel').value); if(autoActive){stopCountdown();startCountdown();} }
 function startCountdown(){
-  if(!$('countdown-wrap'))return;
   stopCountdown(); countdownLeft=intervalSec; updateCD();
   $('countdown-wrap').style.display='flex';
   countdownTimer=setInterval(()=>{ countdownLeft--; updateCD(); if(countdownLeft<=0){stopCountdown();refreshNow();} },1000);
 }
 function stopCountdown(){ if(countdownTimer){clearInterval(countdownTimer);countdownTimer=null;} }
-function updateCD(){ if(!$('countdown-text'))return; const m=Math.floor(countdownLeft/60),s=countdownLeft%60; $('countdown-text').textContent=m>0?`${m}m ${String(s).padStart(2,'0')}s`:`${s}s`; }
+function updateCD(){ const m=Math.floor(countdownLeft/60),s=countdownLeft%60; $('countdown-text').textContent=m>0?`${m}m ${String(s).padStart(2,'0')}s`:`${s}s`; }
 
 // ── DROPDOWNS ──────────────────────────────────────────────────────────────
 

@@ -129,10 +129,16 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
 </div>
 
 <div id="dashboard">
-  <div class="header" style="padding:10px 20px;margin-bottom:12px">
+  <div class="header">
     <div class="htop">
-      <div class="sub" id="sub" style="margin:0"></div>
-      <span class="badge" id="bdg"></span>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="background:#1e3a5f;border-radius:10px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">📋</div>
+        <div><h1>Histórico de Faltantes <span class="badge" id="bdg"></span></h1><div class="sub" id="sub"></div></div>
+      </div>
+      <div class="hbtns">
+        <button class="hbtn" onclick="loadServer()">☁️ Actualizar desde servidor</button>
+        <button class="hbtn" onclick="document.getElementById('fi').click()">📂 Cargar Excel</button>
+      </div>
     </div>
     <div class="date-bar">
       <span style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase;letter-spacing:.6px">📅 Rango</span>
@@ -159,11 +165,6 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
   </div>
 
   <div id="panel-clasif" class="panel">
-    <div class="subtabs" style="border-bottom:2px solid #1c4587;margin-bottom:4px">
-      <button class="stab on" style="--cc:#1c4587;font-weight:700" onclick="showClasNiv('falt',this)">📉 Faltantes</button>
-      <button class="stab" style="--cc:#993c1d;font-weight:700" onclick="showClasNiv('sob',this)">📦 Sobre Inventario</button>
-    </div>
-    <div id="cn-falt">
     <div class="subtabs">
       <button class="stab on" style="--cc:#c0582a" onclick="showSub('alta',this)">🔴 Alta Rotación</button>
       <button class="stab" style="--cc:#b8952a" onclick="showSub('media',this)">🟡 Media Rotación</button>
@@ -174,25 +175,21 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
       <div class="fbox"><div class="flbl">Compradores <button class="bsm" onclick="togSub('alta')">Todos/Ninguno</button></div><div class="pills" id="pills-alta"></div></div>
       <div class="card"><h2>Alta Rotación</h2><div style="position:relative;height:370px"><canvas id="c-alta"></canvas></div></div>
       <div class="card"><h2>Ranking Alta Rotación</h2><div style="position:relative;height:280px"><canvas id="c-rk-alta"></canvas></div></div>
-      
     </div>
     <div id="sp-media" class="spanel">
       <div class="fbox"><div class="flbl">Compradores <button class="bsm" onclick="togSub('media')">Todos/Ninguno</button></div><div class="pills" id="pills-media"></div></div>
       <div class="card"><h2>Media Rotación</h2><div style="position:relative;height:370px"><canvas id="c-media"></canvas></div></div>
       <div class="card"><h2>Ranking Media Rotación</h2><div style="position:relative;height:280px"><canvas id="c-rk-media"></canvas></div></div>
-      
     </div>
     <div id="sp-lenta" class="spanel">
       <div class="fbox"><div class="flbl">Compradores <button class="bsm" onclick="togSub('lenta')">Todos/Ninguno</button></div><div class="pills" id="pills-lenta"></div></div>
       <div class="card"><h2>Lenta Rotación</h2><div style="position:relative;height:370px"><canvas id="c-lenta"></canvas></div></div>
       <div class="card"><h2>Ranking Lenta Rotación</h2><div style="position:relative;height:280px"><canvas id="c-rk-lenta"></canvas></div></div>
-      
     </div>
     <div id="sp-sagr" class="spanel">
       <div class="fbox"><div class="flbl">Compradores <button class="bsm" onclick="togSub('sagr')">Todos/Ninguno</button></div><div class="pills" id="pills-sagr"></div></div>
       <div class="card"><h2>Sagrados</h2><div style="position:relative;height:370px"><canvas id="c-sagr"></canvas></div></div>
       <div class="card"><h2>Ranking Sagrados</h2><div style="position:relative;height:200px"><canvas id="c-rk-sagr"></canvas></div></div>
-      
     </div>
   </div>
 
@@ -543,30 +540,6 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
   </div>
 
   <div class="footer" id="ftr"></div>
-    </div><!-- fin cn-falt -->
-    <div id="cn-sob" style="display:none">
-      <div class="fbox" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
-        <div><div class="flbl">Comprador</div><select id="sob-comp" onchange="renderSobreInv()" style="font-size:13px;padding:6px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:160px"></select></div>
-        <div><div class="flbl">Familia (GRUPO)</div><select id="sob-fam" onchange="renderSobreInv()" style="font-size:13px;padding:6px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:180px"></select></div>
-        <div><div class="flbl">Rotación</div><select id="sob-rot" onchange="renderSobreInv()" style="font-size:13px;padding:6px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:150px"></select></div>
-        <div><div class="flbl">Marca</div><input id="sob-marca" list="sob-marca-list" oninput="renderSobreInv()" placeholder="Todas las marcas" style="font-size:13px;padding:6px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:170px"><datalist id="sob-marca-list"></datalist></div>
-        <div style="align-self:flex-end"><button class="bsm" onclick="limpiarSobreInv()" style="padding:7px 14px">↺ Limpiar filtros</button></div>
-      </div>
-      <div id="sob-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:14px 0"></div>
-      <div class="card"><h2>Exceso por familia de materiales</h2><div style="font-size:11px;color:#6b7a99;margin:-6px 0 8px">Ordenado por meses-clave acumulados · la barra muestra el n.º de claves · color = severidad promedio</div>
-      <div id="sev-leyenda" style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;font-size:11px;color:#4a5568">
-        <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:13px;height:13px;border-radius:3px;background:#1baf7a;display:inline-block"></span>Leve (&lt;4 meses prom.)</span>
-        <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:13px;height:13px;border-radius:3px;background:#fab219;display:inline-block"></span>Moderado (4–5)</span>
-        <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:13px;height:13px;border-radius:3px;background:#eb6834;display:inline-block"></span>Alto (5–7)</span>
-        <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:13px;height:13px;border-radius:3px;background:#d03b3b;display:inline-block"></span>Grave (7+)</span>
-      </div>
-      <div style="position:relative;height:360px"><canvas id="sob-fam-chart"></canvas></div></div>
-      <div class="card"><h2>Dónde se concentra: comprador × familia</h2><div style="font-size:11px;color:#6b7a99;margin:-6px 0 8px">Meses-clave de exceso acumulado en cada cruce · entre más oscura la celda, más inventario detenido ahí</div>
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:11px;color:#4a5568"><span>Menos</span><span style="width:22px;height:12px;background:rgba(153,60,29,.14);display:inline-block;border:.5px solid #edf0f7"></span><span style="width:22px;height:12px;background:rgba(153,60,29,.43);display:inline-block"></span><span style="width:22px;height:12px;background:rgba(153,60,29,.72);display:inline-block"></span><span style="width:22px;height:12px;background:rgba(153,60,29,.86);display:inline-block"></span><span>Más</span></div>
-      <div id="sob-heat" style="overflow-x:auto"></div></div>
-      <div class="card"><h2>Severidad del exceso</h2><div style="font-size:11px;color:#6b7a99;margin:-6px 0 8px">Cuántos meses-clave de exceso viven en cada rango de gravedad por clave</div><div style="position:relative;height:250px"><canvas id="sob-sev-chart"></canvas></div></div>
-      <div class="card"><h2>Promedio de exceso por comprador</h2><div style="font-size:11px;color:#6b7a99;margin:-6px 0 8px">Meses que cada clave supera su objetivo, en promedio (día actual)</div><div style="position:relative;height:320px"><canvas id="sob-prom-chart"></canvas></div></div>
-    </div>
 </div>
 
 <script>
@@ -716,18 +689,10 @@ async function loadServer(){
     if(fb) fb.style.display='block';
   }
 }
-async function esperarSesion(sb,intentos){
-  for(let i=0;i<(intentos||8);i++){
-    const{data:{session}}=await sb.auth.getSession();
-    if(session)return session;
-    await new Promise(r=>setTimeout(r,400));   // la sesión puede tardar en restaurarse tras recargar el iframe
-  }
-  return null;
-}
 async function doFetch(msgEl){
   const sb=window.__SB||(window.__SB=window.supabase.createClient(window.SB_URL,window.SB_KEY));
   if(msgEl){msgEl.textContent='🔐 Verificando sesión...';}
-  const session=await esperarSesion(sb);
+  const{data:{session}}=await sb.auth.getSession();
   if(!session) throw new Error('Sin sesión activa. Entra al portal con tu contraseña desde la pantalla de ingreso.');
   if(msgEl){msgEl.textContent='📡 Consultando datos en el servidor...';}
   const{data:meta,error:e1}=await sb.from('datasets').select('payload,actualizado_en').eq('clave','faltantes').maybeSingle();
@@ -857,47 +822,7 @@ function buildData(raw,rawD,fn){
   const ufd=uq('fecha');
   const detFalt={};
   if(detR.length){const lf=ufd[ufd.length-1];detR.filter(r=>r.fecha===lf&&r.estatus==='FALTANTE').forEach(r=>{detFalt[r.comprador]=detFalt[r.comprador]||{};detFalt[r.comprador][r.clmov]=detFalt[r.comprador][r.clmov]||[];detFalt[r.comprador][r.clmov].push(r);});}
-
-
-
-  // Pre-agregado de SOBRE INVENTARIO (día más reciente): promedios, acumulados,
-  // matriz comprador×familia y severidad. Exceso = max(0, meses_inv - objetivo).
-  const sobreInv={grupos:[],prom:{},cnt:{},tot:{},fam:{},heat:{},sev:{},kpi:{},cierre:null};
-  (function(){
-    const cierre=ufd[ufd.length-1];
-    sobreInv.cierre=cierre;
-    const grupos=new Set();
-    const prom={},cnt={},tot={};          // clave: comp||rot||grupo  (grupo puede ser __ALL__)
-    const acc={};
-    const famTot={};                      // grupo -> {s,n}
-    const heat={};                        // comp -> grupo -> suma
-    const sevBins={'0-3':0,'3-6':0,'6-12':0,'12-24':0,'24+':0};
-    let totalClaves=0,totalExc=0,criticas=0;
-    detR.forEach(x=>{
-      if(x.fecha!==cierre||x.estatus!=='SOBRE INVENTARIO')return;
-      const c=String(x.comprador||'').trim().toUpperCase();if(!c||c==='PRODUCCION')return;
-      const rot=String(x.clmov||'').trim().toUpperCase();if(!rot||rot==='SIN COMPRA')return;
-      const g=String(x.grupo||'').trim().toUpperCase()||'(SIN GRUPO)';
-      const ex=Math.max(0,(+x.meses_inv||0)-(+x.obj_meses||0));
-      grupos.add(g);totalClaves++;totalExc+=ex;
-      if(ex>=24)criticas++;
-      // promedios por comp×rot×(grupo y ALL)
-      [g,'__ALL__'].forEach(gg=>{const k=c+'||'+rot+'||'+gg;(acc[k]=acc[k]||{s:0,n:0});acc[k].s+=ex;acc[k].n++;});
-      // familia total
-      (famTot[g]=famTot[g]||{s:0,n:0});famTot[g].s+=ex;famTot[g].n++;
-      // heat comp×familia
-      (heat[c]=heat[c]||{});heat[c][g]=(heat[c][g]||0)+ex;
-      // severidad
-      const b=ex<3?'0-3':ex<6?'3-6':ex<12?'6-12':ex<24?'12-24':'24+';
-      sevBins[b]+=ex;
-    });
-    Object.keys(acc).forEach(k=>{prom[k]=+(acc[k].s/acc[k].n).toFixed(2);cnt[k]=acc[k].n;tot[k]=+acc[k].s.toFixed(1);});
-    const fam={};Object.keys(famTot).forEach(g=>{fam[g]={tot:+famTot[g].s.toFixed(1),n:famTot[g].n,prom:+(famTot[g].s/famTot[g].n).toFixed(2)};});
-    sobreInv.grupos=[...grupos].sort();
-    sobreInv.prom=prom;sobreInv.cnt=cnt;sobreInv.tot=tot;sobreInv.fam=fam;sobreInv.heat=heat;sobreInv.sev=sevBins;
-    sobreInv.kpi={claves:totalClaves,exceso:+totalExc.toFixed(0),prom:totalClaves?+(totalExc/totalClaves).toFixed(1):0,criticas};
-  })();
-  return{fechas,compradores,totalByDay,clavesTotal,clasByDay,compByDay,compClByDay,CDATA,AREA,uf,pf,mA,mAn,fU,meses:mes,skuMes,sobreInv,rowsRes:rows,totalHoy:totalByDay[uf]||0,clavesHoy:clavesTotal[uf]||0,filename:fn,detR,detF:ufd,detM:uq('marca'),detCM:uq('clmov'),detG:uq('grupo'),detC:uq('comprador'),detE:uq('estatus'),detRd:uq('reorden'),detFalt};
+  return{fechas,compradores,totalByDay,clavesTotal,clasByDay,compByDay,compClByDay,CDATA,AREA,uf,pf,mA,mAn,fU,meses:mes,skuMes,rowsRes:rows,totalHoy:totalByDay[uf]||0,clavesHoy:clavesTotal[uf]||0,filename:fn,detR,detF:ufd,detM:uq('marca'),detCM:uq('clmov'),detG:uq('grupo'),detC:uq('comprador'),detE:uq('estatus'),detRd:uq('reorden'),detFalt};
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────────────
@@ -922,146 +847,11 @@ function render(){
   // Init date filter (sets ffDates)
   resetDates();
   // Render all sections
-  const _rf=(nm,fn)=>{try{fn();}catch(e){console.error('render '+nm+':',e);}};
-  _rf('charts',renderCharts);_rf('pills',renderPills);_rf('res',renderRes);
-  _rf('initDet',initDet);_rf('det',renderDet);_rf('initCmp',initCmp);_rf('cmp',renderCmp);
-  _rf('initRsk',initRsk);_rf('rsk',renderRsk);setTimeout(()=>_rf('colResize',initColResize),100);
+  renderCharts();renderPills();renderRes();initDet();renderDet();initCmp();renderCmp();initRsk();renderRsk();setTimeout(initColResize,100);
 }
 
 // ── CHARTS ────────────────────────────────────────────────────────────────────
 function mC(id,type,data,opts){const ctx=document.getElementById(id);if(!ctx)return;if(CH[id])CH[id].destroy();CH[id]=new Chart(ctx,{type,data,options:opts||BASE});}
-// Plugin: dibuja el nº de claves al final de cada barra (horizontal o vertical)
-const barLabelPlugin={id:'barLabel',afterDatasetsDraw(chart,args,opts){
-  const ds=chart.data.datasets[0];const labs=ds._barLabels;if(!labs)return;
-  const{ctx}=chart;const meta=chart.getDatasetMeta(0);const horiz=chart.options.indexAxis==='y';
-  ctx.save();ctx.font='600 10px Segoe UI';ctx.fillStyle='#4a5568';
-  meta.data.forEach((bar,i)=>{const t=labs[i];if(t==null)return;
-    if(horiz){ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(t,bar.x+6,bar.y);}
-    else{ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText(t,bar.x,bar.y-4);}});
-  ctx.restore();}};
-function mCL(id,type,data,opts){const ctx=document.getElementById(id);if(!ctx)return;if(CH[id])CH[id].destroy();CH[id]=new Chart(ctx,{type,data,options:opts||BASE,plugins:[barLabelPlugin]});}
-
-// Modo de la gráfica de sobre inventario: 'prom' (promedio) o 'tot' (acumulado)
-let sobFamChart,sobSevChart,sobPromChart;
-function showClasNiv(niv,btn){
-  document.querySelectorAll('#panel-clasif > .subtabs:first-child .stab').forEach(b=>b.classList.remove('on'));
-  if(btn)btn.classList.add('on');
-  document.getElementById('cn-falt').style.display=niv==='falt'?'':'none';
-  document.getElementById('cn-sob').style.display=niv==='sob'?'':'none';
-  if(niv==='sob')initSobreInv();
-}
-function initSobreInv(){
-  const S=G.sobreInv;if(!S&&!(G.detR&&G.detR.length))return;
-  renderSobreInv();   // la cascada llena y actualiza los filtros
-}
-const SEVCOL=v=>v>=7?'#d03b3b':v>=5?'#eb6834':v>=4?'#fab219':'#1baf7a';
-// Recalcula KPIs/heat/familias filtrando por comprador, familia y rotación desde detR
-// Filtra el detalle de sobre inventario. 'excepto' omite un filtro (para repoblar en cascada).
-function sobDetalle(excepto){
-  const S=G.sobreInv;const cierre=S?S.cierre:(G.detF||[])[ (G.detF||[]).length-1 ];
-  const fc=document.getElementById('sob-comp').value||'__ALL__';
-  const ff=document.getElementById('sob-fam').value||'__ALL__';
-  const fr=document.getElementById('sob-rot').value||'__ALL__';
-  const fm=(document.getElementById('sob-marca').value||'').trim().toUpperCase();
-  const out=[];
-  (G.detR||[]).forEach(x=>{
-    if(x.fecha!==cierre||x.estatus!=='SOBRE INVENTARIO')return;
-    const c=String(x.comprador||'').trim().toUpperCase();if(!c||c==='PRODUCCION')return;
-    const rot=String(x.clmov||'').trim().toUpperCase();if(!rot||rot==='SIN COMPRA')return;
-    const g=String(x.grupo||'').trim().toUpperCase()||'(SIN GRUPO)';
-    const mk=String(x.marca||'').trim().toUpperCase();
-    if(excepto!=='comp'&&fc!=='__ALL__'&&c!==fc)return;
-    if(excepto!=='fam'&&ff!=='__ALL__'&&g!==ff)return;
-    if(excepto!=='rot'&&fr!=='__ALL__'&&rot!==fr)return;
-    if(excepto!=='marca'&&fm&&mk!==fm)return;
-    out.push({c,rot,g,mk,ex:Math.max(0,(+x.meses_inv||0)-(+x.obj_meses||0))});
-  });
-  return out;
-}
-function sobFiltrado(){return sobDetalle(null);}
-// Repuebla cada filtro con las opciones válidas según los demás (cascada)
-function sobCascada(){
-  const S=G.sobreInv;if(!S)return;
-  // Comprador: según familia+rotación+marca
-  const cVal=document.getElementById('sob-comp').value;
-  const comps=[...new Set(sobDetalle('comp').map(r=>r.c))].sort();
-  const cSel=document.getElementById('sob-comp');
-  cSel.innerHTML='<option value="__ALL__">— Todos los compradores —</option>'+comps.map(c=>`<option value="${c}">${S2N(c)}</option>`).join('');
-  cSel.value=comps.includes(cVal)||cVal==='__ALL__'?cVal:'__ALL__';
-  // Familia: según comprador+rotación+marca
-  const fVal=document.getElementById('sob-fam').value;
-  const fams=[...new Set(sobDetalle('fam').map(r=>r.g))].sort();
-  const fSel=document.getElementById('sob-fam');
-  fSel.innerHTML='<option value="__ALL__">— Todas las familias —</option>'+fams.map(g=>`<option value="${g}">${g}</option>`).join('');
-  fSel.value=fams.includes(fVal)||fVal==='__ALL__'?fVal:'__ALL__';
-  // Rotación: según comprador+familia+marca
-  const rVal=document.getElementById('sob-rot').value;
-  const rots=[...new Set(sobDetalle('rot').map(r=>r.rot))];
-  const ordenRot=['ALTA ROTACIÓN','MEDIA ROTACIÓN','LENTA ROTACIÓN','SAGRADOS'].filter(r=>rots.includes(r));
-  const rSel=document.getElementById('sob-rot');
-  rSel.innerHTML='<option value="__ALL__">— Todas las rotaciones —</option>'+ordenRot.map(r=>`<option value="${r}">${r}</option>`).join('');
-  rSel.value=ordenRot.includes(rVal)||rVal==='__ALL__'?rVal:'__ALL__';
-  // Marca: según comprador+familia+rotación
-  const marcas=[...new Set(sobDetalle('marca').map(r=>r.mk).filter(Boolean))].sort();
-  document.getElementById('sob-marca-list').innerHTML=marcas.map(m=>`<option value="${m}">`).join('');
-}
-function limpiarSobreInv(){
-  document.getElementById('sob-comp').value='__ALL__';
-  document.getElementById('sob-fam').value='__ALL__';
-  document.getElementById('sob-rot').value='__ALL__';
-  document.getElementById('sob-marca').value='';
-  renderSobreInv();
-}
-function renderSobreInv(){
-  if(!G.sobreInv&&!(G.detR&&G.detR.length))return;
-  sobCascada();
-  const rows=sobFiltrado();
-  // KPIs
-  const totExc=rows.reduce((s,r)=>s+r.ex,0);
-  const crit=rows.filter(r=>r.ex>=24).length;
-  const totClavesActivas=(G.clavesTotal&&G.sobreInv?G.clavesTotal[G.sobreInv.cierre]:0)||0;
-  const pct=totClavesActivas?Math.round(rows.length/totClavesActivas*100):null;
-  document.getElementById('sob-kpis').innerHTML=[
-    ['Claves sobre inventario',rows.length.toLocaleString(),(pct!=null?pct+'% del catálogo':''),'#993c1d','#fdeaea'],
-    ['Exceso total',Math.round(totExc).toLocaleString(),'meses-clave sobre objetivo','#1a2035','#f5f6fa'],
-    ['Exceso promedio',rows.length?(totExc/rows.length).toFixed(1):'0','meses por clave','#1a2035','#f5f6fa'],
-    ['Claves críticas',crit.toLocaleString(),'+24 meses de exceso','#1a2035','#f5f6fa']
-  ].map(k=>`<div style="background:${k[4]};border-radius:12px;padding:1rem"><div style="font-size:12px;color:${k[3]};margin-bottom:4px">${k[0]}</div><div style="font-size:24px;font-weight:700;color:${k[3]}">${k[1]}</div><div style="font-size:11px;color:#6b7a99">${k[2]}</div></div>`).join('');
-  // Familias
-  const famAgg={};rows.forEach(r=>{(famAgg[r.g]=famAgg[r.g]||{s:0,n:0});famAgg[r.g].s+=r.ex;famAgg[r.g].n++;});
-  const famArr=Object.entries(famAgg).map(([g,v])=>({g,tot:v.s,prom:v.s/v.n,n:v.n})).sort((a,b)=>b.tot-a.tot).slice(0,12);
-  mCL('sob-fam-chart','bar',{labels:famArr.map(x=>x.g),datasets:[{data:famArr.map(x=>+x.tot.toFixed(0)),backgroundColor:famArr.map(x=>SEVCOL(x.prom)),borderRadius:4,barThickness:22,_barLabels:famArr.map(x=>x.n+' claves')}]},
-    {indexAxis:'y',responsive:true,maintainAspectRatio:false,layout:{padding:{right:56}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>[c.parsed.x.toLocaleString()+' meses-clave acumulados','+'+famArr[c.dataIndex].prom.toFixed(1)+' meses prom. · '+famArr[c.dataIndex].n+' claves']}}},
-     scales:{x:{ticks:{color:'#6b7a99'},grid:{color:'#edf0f7'},title:{display:true,text:'Exceso total (meses-clave)',color:'#6b7a99',font:{size:10}}},y:{ticks:{color:'#4a5568',font:{size:11}},grid:{display:false}}}});
-  // Heat comp×familia (top 6 familias, todos los compradores con datos)
-  const topFam=famArr.slice(0,6).map(x=>x.g);
-  const compSet={};rows.forEach(r=>{if(!topFam.includes(r.g))return;(compSet[r.c]=compSet[r.c]||{});compSet[r.c][r.g]=(compSet[r.c][r.g]||0)+r.ex;});
-  const compArr=Object.keys(compSet).sort((a,b)=>{const sa=topFam.reduce((s,g)=>s+(compSet[a][g]||0),0),sb=topFam.reduce((s,g)=>s+(compSet[b][g]||0),0);return sb-sa;});
-  let maxv=0;compArr.forEach(c=>topFam.forEach(g=>{maxv=Math.max(maxv,compSet[c][g]||0);}));
-  let h='<table style="border-collapse:collapse;font-size:12px;width:100%;min-width:520px"><tr><th style="padding:6px 8px;text-align:left;color:#6b7a99;font-size:11px;font-weight:700">Comprador</th>'+
-    topFam.map(g=>`<th style="padding:6px 8px;text-align:center;color:#6b7a99;font-size:11px;font-weight:700">${g}</th>`).join('')+'</tr>';
-  compArr.forEach(c=>{h+=`<tr><td style="padding:6px 8px;color:#1a2035;font-weight:600;white-space:nowrap">${S2N(c)}</td>`;
-    topFam.forEach(g=>{const v=compSet[c][g]||0;const t=maxv?v/maxv:0;
-      const bg=v===0?'transparent':'rgba(153,60,29,'+(0.12+t*0.72)+')';const tc=t>0.45?'#fff':'#1a2035';
-      h+=`<td style="padding:6px 8px;text-align:center;background:${bg};color:${v===0?'#c9d4f0':tc};border:0.5px solid #edf0f7;font-variant-numeric:tabular-nums">${v===0?'·':Math.round(v).toLocaleString()}</td>`;});
-    h+='</tr>';});
-  h+='</table>';
-  document.getElementById('sob-heat').innerHTML=compArr.length?h:'<p style="color:#6b7a99;padding:16px;font-size:13px">Sin datos para el filtro seleccionado.</p>';
-  // Severidad (meses-clave y nº de claves por rango)
-  const bins={'0-3':0,'3-6':0,'6-12':0,'12-24':0,'24+':0};
-  const binsN={'0-3':0,'3-6':0,'6-12':0,'12-24':0,'24+':0};
-  rows.forEach(r=>{const b=r.ex<3?'0-3':r.ex<6?'3-6':r.ex<12?'6-12':r.ex<24?'12-24':'24+';bins[b]+=r.ex;binsN[b]++;});
-  const sevN=Object.values(binsN);
-  mCL('sob-sev-chart','bar',{labels:Object.keys(bins).map((k,i)=>k+' ('+sevN[i]+')'),datasets:[{data:Object.values(bins).map(v=>+v.toFixed(0)),backgroundColor:['#1baf7a','#fab219','#eb6834','#d03b3b','#a32d2d'],borderRadius:4,barThickness:46,_barLabels:sevN.map(n=>n+' claves')}]},
-    {responsive:true,maintainAspectRatio:false,layout:{padding:{top:22}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>[c.parsed.y.toLocaleString()+' meses-clave',sevN[c.dataIndex]+' claves en este rango']}}},
-     scales:{x:{ticks:{color:'#6b7a99'},grid:{display:false},title:{display:true,text:'Rango de exceso por clave',color:'#6b7a99',font:{size:10}}},y:{ticks:{color:'#6b7a99'},grid:{color:'#edf0f7'},title:{display:true,text:'Meses-clave',color:'#6b7a99',font:{size:10}}}}});
-  // Promedio por comprador
-  const compAgg={};rows.forEach(r=>{(compAgg[r.c]=compAgg[r.c]||{s:0,n:0});compAgg[r.c].s+=r.ex;compAgg[r.c].n++;});
-  const compProm=Object.entries(compAgg).map(([c,v],i)=>({n:S2N(c),v:+(v.s/v.n).toFixed(2),n2:v.n,col:PAL[i%PAL.length]})).sort((a,b)=>b.v-a.v);
-  mCL('sob-prom-chart','bar',{labels:compProm.map(x=>x.n),datasets:[{data:compProm.map(x=>x.v),backgroundColor:compProm.map(x=>x.col),borderRadius:5,_barLabels:compProm.map(x=>x.n2+' claves')}]},
-    {indexAxis:'y',responsive:true,maintainAspectRatio:false,layout:{padding:{right:60}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'+'+c.parsed.x.toFixed(2)+' meses prom. ('+compProm[c.dataIndex].n2+' claves)'}}},
-     scales:{x:{ticks:{color:'#6b7a99'},grid:{color:'#edf0f7'},title:{display:true,text:'Meses de exceso (promedio por clave)',color:'#6b7a99',font:{size:10}}},y:{ticks:{color:'#4a5568',font:{size:11}},grid:{display:false}}}});
-}
 function rkC(id,rk){if(!rk.length){const e=document.getElementById(id);if(e)e.parentElement.innerHTML='<p style="color:#6b7a99;text-align:center;padding:20px;font-size:13px">Sin faltantes</p>';return;}mC(id,'bar',{labels:rk.map(d=>d.n),datasets:[{label:'Faltantes',data:rk.map(d=>d.v),backgroundColor:rk.map(d=>d.c),borderRadius:5}]},{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#fff',titleColor:'#1a2035',bodyColor:'#4a5568',borderColor:'#e2e6ed',borderWidth:1,callbacks:{label:c=>'  '+c.parsed.x}}},scales:{x:{ticks:{color:'#6b7a99'},grid:{color:'#edf0f7'}},y:{ticks:{color:'#4a5568',font:{size:11}},grid:{color:'#edf0f7'}}}});}
 function renderCharts(){
   const{fechas,compradores,totalByDay,clasByDay,clavesTotal,compByDay,compClByDay,uf}=G;
@@ -1177,14 +967,13 @@ function llenarMesesRes(){
   sel.innerHTML=ms.slice().reverse().map(m=>`<option value="${m}">${mesLbl(m)}</option>`).join('');
   sel.value=(G&&G.mA)||ms[ms.length-1];
 }
-
 function renderRes(){
   if(!G.compradores) return;
   const selMes=document.getElementById('r-mes');
   const mSel=(selMes&&selMes.value)||G.mA;
-  const calc=calcResMes(mSel)||{CDATA:G.CDATA||{},AREA:G.AREA||{},cierre:G.uf,cierrePrev:null,mSel:G.mA,mPrev:G.mAn};
+  const calc=calcResMes(mSel)||{CDATA:G.CDATA,AREA:G.AREA,cierre:G.uf,cierrePrev:null,mSel:G.mA,mPrev:G.mAn};
   const compradores=G.compradores;
-  const CDATA=(calc&&calc.CDATA)||G.CDATA||{}, AREA=(calc&&calc.AREA)||G.AREA||{};
+  const CDATA=calc?calc.CDATA:G.CDATA, AREA=calc?calc.AREA:G.AREA;
   // Encabezados dinámicos según el mes elegido
   if(calc&&calc.cierre){
     const thA=document.getElementById('th-ant'),thH=document.getElementById('th-act');
@@ -1857,7 +1646,7 @@ function expRskExcelAll(){
 
 // ── TABS ──────────────────────────────────────────────────────────────────────
 function showTab(id,btn){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));document.getElementById('panel-'+id).classList.add('on');btn.classList.add('on');}
-function showSub(id,btn){document.querySelectorAll('#cn-falt .spanel').forEach(p=>p.classList.remove('on'));document.querySelectorAll('#cn-falt .subtabs .stab').forEach(b=>b.classList.remove('on'));document.getElementById('sp-'+id).classList.add('on');btn.classList.add('on');}
+function showSub(id,btn){document.querySelectorAll('.spanel').forEach(p=>p.classList.remove('on'));document.querySelectorAll('.stab').forEach(b=>b.classList.remove('on'));document.getElementById('sp-'+id).classList.add('on');btn.classList.add('on');}
 
 // ── AUTO-INIT ─────────────────────────────────────────────────────────────────
 window.addEventListener('load',async function(){
