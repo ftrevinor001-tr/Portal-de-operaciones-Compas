@@ -411,6 +411,10 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
 .chip-nocolocada{background:var(--red-bg);color:var(--red);font-size:10px;padding:3px 9px;border-radius:20px;font-weight:700;white-space:nowrap}
 .chip-sindato{background:#f0eeea;color:var(--tx3);font-size:10px;padding:3px 9px;border-radius:20px;font-weight:600;white-space:nowrap}
 .chip-pendiente{background:var(--purple-bg);color:var(--purple);font-size:10px;padding:3px 9px;border-radius:20px;font-weight:700;white-space:nowrap}
+
+/* Separación de columnas de la tabla de detalle por pestaña */
+#otif-detalle-wrap[data-mode="otif"] .sc-target{display:none}
+#otif-detalle-wrap[data-mode="target"] .sc-otif{display:none}
 </style>
 </head>
 <body>
@@ -645,7 +649,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
     <!-- Detail table -->
     <div class="tbl-card" id="otif-detalle-wrap">
       <div class="tbl-top">
-        <h3>Detalle de Líneas de Pedido</h3>
+        <h3>Detalle de Líneas de Pedido <span id="otif-tabla-modo" style="font-size:11px;font-weight:400;color:var(--tx2)"></span></h3>
         <span id="otif-row-count"></span>
         <button class="export-btn" onclick="exportOTIF()" style="margin-left:auto">⬇ Exportar Excel</button>
       </div>
@@ -674,32 +678,32 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
         <table>
           <thead>
             <tr class="sec-hdr">
-              <th colspan="5" style="background:#1c3557">IDENTIFICACIÓN</th>
-              <th colspan="4" style="background:#8b1a1a">TARGET DE COMPRADOR</th>
-              <th colspan="8" style="background:#0e4d72">OTIF DE PROVEEDOR</th>
-              <th colspan="3" style="background:#1a5c45">LEAD TIME</th>
+              <th colspan="5" class="sc-ident" style="background:#1c3557">IDENTIFICACIÓN</th>
+              <th colspan="4" class="sc-target" style="background:#8b1a1a">TARGET DE COMPRADOR</th>
+              <th colspan="8" class="sc-otif" style="background:#0e4d72">OTIF DE PROVEEDOR</th>
+              <th colspan="3" class="sc-otif" style="background:#1a5c45">LEAD TIME</th>
             </tr>
             <tr>
-              <th data-ocol="oc"      style="width:72px">OC<span class="sarr">↕</span></th>
-              <th data-ocol="clave"   style="width:62px">Clave<span class="sarr">↕</span></th>
-              <th data-ocol="desc"    style="min-width:175px">Descripción<span class="sarr">↕</span></th>
-              <th data-ocol="prov"    style="width:80px">Proveedor<span class="sarr">↕</span></th>
-              <th data-ocol="qty"     class="num" style="width:54px">Cant.<span class="sarr">↕</span></th>
-              <th data-ocol="foc"     class="ctr" style="width:90px">F. OC Real<span class="sarr">↕</span></th>
-              <th data-ocol="freq"    class="ctr" style="width:90px">F. Requerida<span class="sarr">↕</span></th>
-              <th data-ocol="difDias" class="num" style="width:72px">Dif. días<span class="sarr">↕</span></th>
-              <th data-ocol="otifC"   class="ctr" style="width:110px">Target<span class="sarr">↕</span></th>
-              <th data-ocol="entregaSol" class="ctr" style="width:96px">Entrega Sol.<span class="sarr">↕</span></th>
-              <th data-ocol="eta"     class="ctr" style="width:90px">ETA Estimada<span class="sarr">↕</span></th>
-              <th data-ocol="etaR"    class="ctr" style="width:88px">ETA Real<span class="sarr">↕</span></th>
-              <th data-ocol="difEntrega" class="num" style="width:76px">Dif. días<span class="sarr">↕</span></th>
-              <th data-ocol="otifE"   class="ctr" style="width:90px">On Time<span class="sarr">↕</span></th>
-              <th data-ocol="recibReal" class="num" style="width:80px">Cant. Recibida<span class="sarr">↕</span></th>
-              <th data-ocol="ifOk"    class="ctr" style="width:88px">In Full<span class="sarr">↕</span></th>
-              <th data-ocol="obs"     style="min-width:130px">Observaciones<span class="sarr">↕</span></th>
-              <th data-ocol="ltEstimado" class="num" style="width:80px">LT Estim. (m)<span class="sarr">↕</span></th>
-              <th data-ocol="ltReal"     class="num" style="width:80px">LT Real (m)<span class="sarr">↕</span></th>
-              <th data-ocol="ltDif"      class="num" style="width:80px">Dif. LT (m)<span class="sarr">↕</span></th>
+              <th data-ocol="oc" data-sec="ident" class="sc-ident"      style="width:72px">OC<span class="sarr">↕</span></th>
+              <th data-ocol="clave" data-sec="ident" class="sc-ident"   style="width:62px">Clave<span class="sarr">↕</span></th>
+              <th data-ocol="desc" data-sec="ident" class="sc-ident"    style="min-width:175px">Descripción<span class="sarr">↕</span></th>
+              <th data-ocol="prov" data-sec="ident" class="sc-ident"    style="width:80px">Proveedor<span class="sarr">↕</span></th>
+              <th data-ocol="qty" data-sec="ident"     class="sc-ident num" style="width:54px">Cant.<span class="sarr">↕</span></th>
+              <th data-ocol="foc" data-sec="target"     class="sc-target ctr" style="width:90px">F. OC Real<span class="sarr">↕</span></th>
+              <th data-ocol="freq" data-sec="target"    class="sc-target ctr" style="width:90px">F. Requerida<span class="sarr">↕</span></th>
+              <th data-ocol="difDias" data-sec="target" class="sc-target num" style="width:72px">Dif. días<span class="sarr">↕</span></th>
+              <th data-ocol="otifC" data-sec="target"   class="sc-target ctr" style="width:110px">Target<span class="sarr">↕</span></th>
+              <th data-ocol="entregaSol" data-sec="otif" class="sc-otif ctr" style="width:96px">Entrega Sol.<span class="sarr">↕</span></th>
+              <th data-ocol="eta" data-sec="otif"     class="sc-otif ctr" style="width:90px">ETA Estimada<span class="sarr">↕</span></th>
+              <th data-ocol="etaR" data-sec="otif"    class="sc-otif ctr" style="width:88px">ETA Real<span class="sarr">↕</span></th>
+              <th data-ocol="difEntrega" data-sec="otif" class="sc-otif num" style="width:76px">Dif. días<span class="sarr">↕</span></th>
+              <th data-ocol="otifE" data-sec="otif"   class="sc-otif ctr" style="width:90px">On Time<span class="sarr">↕</span></th>
+              <th data-ocol="recibReal" data-sec="otif" class="sc-otif num" style="width:80px">Cant. Recibida<span class="sarr">↕</span></th>
+              <th data-ocol="ifOk" data-sec="otif"    class="sc-otif ctr" style="width:88px">In Full<span class="sarr">↕</span></th>
+              <th data-ocol="obs" data-sec="otif" class="sc-otif"     style="min-width:130px">Observaciones<span class="sarr">↕</span></th>
+              <th data-ocol="ltEstimado" data-sec="otif" class="sc-otif num" style="width:80px">LT Estim. (m)<span class="sarr">↕</span></th>
+              <th data-ocol="ltReal" data-sec="otif"     class="sc-otif num" style="width:80px">LT Real (m)<span class="sarr">↕</span></th>
+              <th data-ocol="ltDif" data-sec="otif"      class="sc-otif num" style="width:80px">Dif. LT (m)<span class="sarr">↕</span></th>
             </tr>
           </thead>
           <tbody id="otif-tbody"></tbody>
@@ -1882,9 +1886,14 @@ function aplicarVistaOtif(tab){
   const filaRecep=document.getElementById('filtro-mes-recep');
   if(filaOC)filaOC.style.display=esTarget?'':'none';
   if(filaRecep)filaRecep.style.display=esOtif?'':'none';
-  // Tabla de detalle de líneas: solo en OTIF-Proveedor
+  // Tabla de detalle: visible en AMBAS pestañas, pero con columnas distintas según el modo
   const detalle=document.getElementById('otif-detalle-wrap');
-  if(detalle)detalle.style.display=esOtif?'':'none';
+  if(detalle){
+    detalle.style.display=(esOtif||esTarget)?'':'none';
+    detalle.setAttribute('data-mode',esTarget?'target':'otif');
+    const modoLbl=document.getElementById('otif-tabla-modo');
+    if(modoLbl)modoLbl.textContent=esTarget?'· Target de Comprador':'· OTIF de Proveedor';
+  }
 }
 function switchMainTab(tab){
   currentMainTab=tab;
@@ -1997,7 +2006,9 @@ function otifByOC(){
 }
 // Full: + Clave (for table)
 function filteredOTIF(){
-  return otifByOC().filter(d=>!otifClave||d.clave===otifClave);
+  // La tabla usa la base del lado activo: Target→baseTarget (Mes OC), OTIF→baseOtifProv (Mes Recepción)
+  const base=(currentMainTab==='target')?baseTarget():baseOtifProv();
+  return base.filter(d=>(!otifOC||d.oc===otifOC)&&(!otifClave||d.clave===otifClave));
 }
 // Target data: all orders filtered by month of foc (fecha OC)
 function targetData(){
@@ -2455,26 +2466,26 @@ function renderOTIFTable(data){
   document.getElementById('otif-tbody').innerHTML=sorted.map(d=>{
     const rec=d.estatus==='RECIBIDO';
     return`<tr>
-      <td class="id-c">${d.oc}</td>
-      <td class="id-c">${d.clave}</td>
-      <td style="white-space:normal;word-break:break-word;max-width:200px;font-size:10px">${d.desc}</td>
-      <td>${pChip(d)}</td>
-      <td class="num">${d.qty||'—'}</td>
-      <td class="ctr" style="font-size:10px">${fmtDate(d.foc)||'—'}</td>
-      <td class="ctr" style="font-size:10px">${fmtDate(d.freq)||'—'}</td>
-      <td class="num">${difDiasCell(d)}</td>
-      <td class="ctr">${chipTarget(d.otifC)}</td>
-      <td class="ctr" style="font-size:10px">${fmtDate(d.entregaSol)||'—'}</td>
-      <td class="ctr" style="font-size:10px">${d.eta?fmtDate(d.eta):'—'}</td>
-      <td class="ctr" style="font-size:10px">${etaRealCell(d)}</td>
-      <td class="num">${difEntregaCell(d)}</td>
-      <td class="ctr">${chipOnTime(d.otifE,rec)}</td>
-      <td class="num">${cantRecibCell(d)}</td>
-      <td class="ctr">${chipIF(d.ifOk,rec)}</td>
-      <td style="white-space:normal;word-break:break-word;font-size:11px;color:var(--tx2)">${d.obs||'—'}</td>
-      <td class="num" style="font-size:11px">${d.ltEstimado!=null?d.ltEstimado+'m':'<span class="dash">—</span>'}</td>
-      <td class="num" style="font-size:11px;font-weight:600">${d.ltReal!==null?d.ltReal+'m':'<span class="dash">—</span>'}</td>
-      <td class="num" style="font-size:11px;font-weight:700;color:${d.ltDif===null?'var(--tx3)':d.ltDif<=0?'var(--green)':d.ltDif<=1?'var(--amber)':'var(--red)'}">${d.ltDif!==null?(d.ltDif>0?'+':'')+d.ltDif+'m':'<span class="dash">—</span>'}</td>
+      <td class="id-c sc-ident">${d.oc}</td>
+      <td class="id-c sc-ident">${d.clave}</td>
+      <td class="sc-ident" style="white-space:normal;word-break:break-word;max-width:200px;font-size:10px">${d.desc}</td>
+      <td class="sc-ident">${pChip(d)}</td>
+      <td class="num sc-ident">${d.qty||'—'}</td>
+      <td class="ctr sc-target" style="font-size:10px">${fmtDate(d.foc)||'—'}</td>
+      <td class="ctr sc-target" style="font-size:10px">${fmtDate(d.freq)||'—'}</td>
+      <td class="num sc-target">${difDiasCell(d)}</td>
+      <td class="ctr sc-target">${chipTarget(d.otifC)}</td>
+      <td class="ctr sc-otif" style="font-size:10px">${fmtDate(d.entregaSol)||'—'}</td>
+      <td class="ctr sc-otif" style="font-size:10px">${d.eta?fmtDate(d.eta):'—'}</td>
+      <td class="ctr sc-otif" style="font-size:10px">${etaRealCell(d)}</td>
+      <td class="num sc-otif">${difEntregaCell(d)}</td>
+      <td class="ctr sc-otif">${chipOnTime(d.otifE,rec)}</td>
+      <td class="num sc-otif">${cantRecibCell(d)}</td>
+      <td class="ctr sc-otif">${chipIF(d.ifOk,rec)}</td>
+      <td class="sc-otif" style="white-space:normal;word-break:break-word;font-size:11px;color:var(--tx2)">${d.obs||'—'}</td>
+      <td class="num sc-otif" style="font-size:11px">${d.ltEstimado!=null?d.ltEstimado+'m':'<span class="dash">—</span>'}</td>
+      <td class="num sc-otif" style="font-size:11px;font-weight:600">${d.ltReal!==null?d.ltReal+'m':'<span class="dash">—</span>'}</td>
+      <td class="num sc-otif" style="font-size:11px;font-weight:700;color:${d.ltDif===null?'var(--tx3)':d.ltDif<=0?'var(--green)':d.ltDif<=1?'var(--amber)':'var(--red)'}">${d.ltDif!==null?(d.ltDif>0?'+':'')+d.ltDif+'m':'<span class="dash">—</span>'}</td>
     </tr>`;
   }).join('');
 }
