@@ -132,7 +132,7 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
   <div class="header" style="padding:10px 20px;margin-bottom:12px">
     <div class="htop">
       <div class="sub" id="sub" style="margin:0"></div>
-      <span class="badge" id="bdg"></span>
+      <span class="badge" id="bdg"></span><span style="font-size:9px;color:#c9d4f0;margin-left:6px">v-tabs2</span>
     </div>
     <div class="date-bar">
       <span style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase;letter-spacing:.6px">📅 Rango</span>
@@ -1861,7 +1861,23 @@ function expRskExcelAll(){
 }
 
 // ── TABS ──────────────────────────────────────────────────────────────────────
-function showTab(id,btn){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));document.getElementById('panel-'+id).classList.add('on');btn.classList.add('on');}
+function showTab(id,btn){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
+  const panel=document.getElementById('panel-'+id);
+  if(!panel){console.error('Panel no encontrado: panel-'+id);return;}
+  panel.classList.add('on');
+  panel.style.display='block';   // forzar visibilidad por si el CSS falla
+  if(btn)btn.classList.add('on');
+  // Re-render de la sección al mostrarla (por si no se dibujó al cargar)
+  try{
+    if(id==='resumen'&&typeof renderRes==='function')renderRes();
+    if(id==='detalle'){if(typeof initDet==='function')initDet();if(typeof renderDet==='function')renderDet();}
+    if(id==='comp'){if(typeof initCmp==='function')initCmp();if(typeof renderCmp==='function')renderCmp();}
+    if(id==='clasif'){if(typeof renderRsk==='function')renderRsk();}
+  }catch(e){console.error('re-render '+id+':',e);}
+}
+window.showTab=showTab;
 function showSub(id,btn){document.querySelectorAll('#cn-falt .spanel').forEach(p=>p.classList.remove('on'));document.querySelectorAll('#cn-falt .subtabs .stab').forEach(b=>b.classList.remove('on'));document.getElementById('sp-'+id).classList.add('on');btn.classList.add('on');}
 
 // ── AUTO-INIT ─────────────────────────────────────────────────────────────────
