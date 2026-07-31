@@ -588,19 +588,13 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
         <select class="msel" id="otif-status-sel"><option value="">Todos</option></select>
         <div class="filter-sep"></div>
         <span id="filtro-mes-oc" style="display:flex;align-items:center;gap:5px">
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
-          <input type="checkbox" id="chk-month-oc" checked onchange="toggleOtifMonthFilter('oc',this.checked);renderOTIF()" style="width:14px;height:14px;accent-color:var(--navy)">
-          <span class="tb-lbl" style="cursor:pointer" title="Filtra por mes de colocación de la OC — Target de Comprador">🎯 Mes OC <span style="font-weight:400;opacity:.65;font-size:9px">(Ctrl+clic)</span></span>
-        </label>
-        <select class="msel" id="otif-month-sel" multiple size="3" style="min-width:130px;font-size:11px" title="Ctrl/Cmd+clic para varios meses"></select>
+          <span class="tb-lbl" title="Filtra por mes de colocación de la OC">🎯 Mes OC <span style="font-weight:400;opacity:.65;font-size:9px">(Ctrl+clic · vacío = todos)</span></span>
+          <select class="msel" id="otif-month-sel" multiple size="3" style="min-width:130px;font-size:11px" title="Ctrl/Cmd+clic para varios meses; sin selección muestra todos"></select>
         </span>
         <div class="filter-sep"></div>
         <span id="filtro-mes-recep" style="display:flex;align-items:center;gap:5px">
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
-          <input type="checkbox" id="chk-month-recep" checked onchange="toggleOtifMonthFilter('recep',this.checked);renderOTIF()" style="width:14px;height:14px;accent-color:var(--navy)">
-          <span class="tb-lbl" style="cursor:pointer" title="Filtra por mes de recepción real ETA Real — OTIF de Proveedor">📦 Mes Recepción <span style="font-weight:400;opacity:.65;font-size:9px">(Ctrl+clic)</span></span>
-        </label>
-        <select class="msel" id="otif-month-recep-sel" multiple size="3" style="min-width:130px;font-size:11px" title="Ctrl/Cmd+clic para varios meses"></select>
+          <span class="tb-lbl" title="Filtra por mes de recepción real (ETA Real)">📦 Mes Recepción <span style="font-weight:400;opacity:.65;font-size:9px">(Ctrl+clic · vacío = todos)</span></span>
+          <select class="msel" id="otif-month-recep-sel" multiple size="3" style="min-width:130px;font-size:11px" title="Ctrl/Cmd+clic para varios meses; sin selección muestra todos"></select>
         </span>
         <button class="clear-btn" id="otif-clear-top" style="margin-left:8px">✕ Limpiar</button>
       </div>
@@ -1973,8 +1967,8 @@ function otifByProvStatus(){
   return OTIF_DATA.filter(d=>{
     if(otifProv&&d.prov!==otifProv)return false;
     if(otifStatus&&d.estatus!==otifStatus)return false;
-    if(otifMonthOcEnabled&&otifMonth.length&&!otifMonth.includes(mKey(d.foc)))return false;
-    if(otifMonthRecepEnabled&&otifMonthRecep.length&&d.etaR&&!otifMonthRecep.includes(mKey(d.etaR)))return false;
+    if(otifMonth.length&&!otifMonth.includes(mKey(d.foc)))return false;
+    if(otifMonthRecep.length&&d.etaR&&!otifMonthRecep.includes(mKey(d.etaR)))return false;
     return true;
   });
 }
@@ -2012,17 +2006,7 @@ function updateOTIFStatusOptions(){
   ss.className='msel'+(otifStatus?' msel-active':'');
   ss.onchange=()=>{otifStatus=ss.value;otifOC='';otifClave='';updateOTIFMonthOptions();renderOTIF();};
 }
-function toggleOtifMonthFilter(type,enabled){
-  if(type==='oc'){
-    otifMonthOcEnabled=enabled;
-    const sel=document.getElementById('otif-month-sel');
-    if(sel) sel.style.opacity=enabled?'1':'0.35';
-  } else {
-    otifMonthRecepEnabled=enabled;
-    const sel=document.getElementById('otif-month-recep-sel');
-    if(sel) sel.style.opacity=enabled?'1':'0.35';
-  }
-}
+function toggleOtifMonthFilter(){/* checkboxes eliminados: el filtro de mes se controla solo con el selector */}
 function updateOTIFMonthOptions(){
   // Combine months from foc and etaR
   const keys=new Set();
@@ -2049,12 +2033,9 @@ function updateOTIFMonthRecepOptions(){
     if(d.etaR)keys.add(mKey(d.etaR));
   });
   const sorted=[...keys].filter(Boolean).sort();
-  if(!otifMonthRecepInited){
-    otifMonthRecep=sorted.length?[sorted[sorted.length-1]]:[];
-    otifMonthRecepInited=true;
-  } else {
-    otifMonthRecep=otifMonthRecep.filter(k=>sorted.includes(k));
-  }
+  // Sin preselección: vacío = todos los meses
+  otifMonthRecep=otifMonthRecep.filter(k=>sorted.includes(k));
+  otifMonthRecepInited=true;
   const ms=document.getElementById('otif-month-recep-sel');
   if(!ms)return;
   ms.innerHTML=sorted.map(k=>`<option value="${k}"${otifMonthRecep.includes(k)?' selected':''}>${mLabel(k)}</option>`).join('');
@@ -2243,8 +2224,8 @@ function renderOTIF(){
   renderOCCards(OTIF_DATA.filter(d=>{
     if(otifProv&&d.prov!==otifProv)return false;
     if(otifStatus&&d.estatus!==otifStatus)return false;
-    if(otifMonthOcEnabled&&otifMonth.length&&!otifMonth.includes(mKey(d.foc)))return false;
-    if(otifMonthRecepEnabled&&otifMonthRecep.length&&d.etaR&&!otifMonthRecep.includes(mKey(d.etaR)))return false;
+    if(otifMonth.length&&!otifMonth.includes(mKey(d.foc)))return false;
+    if(otifMonthRecep.length&&d.etaR&&!otifMonthRecep.includes(mKey(d.etaR)))return false;
     return true;
   }));
   if(!ocVisible){const g=document.getElementById('oc-cards');if(g)g.style.display='none';}
@@ -2264,9 +2245,6 @@ function buildOTIFFilters(){
   // Clear top filters
   document.getElementById('otif-clear-top').onclick=()=>{
     otifProv='';otifStatus='';otifMonth=[];otifMonthInited=false;otifMonthRecep=[];otifMonthRecepInited=false;otifOC='';otifClave='';
-    otifMonthOcEnabled=true;otifMonthRecepEnabled=true;
-    const chkOc=document.getElementById('chk-month-oc');if(chkOc)chkOc.checked=true;
-    const chkRec=document.getElementById('chk-month-recep');if(chkRec)chkRec.checked=true;
     document.getElementById('otif-prov-sel').dataset.built='';
     buildOTIFFilters();renderOTIF();
   };
