@@ -415,6 +415,14 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
 /* Separación de columnas de la tabla de detalle por pestaña */
 #otif-detalle-wrap[data-mode="otif"] .sc-target{display:none}
 #otif-detalle-wrap[data-mode="target"] .sc-otif{display:none}
+
+/* Tabla de detalle compacta y ajustada al ancho por pestaña */
+#otif-detalle-wrap table{table-layout:auto;width:100%;font-size:11px}
+#otif-detalle-wrap table th,#otif-detalle-wrap table td{padding:5px 7px;font-size:11px;white-space:nowrap}
+#otif-detalle-wrap table td[style*="white-space:normal"]{white-space:normal}
+#otif-detalle-wrap .tbl-scroll{overflow-x:auto}
+/* En modo separado, las columnas visibles ocupan todo el ancho */
+#otif-detalle-wrap[data-mode="otif"] table,#otif-detalle-wrap[data-mode="target"] table{min-width:0}
 </style>
 </head>
 <body>
@@ -580,11 +588,11 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
   <div id="tab-otif" style="display:none">
 
     <!-- KPI sections: Target de Comprador | OTIF de Proveedor -->
-    <div id="otif-kpis"></div>
-
-    <!-- Filters: dropdowns cascading + month -->
-    <div class="filter-section" style="margin-bottom:16px">
-      <div class="filter-row">
+    <div style="display:flex;gap:14px;align-items:stretch;flex-wrap:wrap;margin-bottom:16px">
+      <div id="otif-kpis" style="flex:1 1 auto;min-width:340px"></div>
+      <!-- Filters al lado de las tarjetas -->
+      <div class="filter-section" id="otif-filtros-box" style="margin-bottom:0;flex:0 0 auto;display:flex;align-items:center;min-width:260px">
+      <div class="filter-row" style="flex-direction:column;align-items:flex-start;gap:8px">
         <span class="tb-lbl">Proveedor:</span>
         <select class="msel" id="otif-prov-sel"><option value="">Todos</option></select>
         <div class="filter-sep"></div>
@@ -603,6 +611,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
         <button class="clear-btn" id="otif-clear-top" style="margin-left:8px">✕ Limpiar</button>
       </div>
     </div>
+    </div><!-- fin wrapper KPIs+filtros -->
 
 
     <!-- ── TREND ANALYSIS SECTION ── -->
@@ -712,16 +721,9 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
     </div>
     <div class="footer" id="otif-footer"></div>
     <!-- OTIF Methodology note -->
-    <div id="otif-metodologia" style="margin-top:14px;background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:16px 20px;font-size:11px;color:var(--tx2);line-height:1.7">
+    <div id="metodologia-otif" style="margin-top:14px;background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:16px 20px;font-size:11px;color:var(--tx2);line-height:1.7">
       <div style="font-size:12px;font-weight:700;color:var(--tx);margin-bottom:10px;border-bottom:1px solid var(--brd);padding-bottom:6px">📐 Metodología de cálculo</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-        <div>
-          <div style="font-weight:700;color:var(--navy);margin-bottom:4px">🎯 Target de Comprador — por Orden de Compra</div>
-          <p>Mide si el comprador colocó la OC dentro de los <b>5 días naturales</b> posteriores a que la alarma disparó (Fecha Requerida). Se agrupa por OC: una orden <b>cumple</b> si ≥ 95 % de sus líneas cumplen: <em>Fecha OC Real ∈ [Fecha Requerida, Fecha Requerida + 5 días]</em>.</p>
-          <p style="margin-top:4px">Colocar la OC <b>antes</b> de que la alarma dispare también cuenta como <b>Fuera de tiempo</b> (datos no actualizados). El campo <em>Dif. días</em> muestra: negativo = antes de alarma, 0–5 = en tiempo, &gt;5 = tarde.</p>
-          <p style="margin-top:6px"><b>Indicador:</b> % de OCs que cumplen / total de OCs del período.<br><b>Período:</b> se filtra por el mes de la Fecha Requerida.</p>
-        </div>
-        <div>
+      <div>
           <div style="font-weight:700;color:var(--navy);margin-bottom:4px">📦 OTIF de Proveedor — métricas de entrega</div>
           <p><b>On Time</b> — por OC: una orden cumple si el ≥ 95 % de sus líneas recibidas llegaron en o antes de la ETA estimada (<em>OTIF Entrega = EN TIEMPO</em>).<br>
           Indicador: % de OCs recibidas que cumplen / total de OCs recibidas.</p>
@@ -731,19 +733,18 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
           Indicador: % de OCs que cumplen ambas / total de OCs recibidas.<br>
           <b>Período:</b> se filtra por el mes de recepción (ETA Real).</p>
         </div>
-      </div>
       <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--brd);color:var(--tx3);font-size:10px">
         ⚠️ El umbral del 95 % permite que una línea menor con error no penalice la OC completa. Una OC con 20 líneas necesita que al menos 19 cumplan para contarse como exitosa.
       </div>
-      <div style="margin-top:14px;padding-top:12px;border-top:2px solid var(--brd)">
-        <div style="font-weight:700;color:var(--purple);margin-bottom:4px">🎯 Precisión del Pedido Propuesto — Cálculo vs. Real</div>
-        <p>Compara la <b>cantidad que el sistema proponía</b> al momento de levantar la OC (capturada manualmente) contra la <b>cantidad real</b> con que se colocó. Requiere llenar 2 columnas nuevas en la hoja <em>OTIF PEDIDOS</em> del Excel, después de Observaciones:</p>
-        <ul style="margin:6px 0 6px 18px;padding:0">
-          <li><b>Cantidad Propuesta</b> (columna X) — valor de "Asignación" que mostraba el sistema el día que se generó la OC.</li>
-          <li><b>Motivo</b> (columna Y) — obligatorio si Real = 0 o si la desviación supera ±20%. Usar uno de: <em>ERROR DE CALCULO, NO CUMPLE CANTIDAD MINIMA, VARIACION DE PRECIO, DECISION DE GERENCIA, OTRO</em>.</li>
-        </ul>
-        <p><b>Clasificación:</b> Real = 0 → <em>No colocada</em> · desviación ≤ ±20% → <em>Acertada</em> · desviación &gt; ±20% → <em>Desviada</em>. Cada motivo se traduce automáticamente a un responsable (Planeación, Proveedor, Compras o Gerencia).</p>
-      </div>
+    </div>
+    <div id="metodologia-target" style="display:none;margin-top:14px;background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:16px 20px;font-size:11px;color:var(--tx2);line-height:1.7">
+      <div style="font-size:12px;font-weight:700;color:var(--tx);margin-bottom:10px;border-bottom:1px solid var(--brd);padding-bottom:6px">📐 Metodología de cálculo</div>
+      <div>
+          <div style="font-weight:700;color:var(--navy);margin-bottom:4px">🎯 Target de Comprador — por Orden de Compra</div>
+          <p>Mide si el comprador colocó la OC dentro de los <b>5 días naturales</b> posteriores a que la alarma disparó (Fecha Requerida). Se agrupa por OC: una orden <b>cumple</b> si ≥ 95 % de sus líneas cumplen: <em>Fecha OC Real ∈ [Fecha Requerida, Fecha Requerida + 5 días]</em>.</p>
+          <p style="margin-top:4px">Colocar la OC <b>antes</b> de que la alarma dispare también cuenta como <b>Fuera de tiempo</b> (datos no actualizados). El campo <em>Dif. días</em> muestra: negativo = antes de alarma, 0–5 = en tiempo, &gt;5 = tarde.</p>
+          <p style="margin-top:6px"><b>Indicador:</b> % de OCs que cumplen / total de OCs del período.<br><b>Período:</b> se filtra por el mes de la Fecha Requerida.</p>
+        </div>
     </div>
   </div><!-- /tab-otif -->
 
@@ -835,6 +836,19 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
     </div>
     <div class="footer" id="prec-footer"></div>
 
+  
+    <div id="metodologia-prec" style="margin-top:14px;background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:16px 20px;font-size:11px;color:var(--tx2);line-height:1.7">
+      <div style="font-size:12px;font-weight:700;color:var(--tx);margin-bottom:10px;border-bottom:1px solid var(--brd);padding-bottom:6px">📐 Metodología de cálculo</div>
+      <div style="margin-top:14px;padding-top:12px;border-top:2px solid var(--brd)">
+        <div style="font-weight:700;color:var(--purple);margin-bottom:4px">🎯 Precisión del Pedido Propuesto — Cálculo vs. Real</div>
+        <p>Compara la <b>cantidad que el sistema proponía</b> al momento de levantar la OC (capturada manualmente) contra la <b>cantidad real</b> con que se colocó. Requiere llenar 2 columnas nuevas en la hoja <em>OTIF PEDIDOS</em> del Excel, después de Observaciones:</p>
+        <ul style="margin:6px 0 6px 18px;padding:0">
+          <li><b>Cantidad Propuesta</b> (columna X) — valor de "Asignación" que mostraba el sistema el día que se generó la OC.</li>
+          <li><b>Motivo</b> (columna Y) — obligatorio si Real = 0 o si la desviación supera ±20%. Usar uno de: <em>ERROR DE CALCULO, NO CUMPLE CANTIDAD MINIMA, VARIACION DE PRECIO, DECISION DE GERENCIA, OTRO</em>.</li>
+        </ul>
+        <p><b>Clasificación:</b> Real = 0 → <em>No colocada</em> · desviación ≤ ±20% → <em>Acertada</em> · desviación &gt; ±20% → <em>Desviada</em>. Cada motivo se traduce automáticamente a un responsable (Planeación, Proveedor, Compras o Gerencia).</p>
+      </div>
+    </div>
   </div><!-- /tab-prec -->
 
 
@@ -1878,8 +1892,9 @@ function aplicarVistaOtif(tab){
   show('target-trend-section',esTarget);
   // Tarjetas de OC (OTIF de Proveedor): ocultar en Target
   const occ=document.getElementById('oc-cards');if(occ&&esTarget)occ.style.display='none';
-  // Nota de metodología OTIF: solo en OTIF-Proveedor
-  show('otif-metodologia',esOtif);
+  // Metodología: cada una en su pestaña
+  show('metodologia-otif',esOtif);
+  show('metodologia-target',esTarget);
   const ocToggle=document.getElementById('oc-toggle-btn');if(ocToggle)ocToggle.style.display=esOtif?'':'none';
   // Filtros de mes: mostrar solo el que aplica a cada lado
   const filaOC=document.getElementById('filtro-mes-oc');
@@ -2362,11 +2377,11 @@ function renderOTIFKPIs(){
   const otifOk=[...otifByOC.values()].filter(o=>o.total>0&&o.both/o.total>=0.95).length;
 
   document.getElementById('otif-kpis').innerHTML=`
-  <div id="kpi-target-box" style="background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:14px;margin-bottom:20px">
+  <div id="kpi-target-box" style="background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:12px;margin-bottom:0;flex:0 0 auto;min-width:220px">
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx2);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--brd)">🎯 Target de Comprador${mesLbl}</div>
     ${kpi('Target de Comprador',pct(tOk,tTotal),`${tOk} de ${tTotal} órdenes`,col(tOk,tTotal,70,40))}
   </div>
-  <div id="kpi-otif-box" style="background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:14px;margin-bottom:20px">
+  <div id="kpi-otif-box" style="background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:12px;margin-bottom:0;flex:1 1 auto;min-width:340px">
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx2);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--brd)">📦 OTIF de Proveedor${mesRecepLbl}</div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
       ${kpi('On Time (Entrega)',pct(otOk,otTotal),`${otOk} de ${otTotal} órdenes`,col(otOk,otTotal,80,50))}
