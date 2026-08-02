@@ -730,16 +730,17 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
       <div style="font-size:12px;font-weight:700;color:var(--tx);margin-bottom:10px;border-bottom:1px solid var(--brd);padding-bottom:6px">📐 Metodología de cálculo</div>
       <div>
           <div style="font-weight:700;color:var(--navy);margin-bottom:4px">📦 OTIF de Proveedor — métricas de entrega</div>
-          <p><b>On Time</b> — por OC: una orden cumple si el ≥ 95 % de sus líneas recibidas llegaron en o antes de la ETA estimada (<em>OTIF Entrega = EN TIEMPO</em>).<br>
-          Indicador: % de OCs recibidas que cumplen / total de OCs recibidas.</p>
-          <p style="margin-top:4px"><b>In Full</b> — por clave/línea: una línea cumple si la cantidad recibida es igual a la pedida (<em>IF Entrega = COMPLETO</em>).<br>
-          Indicador: % de claves completas / total de claves recibidas.</p>
-          <p style="margin-top:4px"><b>OTIF (On Time + In Full)</b> — por OC: una orden cumple si el ≥ 95 % de sus líneas recibidas cumplen <em>ambas</em> condiciones (EN TIEMPO y COMPLETO) simultáneamente.<br>
-          Indicador: % de OCs que cumplen ambas / total de OCs recibidas.<br>
+          <p>Las tres métricas se miden <b>por línea recibida</b> (cada clave de cada OC), para que sean comparables entre sí.</p>
+          <p style="margin-top:4px"><b>On Time (Entrega)</b> — una línea cumple si llegó en o antes de la ETA estimada (<em>OTIF Entrega = EN TIEMPO</em>).<br>
+          Indicador: % de líneas a tiempo / total de líneas recibidas.</p>
+          <p style="margin-top:4px"><b>In Full (Completo)</b> — una línea cumple si la cantidad recibida es igual a la pedida (<em>IF Entrega = COMPLETO</em>).<br>
+          Indicador: % de líneas completas / total de líneas recibidas.</p>
+          <p style="margin-top:4px"><b>OTIF (On Time + In Full)</b> — una línea cumple si es <em>a la vez</em> EN TIEMPO y COMPLETO.<br>
+          Indicador: % de líneas que cumplen ambas / total de líneas recibidas.<br>
           <b>Período:</b> se filtra por el mes de recepción (ETA Real).</p>
         </div>
       <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--brd);color:var(--tx3);font-size:10px">
-        ⚠️ El umbral del 95 % permite que una línea menor con error no penalice la OC completa. Una OC con 20 líneas necesita que al menos 19 cumplan para contarse como exitosa.
+        ✔️ Al medir todo por línea, el OTIF siempre es coherente: nunca puede ser mayor que On Time ni que In Full, porque exige que ambas condiciones se cumplan en la misma línea.
       </div>
     </div>
     <div id="metodologia-target" style="display:none;margin-top:14px;background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:16px 20px;font-size:11px;color:var(--tx2);line-height:1.7">
@@ -2357,29 +2358,17 @@ function renderOTIFKPIs(){
   const tTotal=targetByOC.size;
   const tOk=[...targetByOC.values()].filter(o=>o.total>0&&o.ok/o.total>=0.95).length;
 
-  // ── ON TIME: by OC. OC counts if ≥95% of received lines are EN TIEMPO
-  const otByOC=new Map();
-  pd.forEach(d=>{
-    if(!otByOC.has(d.oc))otByOC.set(d.oc,{total:0,ok:0});
-    const o=otByOC.get(d.oc); o.total++;
-    if(d.otifE==='EN TIEMPO')o.ok++;
-  });
-  const otTotal=otByOC.size;
-  const otOk=[...otByOC.values()].filter(o=>o.total>0&&o.ok/o.total>=0.95).length;
+  // ── MÉTRICAS OTIF: todas por LÍNEA para que sean coherentes entre sí.
+  // (Medir On Time por OC e In Full por línea daba resultados ilógicos como
+  //  OTIF 67% con On Time 100% e In Full 92%.)
+  const otTotal=pd.length;
+  const otOk=pd.filter(d=>d.otifE==='EN TIEMPO').length;            // On Time: líneas a tiempo
 
-  // ── IN FULL: by line (clave). COMPLETO count
-  const fOk=pd.filter(d=>d.ifOk==='COMPLETO').length;
   const fTotal=pd.length;
+  const fOk=pd.filter(d=>d.ifOk==='COMPLETO').length;              // In Full: líneas completas
 
-  // ── OTIF: OCs where ≥95% lines are both ON TIME and COMPLETO
-  const otifByOC=new Map();
-  pd.forEach(d=>{
-    if(!otifByOC.has(d.oc))otifByOC.set(d.oc,{total:0,both:0});
-    const o=otifByOC.get(d.oc); o.total++;
-    if(d.otifE==='EN TIEMPO'&&d.ifOk==='COMPLETO')o.both++;
-  });
-  const otifTotal=otifByOC.size;
-  const otifOk=[...otifByOC.values()].filter(o=>o.total>0&&o.both/o.total>=0.95).length;
+  const otifTotal=pd.length;
+  const otifOk=pd.filter(d=>d.otifE==='EN TIEMPO'&&d.ifOk==='COMPLETO').length; // OTIF: a tiempo Y completo
 
   document.getElementById('otif-kpis').innerHTML=`
   <div id="kpi-target-box" style="background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:12px;margin-bottom:0;width:280px;max-width:280px;display:flex;flex-direction:column;justify-content:center">
@@ -2389,9 +2378,9 @@ function renderOTIFKPIs(){
   <div id="kpi-otif-box" style="background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:12px;margin-bottom:0;width:600px;max-width:600px;display:flex;flex-direction:column;justify-content:center">
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx2);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--brd)">📦 OTIF de Proveedor${mesRecepLbl}</div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
-      ${kpi('On Time (Entrega)',pct(otOk,otTotal),`${otOk} de ${otTotal} órdenes`,col(otOk,otTotal,80,50))}
-      ${kpi('In Full (Completo)',pct(fOk,fTotal),`${fOk} de ${fTotal} claves`,col(fOk,fTotal,80,50))}
-      ${kpi('OTIF (On Time + In Full)',pct(otifOk,otifTotal),'',col(otifOk,otifTotal,70,40))}
+      ${kpi('On Time (Entrega)',pct(otOk,otTotal),`${otOk} de ${otTotal} líneas`,col(otOk,otTotal,80,50))}
+      ${kpi('In Full (Completo)',pct(fOk,fTotal),`${fOk} de ${fTotal} líneas`,col(fOk,fTotal,80,50))}
+      ${kpi('OTIF (On Time + In Full)',pct(otifOk,otifTotal),`${otifOk} de ${otifTotal} líneas`,col(otifOk,otifTotal,70,40))}
     </div>
   </div>`;
   if(typeof aplicarVistaOtif==='function')aplicarVistaOtif(currentMainTab);
