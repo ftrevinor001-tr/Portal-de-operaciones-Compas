@@ -735,12 +735,12 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
           Indicador: % de líneas a tiempo / total de líneas recibidas.</p>
           <p style="margin-top:4px"><b>In Full (Completo)</b> — una línea cumple si la cantidad recibida es igual a la pedida (<em>IF Entrega = COMPLETO</em>).<br>
           Indicador: % de líneas completas / total de líneas recibidas.</p>
-          <p style="margin-top:4px"><b>OTIF (On Time + In Full)</b> — una línea cumple si es <em>a la vez</em> EN TIEMPO y COMPLETO.<br>
-          Indicador: % de líneas que cumplen ambas / total de líneas recibidas.<br>
+          <p style="margin-top:4px"><b>OTIF (On Time + In Full)</b> — es el promedio del desempeño del proveedor en las dos dimensiones:<br>
+          Indicador: (líneas a tiempo + líneas completas) / (total de líneas × 2).<br>
           <b>Período:</b> se filtra por el mes de recepción (ETA Real).</p>
         </div>
       <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--brd);color:var(--tx3);font-size:10px">
-        ✔️ Al medir todo por línea, el OTIF siempre es coherente: nunca puede ser mayor que On Time ni que In Full, porque exige que ambas condiciones se cumplan en la misma línea.
+        ✔️ El OTIF combina ambas mediciones (puntualidad y completitud) en un solo indicador. Cada línea aporta por su puntualidad y por su completitud; el resultado es el promedio de qué tan bien cumplió el proveedor en las dos.
       </div>
     </div>
     <div id="metodologia-target" style="display:none;margin-top:14px;background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:16px 20px;font-size:11px;color:var(--tx2);line-height:1.7">
@@ -2367,8 +2367,9 @@ function renderOTIFKPIs(){
   const fTotal=pd.length;
   const fOk=pd.filter(d=>d.ifOk==='COMPLETO').length;              // In Full: líneas completas
 
-  const otifTotal=pd.length;
-  const otifOk=pd.filter(d=>d.otifE==='EN TIEMPO'&&d.ifOk==='COMPLETO').length; // OTIF: a tiempo Y completo
+  // OTIF = promedio de On Time e In Full: (líneas a tiempo + líneas completas) / (total × 2)
+  const otifOk=otOk+fOk;
+  const otifTotal=otTotal+fTotal;
 
   document.getElementById('otif-kpis').innerHTML=`
   <div id="kpi-target-box" style="background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:12px;margin-bottom:0;width:280px;max-width:280px;display:flex;flex-direction:column;justify-content:center">
@@ -2380,7 +2381,7 @@ function renderOTIFKPIs(){
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
       ${kpi('On Time (Entrega)',pct(otOk,otTotal),`${otOk} de ${otTotal} líneas`,col(otOk,otTotal,80,50))}
       ${kpi('In Full (Completo)',pct(fOk,fTotal),`${fOk} de ${fTotal} líneas`,col(fOk,fTotal,80,50))}
-      ${kpi('OTIF (On Time + In Full)',pct(otifOk,otifTotal),`${otifOk} de ${otifTotal} líneas`,col(otifOk,otifTotal,70,40))}
+      ${kpi('OTIF (On Time + In Full)',pct(otifOk,otifTotal),`promedio On Time + In Full`,col(otifOk,otifTotal,70,40))}
     </div>
   </div>`;
   if(typeof aplicarVistaOtif==='function')aplicarVistaOtif(currentMainTab);
