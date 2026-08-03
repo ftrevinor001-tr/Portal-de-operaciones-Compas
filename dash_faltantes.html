@@ -205,6 +205,9 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
         <button class="clear-btn" onclick="limpiarSobreInv()" style="margin-left:auto">↺ Limpiar filtros</button>
       </div>
 
+      <div id="sob-aviso-recarga" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:13px;color:#856404">
+        ⚠️ <b>Datos desactualizados:</b> este tablero necesita que se recargue el Excel maestro en <b>Admin</b> para mostrar la información por día. Mientras tanto los cálculos pueden salir en cero.
+      </div>
       <!-- KPIs -->
       <div id="sob-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:18px"></div>
 
@@ -966,6 +969,12 @@ function showClasNiv(niv,btn){
 }
 function initSobreInv(){
   const S=G.sobreInv; if(!S||!S.celdas)return;
+  // Detectar si los datos son de la estructura vieja (por mes) → avisar que hay que recargar
+  const esViejo=S.meses&&S.meses.length&&S.meses[0].length<=7;
+  const avisoEl=document.getElementById('sob-aviso-recarga');
+  if(esViejo){
+    if(avisoEl)avisoEl.style.display='block';
+  } else if(avisoEl){avisoEl.style.display='none';}
   // Poblar los selects de filtros
   const setOpts=(id,arr,todos)=>{const el=document.getElementById(id);if(!el)return;
     el.innerHTML=`<option value="">${todos}</option>`+arr.map(v=>`<option value="${v}">${v}</option>`).join('');};
