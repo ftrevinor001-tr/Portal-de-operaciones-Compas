@@ -161,7 +161,7 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
   <div id="panel-clasif" class="panel">
     <div class="subtabs" style="border-bottom:2px solid #1c4587;margin-bottom:4px">
       <button class="stab on" style="--cc:#1c4587;font-weight:700" onclick="showClasNiv('falt',this)">📉 Faltantes</button>
-      <button class="stab" style="--cc:#993c1d;font-weight:700" onclick="showClasNiv('sob',this)">📦 Sobre Inventario</button>
+      <button class="stab" style="--cc:#993c1d;font-weight:700" onclick="showClasNiv('sob',this)">📦 Meses Inv. vs Objetivo</button>
     </div>
     <div id="cn-falt">
     <div class="subtabs">
@@ -197,7 +197,7 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
     </div><!-- fin cn-falt -->
 <div id="cn-sob" style="display:none">
       <div class="fbox" style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px">
-        <div><div class="flbl">📅 Mes</div><select id="sob-mes" onchange="renderSobreInv()" style="font-size:13px;padding:6px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:130px"></select></div>
+        <div><div class="flbl">📅 Día</div><select id="sob-mes" onchange="renderSobreInv()" style="font-size:13px;padding:6px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:130px"></select></div>
         <div><div class="flbl">👤 Comprador</div><select id="sob-comp" onchange="sobCascada('comp')" style="font-size:13px;padding:6px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:170px"></select></div>
         <div><div class="flbl">📂 Familia (GRUPO)</div><select id="sob-fam" onchange="sobCascada('fam')" style="font-size:13px;padding:6px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:170px"></select></div>
         <div><div class="flbl">🔄 Rotación</div><select id="sob-rot" onchange="sobCascada('rot')" style="font-size:13px;padding:6px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:150px"></select></div>
@@ -888,20 +888,20 @@ function buildData(raw,rawD,fn){
       const mi=+x.meses_inv||0;
       if(mi<=0)return;
       const c=String(x.comprador||'').trim().toUpperCase();if(!c||c==='PRODUCCION')return;
-      const mes=String(x.fecha||'').slice(0,7);if(!mes)return;
+      const dia=String(x.fecha||'').slice(0,10);if(!dia)return;
       const g=String(x.grupo||'').trim().toUpperCase()||'(SIN GRUPO)';
       const rot=String(x.clmov||'').trim().toUpperCase()||'(SIN ROTACIÓN)';
       const mar=String(x.marca||'').trim().toUpperCase()||'(SIN MARCA)';
       const obj=+x.obj_meses||0;
-      meses.add(mes);grupos.add(g);marcas.add(mar);rots.add(rot);comps.add(c);
-      const k=c+'||'+mes+'||'+g+'||'+rot+'||'+mar;
+      meses.add(dia);grupos.add(g);marcas.add(mar);rots.add(rot);comps.add(c);
+      const k=c+'||'+dia+'||'+g+'||'+rot+'||'+mar;
       (acc[k]=acc[k]||{sMeses:0,sObj:0,n:0});
       acc[k].sMeses+=mi;acc[k].sObj+=obj;acc[k].n++;
     });
     const celdas=Object.keys(acc).map(k=>{
-      const [c,mes,g,rot,mar]=k.split('||');
+      const [c,dia,g,rot,mar]=k.split('||');
       const a=acc[k];
-      return {c,mes,g,rot,mar,sm:+a.sMeses.toFixed(2),so:+a.sObj.toFixed(2),n:a.n};
+      return {c,dia,g,rot,mar,sm:+a.sMeses.toFixed(2),so:+a.sObj.toFixed(2),n:a.n};
     });
     sobreInv.celdas=celdas;
     sobreInv.meses=[...meses].sort();
@@ -969,7 +969,10 @@ function initSobreInv(){
   // Poblar los selects de filtros
   const setOpts=(id,arr,todos)=>{const el=document.getElementById(id);if(!el)return;
     el.innerHTML=`<option value="">${todos}</option>`+arr.map(v=>`<option value="${v}">${v}</option>`).join('');};
-  setOpts('sob-mes',S.meses,'— Todos los meses —');
+  // Días con formato legible dd/mm/aaaa (value queda en ISO)
+  const fmtDia=iso=>{const p=String(iso).split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso;};
+  const mesEl=document.getElementById('sob-mes');
+  if(mesEl)mesEl.innerHTML=`<option value="">— Todos los días —</option>`+S.meses.map(v=>`<option value="${v}">${fmtDia(v)}</option>`).join('');
   setOpts('sob-comp',S.comps,'— Todos —');
   setOpts('sob-fam',S.grupos,'— Todas —');
   setOpts('sob-rot',S.rots,'— Todas —');
@@ -991,7 +994,7 @@ function sobFiltrado(excepto){
   const rot=document.getElementById('sob-rot').value;
   const mar=(document.getElementById('sob-marca').value||'').trim().toUpperCase();
   return S.celdas.filter(x=>{
-    if(excepto!=='mes'&&mes&&x.mes!==mes)return false;
+    if(excepto!=='mes'&&mes&&x.dia!==mes)return false;
     if(excepto!=='comp'&&comp&&x.c!==comp)return false;
     if(excepto!=='fam'&&fam&&x.g!==fam)return false;
     if(excepto!=='rot'&&rot&&x.rot!==rot)return false;
@@ -1062,18 +1065,32 @@ function renderSobreInv(){
       kpi('Compradores sobre objetivo',sobre+' de '+rows.length,'prom. inv. mayor al objetivo','#b8952a');
   }
 
-  // Gráfica de barras agrupadas: meses inv vs objetivo por comprador
+  // Gráfica: barras (meses inv) + línea de objetivo, con valores visibles
   const ctx=document.getElementById('sob-comp-chart');
   if(ctx){
     if(window._sobChart)window._sobChart.destroy();
+    // plugin inline para dibujar los valores sobre barras y puntos
+    const valuePlugin={id:'sobValues',afterDatasetsDraw(chart){
+      const {ctx:cx}=chart;cx.save();cx.font='bold 11px sans-serif';cx.textAlign='center';
+      chart.data.datasets.forEach((ds,di)=>{
+        const meta=chart.getDatasetMeta(di);
+        meta.data.forEach((pt,i)=>{
+          const v=ds.data[i];if(v==null)return;
+          cx.fillStyle=di===0?'#8a3410':'#1e5c48';
+          const yOff=di===0?-6:-8;
+          cx.fillText(v.toFixed(1),pt.x,pt.y+yOff);
+        });
+      });cx.restore();
+    }};
     window._sobChart=new Chart(ctx,{type:'bar',data:{labels:rows.map(r=>r.comp),
       datasets:[
-        {label:'Prom. meses inventario',data:rows.map(r=>+r.promMeses.toFixed(2)),backgroundColor:'#c0582a'},
-        {label:'Prom. objetivo',data:rows.map(r=>+r.promObj.toFixed(2)),backgroundColor:'#3a9688'}
+        {type:'bar',label:'Prom. meses inventario',data:rows.map(r=>+r.promMeses.toFixed(2)),backgroundColor:'#c0582a',order:2},
+        {type:'line',label:'Prom. objetivo',data:rows.map(r=>+r.promObj.toFixed(2)),borderColor:'#1e7a4a',backgroundColor:'#1e7a4a',borderWidth:2.5,pointRadius:4,pointBackgroundColor:'#1e7a4a',tension:0.2,order:1,fill:false}
       ]},
-      options:{responsive:true,maintainAspectRatio:false,
+      options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:18}},
         plugins:{legend:{position:'top'},tooltip:{callbacks:{afterlabel:c=>{const r=rows[c.dataIndex];return r?`${r.n} claves`:'';}}}},
-        scales:{y:{beginAtZero:true,title:{display:true,text:'Meses'}}}}});
+        scales:{y:{beginAtZero:true,title:{display:true,text:'Meses'}}}},
+      plugins:[valuePlugin]});
   }
 
   // Tabla

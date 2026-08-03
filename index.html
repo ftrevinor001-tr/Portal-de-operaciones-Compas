@@ -702,21 +702,21 @@ function buildData(raw,rawD,fn){
       const mi=+x.meses_inv||0;
       if(mi<=0)return;                          // solo claves con meses de inventario > 0
       const c=String(x.comprador||'').trim().toUpperCase();if(!c||c==='PRODUCCION')return;
-      const mes=String(x.fecha||'').slice(0,7);if(!mes)return;
+      const dia=String(x.fecha||'').slice(0,10);if(!dia)return;
       const g=String(x.grupo||'').trim().toUpperCase()||'(SIN GRUPO)';
       const rot=String(x.clmov||'').trim().toUpperCase()||'(SIN ROTACIÓN)';
       const mar=String(x.marca||'').trim().toUpperCase()||'(SIN MARCA)';
       const obj=+x.obj_meses||0;
-      meses.add(mes);grupos.add(g);marcas.add(mar);rots.add(rot);comps.add(c);
-      const k=c+'||'+mes+'||'+g+'||'+rot+'||'+mar;
+      meses.add(dia);grupos.add(g);marcas.add(mar);rots.add(rot);comps.add(c);
+      const k=c+'||'+dia+'||'+g+'||'+rot+'||'+mar;
       (acc[k]=acc[k]||{sMeses:0,sObj:0,n:0});
       acc[k].sMeses+=mi;acc[k].sObj+=obj;acc[k].n++;
     });
     // convertir el acumulador en un arreglo de celdas compacto
     const celdas=Object.keys(acc).map(k=>{
-      const [c,mes,g,rot,mar]=k.split('||');
+      const [c,dia,g,rot,mar]=k.split('||');
       const a=acc[k];
-      return {c,mes,g,rot,mar,sm:+a.sMeses.toFixed(2),so:+a.sObj.toFixed(2),n:a.n};
+      return {c,dia,g,rot,mar,sm:+a.sMeses.toFixed(2),so:+a.sObj.toFixed(2),n:a.n};
     });
     sobreInv.celdas=celdas;
     sobreInv.meses=[...meses].sort();
