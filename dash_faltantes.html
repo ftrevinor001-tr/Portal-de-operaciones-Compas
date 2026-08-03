@@ -965,7 +965,7 @@ function showClasNiv(niv,btn){
   if(niv==='sob')initSobreInv();
 }
 function initSobreInv(){
-  const S=DATA.sobreInv; if(!S||!S.celdas)return;
+  const S=G.sobreInv; if(!S||!S.celdas)return;
   // Poblar los selects de filtros
   const setOpts=(id,arr,todos)=>{const el=document.getElementById(id);if(!el)return;
     el.innerHTML=`<option value="">${todos}</option>`+arr.map(v=>`<option value="${v}">${v}</option>`).join('');};
@@ -984,7 +984,7 @@ function initSobreInv(){
 
 // Devuelve las celdas que pasan los filtros actuales (excepto el indicado, para cascada)
 function sobFiltrado(excepto){
-  const S=DATA.sobreInv; if(!S||!S.celdas)return [];
+  const S=G.sobreInv; if(!S||!S.celdas)return [];
   const mes=document.getElementById('sob-mes').value;
   const comp=document.getElementById('sob-comp').value;
   const fam=document.getElementById('sob-fam').value;
@@ -1002,7 +1002,7 @@ function sobFiltrado(excepto){
 
 // Actualiza las opciones de los demás filtros según lo seleccionado (cascada) y redibuja
 function sobCascada(cambio){
-  const S=DATA.sobreInv; if(!S)return;
+  const S=G.sobreInv; if(!S)return;
   const rellenar=(id,campo,todos)=>{
     const el=document.getElementById(id);if(!el)return;
     const val=el.value;
@@ -1020,7 +1020,7 @@ function sobCascada(cambio){
 }
 
 function limpiarSobreInv(){
-  const S=DATA.sobreInv;
+  const S=G.sobreInv;
   ['sob-comp','sob-fam','sob-rot'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const mar=document.getElementById('sob-marca');if(mar)mar.value='';
   const mesSel=document.getElementById('sob-mes');
@@ -1029,7 +1029,7 @@ function limpiarSobreInv(){
 }
 
 function renderSobreInv(){
-  const S=DATA.sobreInv; if(!S||!S.celdas)return;
+  const S=G.sobreInv; if(!S||!S.celdas)return;
   const celdas=sobFiltrado(null);
   // Agregar por comprador: sumar meses y objetivo, contar claves
   const porComp={};
