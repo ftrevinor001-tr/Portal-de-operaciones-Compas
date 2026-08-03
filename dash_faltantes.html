@@ -218,6 +218,13 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
         <div style="position:relative;height:420px"><canvas id="sob-comp-chart"></canvas></div>
       </div>
 
+      <!-- Gráfica de marcas críticas -->
+      <div class="card" style="margin-bottom:16px">
+        <h2 id="sob-marcas-titulo">Marcas que más afectan el inventario</h2>
+        <p style="font-size:12px;color:#6b7a99;margin:-4px 0 12px">Ordenadas por exceso sobre objetivo (meses acumulados por encima del objetivo). Entre paréntesis, la familia y el número de claves.</p>
+        <div style="position:relative;height:520px"><canvas id="sob-marcas-chart"></canvas></div>
+      </div>
+
       <!-- Tabla detalle por comprador -->
       <div class="card">
         <h2>Detalle por comprador</h2>
@@ -898,13 +905,14 @@ function buildData(raw,rawD,fn){
       const obj=+x.obj_meses||0;
       meses.add(dia);grupos.add(g);marcas.add(mar);rots.add(rot);comps.add(c);
       const k=c+'||'+dia+'||'+g+'||'+rot+'||'+mar;
-      (acc[k]=acc[k]||{sMeses:0,sObj:0,n:0});
+      (acc[k]=acc[k]||{sMeses:0,sObj:0,n:0,exc:0});
       acc[k].sMeses+=mi;acc[k].sObj+=obj;acc[k].n++;
+      if(mi>obj)acc[k].exc+=(mi-obj);
     });
     const celdas=Object.keys(acc).map(k=>{
       const [c,dia,g,rot,mar]=k.split('||');
       const a=acc[k];
-      return {c,dia,g,rot,mar,sm:+a.sMeses.toFixed(2),so:+a.sObj.toFixed(2),n:a.n};
+      return {c,dia,g,rot,mar,sm:+a.sMeses.toFixed(2),so:+a.sObj.toFixed(2),n:a.n,exc:+a.exc.toFixed(2)};
     });
     sobreInv.celdas=celdas;
     sobreInv.meses=[...meses].sort();
@@ -1080,14 +1088,26 @@ function renderSobreInv(){
     if(window._sobChart)window._sobChart.destroy();
     // plugin inline para dibujar los valores sobre barras y puntos
     const valuePlugin={id:'sobValues',afterDatasetsDraw(chart){
-      const {ctx:cx}=chart;cx.save();cx.font='bold 11px sans-serif';cx.textAlign='center';
+      const {ctx:cx}=chart;cx.save();cx.textAlign='center';
       chart.data.datasets.forEach((ds,di)=>{
         const meta=chart.getDatasetMeta(di);
         meta.data.forEach((pt,i)=>{
           const v=ds.data[i];if(v==null)return;
-          cx.fillStyle=di===0?'#8a3410':'#1e5c48';
-          const yOff=di===0?-6:-8;
-          cx.fillText(v.toFixed(1),pt.x,pt.y+yOff);
+          if(di===0){
+            // Barra de meses de inventario: valor + número de claves
+            cx.fillStyle='#8a3410';
+            cx.font='bold 11px sans-serif';
+            cx.fillText(v.toFixed(1),pt.x,pt.y-16);
+            cx.fillStyle='#6b7a99';
+            cx.font='9px sans-serif';
+            const nc=rows[i]?rows[i].n:0;
+            cx.fillText(nc.toLocaleString()+' claves',pt.x,pt.y-5);
+          } else {
+            // Línea de objetivo
+            cx.fillStyle='#1e5c48';
+            cx.font='bold 11px sans-serif';
+            cx.fillText(v.toFixed(1),pt.x,pt.y-8);
+          }
         });
       });cx.restore();
     }};
@@ -1117,6 +1137,70 @@ function renderSobreInv(){
       </tr>`;
     }).join('')||'<tr><td colspan="5" style="padding:16px;text-align:center;color:#8a97ad">Sin datos para los filtros aplicados</td></tr>';
   }
+
+  // ── Gráfica de MARCAS CRÍTICAS (barras horizontales, ordenadas por exceso sobre objetivo) ──
+  renderMarcasCriticas(celdas);
+}
+
+function renderMarcasCriticas(celdas){
+  // Agrupar por marca: sumar exceso, meses, claves; familia dominante
+  const porMarca={};
+  celdas.forEach(x=>{
+    const m=x.mar;
+    (porMarca[m]=porMarca[m]||{exc:0,sm:0,n:0,fam:{}});
+    porMarca[m].exc+=x.exc;porMarca[m].sm+=x.sm;porMarca[m].n+=x.n;
+    porMarca[m].fam[x.g]=(porMarca[m].fam[x.g]||0)+x.n;
+  });
+  let marcas=Object.keys(porMarca).map(m=>{
+    const d=porMarca[m];
+    const famDom=Object.keys(d.fam).sort((a,b)=>d.fam[b]-d.fam[a])[0]||'—';
+    return {marca:m,exc:d.exc,prom:d.n?d.sm/d.n:0,n:d.n,fam:famDom};
+  }).filter(x=>x.exc>0);          // solo marcas con exceso real
+  marcas.sort((a,b)=>b.exc-a.exc);
+  const TOP=15;
+  marcas=marcas.slice(0,TOP);
+
+  // color por severidad del promedio de meses
+  const colorSev=p=>p>=12?'#8b1a1a':p>=7?'#c0392b':p>=5?'#e08a2b':p>=4?'#e0c020':'#3a9688';
+
+  // actualizar título según filtro de comprador
+  const comp=document.getElementById('sob-comp').value;
+  const tit=document.getElementById('sob-marcas-titulo');
+  if(tit)tit.textContent=comp?`Marcas que más afectan a ${comp}`:'Marcas que más afectan el inventario (todos los compradores)';
+
+  const ctx=document.getElementById('sob-marcas-chart');
+  if(!ctx)return;
+  if(window._marcasChart)window._marcasChart.destroy();
+  if(!marcas.length){
+    const cx=ctx.getContext('2d');cx.clearRect(0,0,ctx.width,ctx.height);
+    cx.fillStyle='#8a97ad';cx.font='14px sans-serif';cx.textAlign='center';
+    cx.fillText('Sin marcas con exceso sobre objetivo para los filtros aplicados',ctx.width/2,60);
+    return;
+  }
+
+  const labelPlugin={id:'marcaLabels',afterDatasetsDraw(chart){
+    const {ctx:cx}=chart;cx.save();cx.textAlign='left';cx.font='bold 10px sans-serif';
+    const meta=chart.getDatasetMeta(0);
+    meta.data.forEach((bar,i)=>{
+      const m=marcas[i];if(!m)return;
+      cx.fillStyle='#2c3e50';
+      cx.fillText(`+${m.exc.toFixed(0)} · ${m.prom.toFixed(1)} meses · ${m.n} claves`,bar.x+6,bar.y+3);
+    });cx.restore();
+  }};
+
+  window._marcasChart=new Chart(ctx,{type:'bar',data:{
+    labels:marcas.map(m=>`${m.marca} (${m.fam})`),
+    datasets:[{label:'Exceso acumulado sobre objetivo (meses)',data:marcas.map(m=>+m.exc.toFixed(1)),
+      backgroundColor:marcas.map(m=>colorSev(m.prom)),borderRadius:3}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      layout:{padding:{right:120}},
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{
+          title:c=>marcas[c[0].dataIndex].marca,
+          label:c=>{const m=marcas[c.dataIndex];return [`Familia: ${m.fam}`,`Exceso: +${m.exc.toFixed(1)} meses`,`Promedio: ${m.prom.toFixed(1)} meses inv.`,`Claves: ${m.n}`];}}}},
+      scales:{x:{beginAtZero:true,title:{display:true,text:'Exceso sobre objetivo (meses acumulados)'}},
+        y:{ticks:{font:{size:10},autoSkip:false}}}},
+    plugins:[labelPlugin]});
 }
 function rkC(id,rk){if(!rk.length){const e=document.getElementById(id);if(e)e.parentElement.innerHTML='<p style="color:#6b7a99;text-align:center;padding:20px;font-size:13px">Sin faltantes</p>';return;}mC(id,'bar',{labels:rk.map(d=>d.n),datasets:[{label:'Faltantes',data:rk.map(d=>d.v),backgroundColor:rk.map(d=>d.c),borderRadius:5}]},{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#fff',titleColor:'#1a2035',bodyColor:'#4a5568',borderColor:'#e2e6ed',borderWidth:1,callbacks:{label:c=>'  '+c.parsed.x}}},scales:{x:{ticks:{color:'#6b7a99'},grid:{color:'#edf0f7'}},y:{ticks:{color:'#4a5568',font:{size:11}},grid:{color:'#edf0f7'}}}});}
 function renderCharts(){

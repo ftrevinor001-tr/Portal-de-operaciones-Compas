@@ -366,7 +366,7 @@ const TIPOS={
   FALTANTES:{t:'Claves en faltante',sev:'alta',icon:'🔴',dash:'Histórico Faltantes'},
   FALTANTE_NUEVO:{t:'Faltantes nuevos',sev:'alta',icon:'🆕',dash:'Histórico Faltantes'},
   RIESGO:{t:'Claves en riesgo',sev:'media',icon:'⚠️',dash:'Histórico Faltantes'},
-  PROLONGADO:{t:'Faltante/riesgo prolongado',sev:'alta',icon:'⏳',dash:'Monitor de Inventario'},
+  PROLONGADO:{t:'Faltante prolongado',sev:'alta',icon:'⏳',dash:'Monitor de Inventario'},
   SOBREINVENTARIO:{t:'Sobre inventario',sev:'baja',icon:'📦',dash:'Histórico Faltantes'},
   OC_3_MESES:{t:'OC >3 meses sin recibir',sev:'alta',icon:'🚨',dash:'Back Orders'},
   OC_SIN_APLICAR:{t:'OC sin aplicar >1 semana',sev:'media',icon:'📋',dash:'Back Orders'},
@@ -709,14 +709,15 @@ function buildData(raw,rawD,fn){
       const obj=+x.obj_meses||0;
       meses.add(dia);grupos.add(g);marcas.add(mar);rots.add(rot);comps.add(c);
       const k=c+'||'+dia+'||'+g+'||'+rot+'||'+mar;
-      (acc[k]=acc[k]||{sMeses:0,sObj:0,n:0});
+      (acc[k]=acc[k]||{sMeses:0,sObj:0,n:0,exc:0});
       acc[k].sMeses+=mi;acc[k].sObj+=obj;acc[k].n++;
+      if(mi>obj)acc[k].exc+=(mi-obj);
     });
     // convertir el acumulador en un arreglo de celdas compacto
     const celdas=Object.keys(acc).map(k=>{
       const [c,dia,g,rot,mar]=k.split('||');
       const a=acc[k];
-      return {c,dia,g,rot,mar,sm:+a.sMeses.toFixed(2),so:+a.sObj.toFixed(2),n:a.n};
+      return {c,dia,g,rot,mar,sm:+a.sMeses.toFixed(2),so:+a.sObj.toFixed(2),n:a.n,exc:+a.exc.toFixed(2)};
     });
     sobreInv.celdas=celdas;
     sobreInv.meses=[...meses].sort();
@@ -847,10 +848,10 @@ function computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif,mapaManual){
     const sob=hoyC.filter(r=>r.estatus==='SOBRE INVENTARIO').map(r=>({Clave:r.clave,Nombre:r.nombre,Marca:r.marca,'Meses Inv':(+r.meses_inv).toFixed(1),'Obj':r.obj_meses}));
     push(comp,'faltantes','SOBREINVENTARIO',sob,sob.length);
 
-    const prol=[];hoyC.forEach(r=>{if(r.estatus==='FALTANTE'||r.estatus==='RIESGO'){const rc=racha(r.clave);
-      if(rc&&(rc.dias>=60||rc.desdeInicio))prol.push({Clave:r.clave,Nombre:r.nombre,Estatus:r.estatus,'Días seguidos':rc.dias+(rc.desdeInicio?' (todo el periodo)':'')});}});
+    const prol=[];hoyC.forEach(r=>{if(r.estatus==='FALTANTE'){const rc=racha(r.clave);
+      if(rc&&(rc.dias>=60||rc.desdeInicio))prol.push({Clave:r.clave,Nombre:r.nombre,Marca:r.marca,'Días seguidos':rc.dias+(rc.desdeInicio?' (todo el periodo)':'')});}});
     prol.sort((a,b)=>parseInt(b['Días seguidos'])-parseInt(a['Días seguidos']));
-    push(comp,'inventario','PROLONGADO',prol,prol.length,'Claves con faltante o riesgo por 2+ meses continuos; mientras el histórico de la hoja Detalle sea menor a 60 días, se listan las que llevan todo el periodo disponible ('+(diasEntre(primera,uf)+1)+' días).');
+    push(comp,'inventario','PROLONGADO',prol,prol.length,'Claves en FALTANTE por 2+ meses continuos; mientras el histórico de la hoja Detalle sea menor a 60 días, se listan las que llevan todo el periodo disponible ('+(diasEntre(primera,uf)+1)+' días).');
 
     const mineOC=ocs.filter(r=>comp==='GENERAL'||r.comprador===comp);
     const oc3=mineOC.filter(r=>['PENDIENTE RECIBIR','RECIBIDO PARCIALMENTE'].includes(r.estadoOC)&&lim3m(r.fecha))
