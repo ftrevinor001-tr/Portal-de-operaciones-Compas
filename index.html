@@ -688,42 +688,42 @@ function buildData(raw,rawD,fn){
 
 
 
-  // Pre-agregado de SOBRE INVENTARIO (día más reciente): promedios, acumulados,
-  // matriz comprador×familia y severidad. Exceso = max(0, meses_inv - objetivo).
-  const sobreInv={grupos:[],prom:{},cnt:{},tot:{},fam:{},heat:{},sev:{},kpi:{},cierre:null};
+  // Pre-agregado de INVENTARIO por comprador (TODAS las claves con meses_inv>0):
+  // promedio simple de meses de inventario vs promedio simple de meses objetivo.
+  // Se agrega por comprador×mes×familia×rotación×marca para permitir filtros en cascada.
+  const sobreInv={celdas:[],meses:[],grupos:[],marcas:[],rots:[],comps:[],cierre:null};
   (function(){
     const cierre=ufd[ufd.length-1];
     sobreInv.cierre=cierre;
-    const grupos=new Set();
-    const prom={},cnt={},tot={};          // clave: comp||rot||grupo  (grupo puede ser __ALL__)
+    const meses=new Set(),grupos=new Set(),marcas=new Set(),rots=new Set(),comps=new Set();
+    // acumulador por combinación: comp||mes||grupo||rot||marca -> {sMeses,sObj,n}
     const acc={};
-    const famTot={};                      // grupo -> {s,n}
-    const heat={};                        // comp -> grupo -> suma
-    const sevBins={'0-3':0,'3-6':0,'6-12':0,'12-24':0,'24+':0};
-    let totalClaves=0,totalExc=0,criticas=0;
     detR.forEach(x=>{
-      if(x.fecha!==cierre||x.estatus!=='SOBRE INVENTARIO')return;
+      const mi=+x.meses_inv||0;
+      if(mi<=0)return;                          // solo claves con meses de inventario > 0
       const c=String(x.comprador||'').trim().toUpperCase();if(!c||c==='PRODUCCION')return;
-      const rot=String(x.clmov||'').trim().toUpperCase();if(!rot||rot==='SIN COMPRA')return;
+      const mes=String(x.fecha||'').slice(0,7);if(!mes)return;
       const g=String(x.grupo||'').trim().toUpperCase()||'(SIN GRUPO)';
-      const ex=Math.max(0,(+x.meses_inv||0)-(+x.obj_meses||0));
-      grupos.add(g);totalClaves++;totalExc+=ex;
-      if(ex>=24)criticas++;
-      // promedios por comp×rot×(grupo y ALL)
-      [g,'__ALL__'].forEach(gg=>{const k=c+'||'+rot+'||'+gg;(acc[k]=acc[k]||{s:0,n:0});acc[k].s+=ex;acc[k].n++;});
-      // familia total
-      (famTot[g]=famTot[g]||{s:0,n:0});famTot[g].s+=ex;famTot[g].n++;
-      // heat comp×familia
-      (heat[c]=heat[c]||{});heat[c][g]=(heat[c][g]||0)+ex;
-      // severidad
-      const b=ex<3?'0-3':ex<6?'3-6':ex<12?'6-12':ex<24?'12-24':'24+';
-      sevBins[b]+=ex;
+      const rot=String(x.clmov||'').trim().toUpperCase()||'(SIN ROTACIÓN)';
+      const mar=String(x.marca||'').trim().toUpperCase()||'(SIN MARCA)';
+      const obj=+x.obj_meses||0;
+      meses.add(mes);grupos.add(g);marcas.add(mar);rots.add(rot);comps.add(c);
+      const k=c+'||'+mes+'||'+g+'||'+rot+'||'+mar;
+      (acc[k]=acc[k]||{sMeses:0,sObj:0,n:0});
+      acc[k].sMeses+=mi;acc[k].sObj+=obj;acc[k].n++;
     });
-    Object.keys(acc).forEach(k=>{prom[k]=+(acc[k].s/acc[k].n).toFixed(2);cnt[k]=acc[k].n;tot[k]=+acc[k].s.toFixed(1);});
-    const fam={};Object.keys(famTot).forEach(g=>{fam[g]={tot:+famTot[g].s.toFixed(1),n:famTot[g].n,prom:+(famTot[g].s/famTot[g].n).toFixed(2)};});
+    // convertir el acumulador en un arreglo de celdas compacto
+    const celdas=Object.keys(acc).map(k=>{
+      const [c,mes,g,rot,mar]=k.split('||');
+      const a=acc[k];
+      return {c,mes,g,rot,mar,sm:+a.sMeses.toFixed(2),so:+a.sObj.toFixed(2),n:a.n};
+    });
+    sobreInv.celdas=celdas;
+    sobreInv.meses=[...meses].sort();
     sobreInv.grupos=[...grupos].sort();
-    sobreInv.prom=prom;sobreInv.cnt=cnt;sobreInv.tot=tot;sobreInv.fam=fam;sobreInv.heat=heat;sobreInv.sev=sevBins;
-    sobreInv.kpi={claves:totalClaves,exceso:+totalExc.toFixed(0),prom:totalClaves?+(totalExc/totalClaves).toFixed(1):0,criticas};
+    sobreInv.marcas=[...marcas].sort();
+    sobreInv.rots=[...rots].sort();
+    sobreInv.comps=[...comps].sort();
   })();
   return{fechas,compradores,totalByDay,clavesTotal,clasByDay,compByDay,compClByDay,CDATA,AREA,uf,pf,mA,mAn,fU,meses:mes,skuMes,sobreInv,rowsRes:rows,totalHoy:totalByDay[uf]||0,clavesHoy:clavesTotal[uf]||0,filename:fn,detR,detF:ufd,detM:uq('marca'),detCM:uq('clmov'),detG:uq('grupo'),detC:uq('comprador'),detE:uq('estatus'),detRd:uq('reorden'),detFalt};
 }
