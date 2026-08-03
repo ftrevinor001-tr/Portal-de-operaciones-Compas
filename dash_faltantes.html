@@ -1148,8 +1148,8 @@ function renderMarcasCriticas(celdas){
   celdas.forEach(x=>{
     const m=x.mar;
     (porMarca[m]=porMarca[m]||{exc:0,sm:0,n:0,fam:{}});
-    porMarca[m].exc+=x.exc;porMarca[m].sm+=x.sm;porMarca[m].n+=x.n;
-    porMarca[m].fam[x.g]=(porMarca[m].fam[x.g]||0)+x.n;
+    porMarca[m].exc+=(+x.exc||0);porMarca[m].sm+=(+x.sm||0);porMarca[m].n+=(+x.n||0);
+    porMarca[m].fam[x.g]=(porMarca[m].fam[x.g]||0)+(+x.n||0);
   });
   let marcas=Object.keys(porMarca).map(m=>{
     const d=porMarca[m];
@@ -1174,7 +1174,10 @@ function renderMarcasCriticas(celdas){
   if(!marcas.length){
     const cx=ctx.getContext('2d');cx.clearRect(0,0,ctx.width,ctx.height);
     cx.fillStyle='#8a97ad';cx.font='14px sans-serif';cx.textAlign='center';
-    cx.fillText('Sin marcas con exceso sobre objetivo para los filtros aplicados',ctx.width/2,60);
+    // Detectar si es porque faltan datos de exceso (Excel no recargado)
+    const sinExc=celdas.length && celdas.every(x=>x.exc===undefined);
+    const msg=sinExc?'⚠️ Recarga el Excel en Admin para ver esta gráfica (falta el dato de exceso)':'Sin marcas con exceso sobre objetivo para los filtros aplicados';
+    cx.fillText(msg,ctx.width/2,60);
     return;
   }
 
