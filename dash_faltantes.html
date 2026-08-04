@@ -268,6 +268,12 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
           <select id="r-clas" onchange="renderRes()"><option value="TODAS">— Todas —</option><option value="TOTAL">Global</option><option value="SAGRADOS">Sagrados</option><option value="ALTA ROTACIÓN">Alta Rotación</option><option value="MEDIA ROTACIÓN">Media Rotación</option><option value="LENTA ROTACIÓN">Lenta Rotación</option></select></div>
         <div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">📅 Mes de análisis</label>
           <select id="r-mes" onchange="renderRes()"></select></div>
+        <div style="display:flex;flex-direction:column;gap:4px;position:relative"><label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">🔤 Clasificación ABC</label>
+          <button type="button" id="r-abc-btn" onclick="toggleAbcMenu()" style="font-size:13px;padding:8px 12px;border:1.5px solid #c9d4f0;border-radius:7px;background:#fff;cursor:pointer;text-align:left;min-width:150px">Todas ▾</button>
+          <div id="r-abc-menu" style="display:none;position:absolute;top:100%;left:0;z-index:50;background:#fff;border:1px solid #c9d4f0;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);padding:8px;margin-top:2px;min-width:180px;max-height:260px;overflow:auto">
+            <div style="font-size:10px;color:#8a97ad;padding:2px 6px 6px">Desmarca para excluir del cálculo</div>
+            <div id="r-abc-list"></div>
+          </div></div>
         <div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">🎯 Objetivo</label>
           <select id="r-obj" onchange="renderRes()"><option value="si">Mostrar</option><option value="no">Ocultar</option></select></div>
         <button onclick="document.getElementById('r-comp').value='TODOS';document.getElementById('r-clas').value='TODAS';document.getElementById('r-mes').value=G.mA;renderRes()" style="padding:7px 12px;background:#fff;border:1.5px solid #c9d4f0;border-radius:7px;color:#1e3a5f;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">↺ Limpiar</button>
@@ -935,7 +941,38 @@ function buildData(raw,rawD,fn){
     sobreInv.rots=[...rots].sort();
     sobreInv.comps=[...comps].sort();
   })();
-  return{fechas,compradores,totalByDay,clavesTotal,clasByDay,compByDay,compClByDay,CDATA,AREA,uf,pf,mA,mAn,fU,meses:mes,skuMes,sobreInv,rowsRes:rows,totalHoy:totalByDay[uf]||0,clavesHoy:clavesTotal[uf]||0,filename:fn,detR,detF:ufd,detM:uq('marca'),detCM:uq('clmov'),detG:uq('grupo'),detC:uq('comprador'),detE:uq('estatus'),detRd:uq('reorden'),detFalt};
+
+  // Pre-agregado ABC para la Comparativa: por cada CIERRE de mes, comprador, rotación y letra ABC,
+  // guarda total de SKUs y faltantes (semáforo ROJO/AMARILLO = faltante), para recalcular al excluir letras.
+  const abcCmp={cierres:{},abcList:[],rotList:[]};
+  (function(){
+    const abcSet=new Set(),rotSet=new Set();
+    // cierres = último día de cada mes disponible
+    const cierrePorMes={};
+    ufd.forEach(f=>{const m=String(f).slice(0,7);if(!cierrePorMes[m]||f>cierrePorMes[m])cierrePorMes[m]=f;});
+    const cierres=Object.values(cierrePorMes);
+    const ROT_MAP={'ALTA ROTACIÓN':'ALTA ROTACIÓN','MEDIA ROTACIÓN':'MEDIA ROTACIÓN','LENTA ROTACIÓN':'LENTA ROTACIÓN','SAGRADOS':'SAGRADOS'};
+    detR.forEach(x=>{
+      const f=String(x.fecha||'');
+      if(!cierres.includes(f))return;
+      const c=String(x.comprador||'').trim().toUpperCase();if(!c||c==='PRODUCCION')return;
+      const abc=String(x.clasificacion||'').trim().toUpperCase()||'(SIN ABC)';
+      let rot=String(x.clmov||'').trim().toUpperCase();
+      rot=ROT_MAP[rot]||rot||'(SIN ROT)';
+      abcSet.add(abc);rotSet.add(rot);
+      const sem=String(x.semaforo||'').toUpperCase();
+      const esFalt=(sem==='ROJO'||sem==='AMARILLO')?1:0;
+      const mes=f.slice(0,7);
+      const K=abcCmp.cierres[mes]=abcCmp.cierres[mes]||{fecha:f,celdas:{}};
+      const k=c+'||'+rot+'||'+abc;
+      (K.celdas[k]=K.celdas[k]||{skus:0,falt:0});
+      K.celdas[k].skus++;
+      K.celdas[k].falt+=esFalt;
+    });
+    abcCmp.abcList=[...abcSet].sort();
+    abcCmp.rotList=[...rotSet].sort();
+  })();
+  return{fechas,compradores,totalByDay,clavesTotal,clasByDay,compByDay,compClByDay,CDATA,AREA,uf,pf,mA,mAn,fU,meses:mes,skuMes,sobreInv,abcCmp,rowsRes:rows,totalHoy:totalByDay[uf]||0,clavesHoy:clavesTotal[uf]||0,filename:fn,detR,detF:ufd,detM:uq('marca'),detCM:uq('clmov'),detG:uq('grupo'),detC:uq('comprador'),detE:uq('estatus'),detRd:uq('reorden'),detFalt};
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────────────
@@ -955,6 +992,7 @@ function render(){
   const sc=document.getElementById('r-comp');
   sc.innerHTML='<option value="TODOS">— Todos —</option><option value="__A__">▶ Área General</option>';
   compradores.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sc.appendChild(o);});
+  initAbcFiltro();   // poblar el filtro de Clasificación ABC
   // Reset charts
   Object.values(CH).forEach(ch=>{try{ch.destroy();}catch(e){}});CH={};
   // Init date filter (sets ffDates)
@@ -1335,11 +1373,99 @@ function llenarMesesRes(){
   sel.value=(G&&G.mA)||ms[ms.length-1];
 }
 
+// ── Filtro ABC (multiselección para excluir letras) ──
+let _abcExcluidas=new Set();
+
+function initAbcFiltro(){
+  const A=G.abcCmp;
+  const cont=document.getElementById('r-abc-list');
+  if(!A||!A.abcList||!cont)return;
+  cont.innerHTML=A.abcList.map(l=>
+    `<label style="display:flex;align-items:center;gap:7px;padding:4px 6px;font-size:13px;cursor:pointer;border-radius:5px" onmouseover="this.style.background='#f0f4fb'" onmouseout="this.style.background=''">
+      <input type="checkbox" value="${l}" checked onchange="onAbcToggle()" style="width:15px;height:15px;cursor:pointer"> ${l}</label>`).join('');
+  _abcExcluidas=new Set();
+  actualizarAbcBtn();
+}
+
+function toggleAbcMenu(){
+  const m=document.getElementById('r-abc-menu');
+  if(!m)return;
+  m.style.display=m.style.display==='none'?'block':'none';
+}
+
+function onAbcToggle(){
+  const chks=document.querySelectorAll('#r-abc-list input[type=checkbox]');
+  _abcExcluidas=new Set();
+  chks.forEach(c=>{if(!c.checked)_abcExcluidas.add(c.value);});
+  actualizarAbcBtn();
+  renderRes();
+}
+
+function actualizarAbcBtn(){
+  const btn=document.getElementById('r-abc-btn');
+  if(!btn)return;
+  const A=G.abcCmp;const total=A&&A.abcList?A.abcList.length:0;
+  const incl=total-_abcExcluidas.size;
+  if(_abcExcluidas.size===0)btn.textContent='Todas ▾';
+  else if(incl===0)btn.textContent='Ninguna ▾';
+  else btn.textContent=`${incl} de ${total} ▾`;
+}
+
+// Cerrar el menú al hacer clic fuera
+document.addEventListener('click',e=>{
+  const menu=document.getElementById('r-abc-menu'),btn=document.getElementById('r-abc-btn');
+  if(menu&&btn&&menu.style.display==='block'&&!menu.contains(e.target)&&e.target!==btn){
+    menu.style.display='none';
+  }
+});
+
+// Recalcula CDATA/AREA para un mes usando abcCmp, excluyendo las letras marcadas.
+// Devuelve la misma estructura que calcResMes, o null si no hay datos ABC.
+function calcResMesABC(mSel){
+  const A=G.abcCmp;
+  if(!A||!A.cierres||!A.cierres[mSel])return null;
+  const CLSL=['SAGRADOS','ALTA ROTACIÓN','MEDIA ROTACIÓN','LENTA ROTACIÓN'];
+  const meses=Object.keys(A.cierres).sort();
+  const idx=meses.indexOf(mSel);
+  const mPrev=idx>0?meses[idx-1]:null;
+  const cur=A.cierres[mSel], prev=mPrev?A.cierres[mPrev]:null;
+  const cierre=cur.fecha, cierrePrev=prev?prev.fecha:null;
+  const incluir=l=>!_abcExcluidas.has(l);
+
+  // suma skus y faltantes de un cierre para comprador c y rotación cl (o TOTAL), aplicando exclusión ABC
+  const agg=(cierreObj,c,cl)=>{
+    let skus=0,falt=0;
+    if(!cierreObj)return {skus:0,falt:0};
+    Object.keys(cierreObj.celdas).forEach(k=>{
+      const [kc,krot,kabc]=k.split('||');
+      if(c&&kc!==c)return;
+      if(cl&&cl!=='TOTAL'&&krot!==cl)return;
+      if(!incluir(kabc))return;
+      const cel=cierreObj.celdas[k];
+      skus+=cel.skus;falt+=cel.falt;
+    });
+    return {skus,falt};
+  };
+  const st=(c,cl)=>{
+    const a=agg(cur,c,cl), ap=agg(prev,c,cl);
+    const sk=a.skus, skA=ap.skus, f2=a.falt, f1=ap.falt;
+    const pk=Math.max(f1,f2);   // sin histórico diario por ABC, el pico ≈ máx de los dos cierres
+    return {skus:sk,f1,f2,pico:pk,
+      pct_f1:skA>0?+(f1/skA*100).toFixed(2):0,
+      pct_f2:sk>0?+(f2/sk*100).toFixed(2):0,
+      pct_pico:sk>0?+(pk/sk*100).toFixed(2):0};
+  };
+  const compradores=G.compradores||[];
+  const CD={};compradores.forEach(c=>{CD[c]={};[...CLSL,'TOTAL'].forEach(cl=>{CD[c][cl]=st(c,cl);});});
+  const AR={};[...CLSL,'TOTAL'].forEach(cl=>{AR[cl]=st(null,cl);});
+  return {CDATA:CD,AREA:AR,cierre,cierrePrev,mSel,mPrev,aprox:true};
+}
+
 function renderRes(){
   if(!G.compradores) return;
   const selMes=document.getElementById('r-mes');
   const mSel=(selMes&&selMes.value)||G.mA;
-  const calc=calcResMes(mSel)||{CDATA:G.CDATA||{},AREA:G.AREA||{},cierre:G.uf,cierrePrev:null,mSel:G.mA,mPrev:G.mAn};
+  const calc=(_abcExcluidas&&_abcExcluidas.size>0?calcResMesABC(mSel):null)||calcResMes(mSel)||{CDATA:G.CDATA||{},AREA:G.AREA||{},cierre:G.uf,cierrePrev:null,mSel:G.mA,mPrev:G.mAn};
   const compradores=G.compradores;
   const CDATA=(calc&&calc.CDATA)||G.CDATA||{}, AREA=(calc&&calc.AREA)||G.AREA||{};
   // Encabezados dinámicos según el mes elegido

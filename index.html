@@ -726,7 +726,38 @@ function buildData(raw,rawD,fn){
     sobreInv.rots=[...rots].sort();
     sobreInv.comps=[...comps].sort();
   })();
-  return{fechas,compradores,totalByDay,clavesTotal,clasByDay,compByDay,compClByDay,CDATA,AREA,uf,pf,mA,mAn,fU,meses:mes,skuMes,sobreInv,rowsRes:rows,totalHoy:totalByDay[uf]||0,clavesHoy:clavesTotal[uf]||0,filename:fn,detR,detF:ufd,detM:uq('marca'),detCM:uq('clmov'),detG:uq('grupo'),detC:uq('comprador'),detE:uq('estatus'),detRd:uq('reorden'),detFalt};
+
+  // Pre-agregado ABC para la Comparativa: por cada CIERRE de mes, comprador, rotación y letra ABC,
+  // guarda total de SKUs y faltantes (semáforo ROJO/AMARILLO = faltante), para recalcular al excluir letras.
+  const abcCmp={cierres:{},abcList:[],rotList:[]};
+  (function(){
+    const abcSet=new Set(),rotSet=new Set();
+    // cierres = último día de cada mes disponible
+    const cierrePorMes={};
+    ufd.forEach(f=>{const m=String(f).slice(0,7);if(!cierrePorMes[m]||f>cierrePorMes[m])cierrePorMes[m]=f;});
+    const cierres=Object.values(cierrePorMes);
+    const ROT_MAP={'ALTA ROTACIÓN':'ALTA ROTACIÓN','MEDIA ROTACIÓN':'MEDIA ROTACIÓN','LENTA ROTACIÓN':'LENTA ROTACIÓN','SAGRADOS':'SAGRADOS'};
+    detR.forEach(x=>{
+      const f=String(x.fecha||'');
+      if(!cierres.includes(f))return;
+      const c=String(x.comprador||'').trim().toUpperCase();if(!c||c==='PRODUCCION')return;
+      const abc=String(x.clasificacion||'').trim().toUpperCase()||'(SIN ABC)';
+      let rot=String(x.clmov||'').trim().toUpperCase();
+      rot=ROT_MAP[rot]||rot||'(SIN ROT)';
+      abcSet.add(abc);rotSet.add(rot);
+      const sem=String(x.semaforo||'').toUpperCase();
+      const esFalt=(sem==='ROJO'||sem==='AMARILLO')?1:0;
+      const mes=f.slice(0,7);
+      const K=abcCmp.cierres[mes]=abcCmp.cierres[mes]||{fecha:f,celdas:{}};
+      const k=c+'||'+rot+'||'+abc;
+      (K.celdas[k]=K.celdas[k]||{skus:0,falt:0});
+      K.celdas[k].skus++;
+      K.celdas[k].falt+=esFalt;
+    });
+    abcCmp.abcList=[...abcSet].sort();
+    abcCmp.rotList=[...rotSet].sort();
+  })();
+  return{fechas,compradores,totalByDay,clavesTotal,clasByDay,compByDay,compClByDay,CDATA,AREA,uf,pf,mA,mAn,fU,meses:mes,skuMes,sobreInv,abcCmp,rowsRes:rows,totalHoy:totalByDay[uf]||0,clavesHoy:clavesTotal[uf]||0,filename:fn,detR,detF:ufd,detM:uq('marca'),detCM:uq('clmov'),detG:uq('grupo'),detC:uq('comprador'),detE:uq('estatus'),detRd:uq('reorden'),detFalt};
 }
 
 
