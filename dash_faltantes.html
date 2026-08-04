@@ -1458,14 +1458,14 @@ function calcResMesABC(mSel){
   const compradores=G.compradores||[];
   const CD={};compradores.forEach(c=>{CD[c]={};[...CLSL,'TOTAL'].forEach(cl=>{CD[c][cl]=st(c,cl);});});
   const AR={};[...CLSL,'TOTAL'].forEach(cl=>{AR[cl]=st(null,cl);});
-  return {CDATA:CD,AREA:AR,cierre,cierrePrev,mSel,mPrev,aprox:true};
+  return {CDATA:CD,AREA:AR,cierre,cierrePrev,mSel,mPrev,aprox:false,picoAprox:true};
 }
 
 function renderRes(){
   if(!G.compradores) return;
   const selMes=document.getElementById('r-mes');
   const mSel=(selMes&&selMes.value)||G.mA;
-  const calc=(_abcExcluidas&&_abcExcluidas.size>0?calcResMesABC(mSel):null)||calcResMes(mSel)||{CDATA:G.CDATA||{},AREA:G.AREA||{},cierre:G.uf,cierrePrev:null,mSel:G.mA,mPrev:G.mAn};
+  const calc=calcResMesABC(mSel)||calcResMes(mSel)||{CDATA:G.CDATA||{},AREA:G.AREA||{},cierre:G.uf,cierrePrev:null,mSel:G.mA,mPrev:G.mAn};
   const compradores=G.compradores;
   const CDATA=(calc&&calc.CDATA)||G.CDATA||{}, AREA=(calc&&calc.AREA)||G.AREA||{};
   // Encabezados dinámicos según el mes elegido
@@ -1474,7 +1474,7 @@ function renderRes(){
     if(thA)thA.textContent=calc.mPrev?'Cierre '+mesLbl(calc.mPrev):'Inicio';
     if(thH)thH.textContent=mesLbl(calc.mSel).split(' ')[0].toUpperCase();
     const sub=document.getElementById('res-sub');
-    if(sub)sub.textContent='Cierre '+(calc.mPrev?mesLbl(calc.mPrev):'inicio')+(calc.cierrePrev?' ('+calc.cierrePrev.split('-').reverse().join('/')+')':'')+' vs '+mesLbl(calc.mSel)+' · cierre al '+calc.cierre.split('-').reverse().join('/')+' · sin PRODUCCION'+(calc.aprox?' · Total SKU\'s aproximado (recarga el Excel en Admin para el histórico exacto)':'');
+    if(sub)sub.textContent='Cierre '+(calc.mPrev?mesLbl(calc.mPrev):'inicio')+(calc.cierrePrev?' ('+calc.cierrePrev.split('-').reverse().join('/')+')':'')+' vs '+mesLbl(calc.mSel)+' · cierre al '+calc.cierre.split('-').reverse().join('/')+' · sin PRODUCCION'+(calc.aprox?' · Total SKU\'s aproximado (recarga el Excel en Admin para el histórico exacto)':'')+(calc.picoAprox?' · Pico ≈ mayor de los dos cierres':'');
   }
   const sC=document.getElementById('r-comp').value,sCl=document.getElementById('r-clas').value;
   const showObj=document.getElementById('r-obj').value==='si';
