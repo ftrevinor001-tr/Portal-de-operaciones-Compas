@@ -745,8 +745,8 @@ function buildData(raw,rawD,fn){
       let rot=String(x.clmov||'').trim().toUpperCase();
       rot=ROT_MAP[rot]||rot||'(SIN ROT)';
       abcSet.add(abc);rotSet.add(rot);
-      const sem=String(x.semaforo||'').toUpperCase();
-      const esFalt=(sem==='ROJO'||sem==='AMARILLO')?1:0;
+      const est=String(x.estatus||'').trim().toUpperCase();
+      const esFalt=(est==='FALTANTE')?1:0;   // igual que la comparativa: solo estatus FALTANTE (no riesgo)
       const mes=f.slice(0,7);
       const K=abcCmp.cierres[mes]=abcCmp.cierres[mes]||{fecha:f,celdas:{}};
       const k=c+'||'+rot+'||'+abc;
