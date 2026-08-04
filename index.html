@@ -745,6 +745,9 @@ function buildData(raw,rawD,fn){
       const c=String(x.comprador||'').trim().toUpperCase();if(!c||c==='PRODUCCION')return;
       const abc=String(x.clasificacion||'').trim().toUpperCase()||'(SIN ABC)';
       let rot=String(x.clmov||'').trim().toUpperCase()||'(SIN ROT)';
+      // Solo las 4 rotaciones que cuenta la comparativa (igual que Hoja1): excluir NUEVOS y SIN COMPRA
+      const ROT_VALIDAS=['SAGRADOS','ALTA ROTACIÓN','MEDIA ROTACIÓN','LENTA ROTACIÓN'];
+      if(!ROT_VALIDAS.includes(rot))return;
       const est=String(x.estatus||'').trim().toUpperCase();
       abcSet.add(abc);rotSet.add(rot);diasSet.add(f);
       const k=c+'||'+rot+'||'+abc;

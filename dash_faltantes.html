@@ -960,6 +960,9 @@ function buildData(raw,rawD,fn){
       const c=String(x.comprador||'').trim().toUpperCase();if(!c||c==='PRODUCCION')return;
       const abc=String(x.clasificacion||'').trim().toUpperCase()||'(SIN ABC)';
       let rot=String(x.clmov||'').trim().toUpperCase()||'(SIN ROT)';
+      // Solo las 4 rotaciones que cuenta la comparativa (igual que Hoja1): excluir NUEVOS y SIN COMPRA
+      const ROT_VALIDAS=['SAGRADOS','ALTA ROTACIÓN','MEDIA ROTACIÓN','LENTA ROTACIÓN'];
+      if(!ROT_VALIDAS.includes(rot))return;
       const est=String(x.estatus||'').trim().toUpperCase();
       abcSet.add(abc);rotSet.add(rot);diasSet.add(f);
       const k=c+'||'+rot+'||'+abc;
@@ -1425,9 +1428,41 @@ document.addEventListener('click',e=>{
 
 // Recalcula CDATA/AREA para un mes usando abcCmp, excluyendo las letras marcadas.
 // Devuelve la misma estructura que calcResMes, o null si no hay datos ABC.
+// ¿El mes seleccionado tiene datos de clasificación ABC en el detalle?
+// Habilita o deshabilita visualmente el filtro ABC según si el mes tiene datos ABC
+function actualizarEstadoFiltroAbc(hayABC){
+  const btn=document.getElementById('r-abc-btn');
+  const menu=document.getElementById('r-abc-menu');
+  const wrap=btn?btn.parentElement:null;
+  if(!btn)return;
+  if(hayABC){
+    btn.disabled=false;btn.style.opacity='';btn.style.cursor='pointer';btn.title='';
+    actualizarAbcBtn();
+  }else{
+    btn.disabled=true;btn.style.opacity='.5';btn.style.cursor='not-allowed';
+    btn.textContent='No disponible ▾';
+    btn.title='Este mes no tiene clasificación ABC en el detalle; se usan los totales por rotación (Hoja1).';
+    if(menu)menu.style.display='none';
+  }
+}
+
+function mesTieneABC(mSel){
+  const A=G.abcCmp;
+  if(!A||!A.skusCierre)return false;
+  const fechas=G.fechas||A.dias||[];
+  const fMes=fechas.filter(x=>x.startsWith(mSel));
+  if(!fMes.length)return false;
+  const cierre=fMes[fMes.length-1];
+  const m=A.skusCierre[cierre];
+  // hay ABC si existe el cierre y tiene al menos una celda con letra ABC real (no '(SIN ABC)')
+  if(!m)return false;
+  return Object.keys(m).some(k=>{const abc=k.split('||')[2];return abc && abc!=='(SIN ABC)';});
+}
+
 function calcResMesABC(mSel){
   const A=G.abcCmp;
   if(!A||!A.skusCierre||!A.faltDiarios)return null;
+  if(!mesTieneABC(mSel))return null;   // sin ABC en el detalle → usar Hoja1 (calcResMes)
   const CLSL=['SAGRADOS','ALTA ROTACIÓN','MEDIA ROTACIÓN','LENTA ROTACIÓN'];
   // Usar los meses reales de las fechas (igual que la comparativa original)
   const fechas=G.fechas||A.dias||[];
@@ -1475,6 +1510,8 @@ function renderRes(){
   if(!G.compradores) return;
   const selMes=document.getElementById('r-mes');
   const mSel=(selMes&&selMes.value)||G.mA;
+  const hayABC=mesTieneABC(mSel);
+  actualizarEstadoFiltroAbc(hayABC);
   const calc=calcResMesABC(mSel)||calcResMes(mSel)||{CDATA:G.CDATA||{},AREA:G.AREA||{},cierre:G.uf,cierrePrev:null,mSel:G.mA,mPrev:G.mAn};
   const compradores=G.compradores;
   const CDATA=(calc&&calc.CDATA)||G.CDATA||{}, AREA=(calc&&calc.AREA)||G.AREA||{};
