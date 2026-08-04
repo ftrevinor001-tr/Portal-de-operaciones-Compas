@@ -727,33 +727,37 @@ function buildData(raw,rawD,fn){
     sobreInv.comps=[...comps].sort();
   })();
 
-  // Pre-agregado ABC para la Comparativa: por cada CIERRE de mes, comprador, rotación y letra ABC,
-  // guarda total de SKUs y faltantes (semáforo ROJO/AMARILLO = faltante), para recalcular al excluir letras.
-  const abcCmp={cierres:{},abcList:[],rotList:[]};
+  // Pre-agregado ABC para la Comparativa (por DÍA, para pico correcto):
+  //  · faltДiarios: faltantes (estatus FALTANTE) por día × comprador × rotación × ABC
+  //  · skusCierre: total SKUs por comprador × rotación × ABC en el cierre de cada mes
+  // Con esto se recalcula skus, faltantes y PICO real excluyendo letras ABC.
+  const abcCmp={faltDiarios:{},skusCierre:{},dias:[],cierres:{},abcList:[],rotList:[]};
   (function(){
     const abcSet=new Set(),rotSet=new Set();
-    // cierres = último día de cada mes disponible
+    // cierre = último día de cada mes
     const cierrePorMes={};
     ufd.forEach(f=>{const m=String(f).slice(0,7);if(!cierrePorMes[m]||f>cierrePorMes[m])cierrePorMes[m]=f;});
-    const cierres=Object.values(cierrePorMes);
-    const ROT_MAP={'ALTA ROTACIÓN':'ALTA ROTACIÓN','MEDIA ROTACIÓN':'MEDIA ROTACIÓN','LENTA ROTACIÓN':'LENTA ROTACIÓN','SAGRADOS':'SAGRADOS'};
+    abcCmp.cierres=cierrePorMes;
+    const cierresSet=new Set(Object.values(cierrePorMes));
+    const diasSet=new Set();
     detR.forEach(x=>{
-      const f=String(x.fecha||'');
-      if(!cierres.includes(f))return;
+      const f=String(x.fecha||'');if(!f)return;
       const c=String(x.comprador||'').trim().toUpperCase();if(!c||c==='PRODUCCION')return;
       const abc=String(x.clasificacion||'').trim().toUpperCase()||'(SIN ABC)';
-      let rot=String(x.clmov||'').trim().toUpperCase();
-      rot=ROT_MAP[rot]||rot||'(SIN ROT)';
-      abcSet.add(abc);rotSet.add(rot);
+      let rot=String(x.clmov||'').trim().toUpperCase()||'(SIN ROT)';
       const est=String(x.estatus||'').trim().toUpperCase();
-      const esFalt=(est==='FALTANTE')?1:0;   // igual que la comparativa: solo estatus FALTANTE (no riesgo)
-      const mes=f.slice(0,7);
-      const K=abcCmp.cierres[mes]=abcCmp.cierres[mes]||{fecha:f,celdas:{}};
+      abcSet.add(abc);rotSet.add(rot);diasSet.add(f);
       const k=c+'||'+rot+'||'+abc;
-      (K.celdas[k]=K.celdas[k]||{skus:0,falt:0});
-      K.celdas[k].skus++;
-      K.celdas[k].falt+=esFalt;
+      // faltantes por día (solo estatus FALTANTE) → para el pico
+      if(est==='FALTANTE'){
+        (abcCmp.faltDiarios[f]=abcCmp.faltDiarios[f]||{})[k]=(abcCmp.faltDiarios[f][k]||0)+1;
+      }
+      // SKUs totales solo en los cierres de mes
+      if(cierresSet.has(f)){
+        (abcCmp.skusCierre[f]=abcCmp.skusCierre[f]||{})[k]=(abcCmp.skusCierre[f][k]||0)+1;
+      }
     });
+    abcCmp.dias=[...diasSet].sort();
     abcCmp.abcList=[...abcSet].sort();
     abcCmp.rotList=[...rotSet].sort();
   })();
