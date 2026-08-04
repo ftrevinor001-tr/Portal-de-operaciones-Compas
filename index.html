@@ -966,6 +966,65 @@ async function publicarDataset(clave,meta){
   const ds=await sb.from('datasets').upsert({clave:clave,payload:meta,actualizado_por:usuarioActual||'admin'});
   if(ds.error)throw new Error('datasets ('+clave+'): '+ds.error.message);
 }
+// ── Guardar el detalle diario en Supabase, solo los días que aún no están ──
+async function guardarDiasNuevos(rawD){
+  if(!rawD||!rawD.length){log('   (sin filas de Detalle para guardar)');return;}
+  // 1. Ver qué días ya están cargados en la base
+  const {data:diasEx,error:e1}=await sb.from('dias_cargados').select('fecha');
+  if(e1)throw new Error('leer dias_cargados: '+e1.message);
+  const yaCargados=new Set((diasEx||[]).map(d=>d.fecha));
+
+  // 2. Normalizar filas y agrupar por día
+  const norm=v=>{const s=String(v||'').trim();return s===''||s.toUpperCase()==='NAN'?null:s;};
+  const numX=v=>{const n=parseFloat(String(v).replace(/,/g,''));return isNaN(n)?null:n;};
+  const porDia={};
+  rawD.forEach(r=>{
+    const f=pD(String(r['Fecha']||''));
+    if(!f)return;
+    (porDia[f]=porDia[f]||[]).push({
+      fecha:f,
+      clave:String(r['Clave']||'').trim(),
+      nombre:norm(r['Nombre']),
+      marca:norm(r['Marca']),
+      unidad:norm(r['Unidad']),
+      clasificacion:norm(r['Clasificación']),
+      existencias:numX(r['Existencias']),
+      grupo:norm(r['GRUPO']),
+      comprador:norm(r['COMPRADOR']),
+      rotacion:norm(r['Clasificación por movimiento']),
+      t_entrega:numX(r['Tiempo de entrega']),
+      obj_meses:numX(r['Objetivo_Meses de inventario']),
+      meses_inv:numX(r['Meses de inventario']),
+      estatus:norm(r['Clasificacion_estatus de inventario']),
+      reorden:norm(r['Clasificacion_Punto de reorden']),
+      back_order:numX(r['Back Order'])
+    });
+  });
+
+  // 3. Determinar qué días son NUEVOS
+  const dias=Object.keys(porDia).sort();
+  const nuevos=dias.filter(d=>!yaCargados.has(d));
+  if(!nuevos.length){log('   ✔️ La base ya tiene todos los días ('+dias.length+'). Nada nuevo que guardar.');return;}
+  log('   💾 Guardando '+nuevos.length+' día(s) nuevo(s) en la base…');
+
+  // 4. Insertar cada día nuevo (en lotes de 1000 para no saturar)
+  let totalFilas=0;
+  for(const d of nuevos){
+    const filas=porDia[d];
+    for(let i=0;i<filas.length;i+=1000){
+      const lote=filas.slice(i,i+1000);
+      const {error:eIns}=await sb.from('detalle_diario').insert(lote);
+      if(eIns)throw new Error('insertar '+d+': '+eIns.message);
+    }
+    // registrar el día como cargado
+    const {error:eDia}=await sb.from('dias_cargados').insert({fecha:d,filas:filas.length});
+    if(eDia)throw new Error('marcar día '+d+': '+eDia.message);
+    totalFilas+=filas.length;
+    log('      • '+d+': '+filas.length.toLocaleString()+' filas ✓');
+  }
+  log('   ✅ Guardados '+nuevos.length+' día(s), '+totalFilas.toLocaleString()+' filas en total.');
+}
+
 async function gzipBlob(str){
   if(typeof CompressionStream==='undefined')return{body:new Blob([str]),gz:false};
   const cs=new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'));
@@ -1028,6 +1087,10 @@ async function procesarExcel(file){
 
     const cg=await sb.from('cargas').insert({archivo:file.name,usuario:usuarioActual||'admin',periodo_inicio:payload.pf,periodo_fin:payload.uf,resumen:{hoja1:raw.length,detalle:rawD.length,dashboard:'faltantes'}});
     if(cg.error) log('⚠️ Historial de cargas: '+cg.error.message);
+
+    // ── GUARDAR DETALLE DIARIO EN LA BASE (solo días nuevos) ──
+    try{ await guardarDiasNuevos(rawD); }
+    catch(e){ log('⚠️ Guardado en base de datos: '+e.message); }
 
     // ── ALARMAS POR COMPRADOR ──
     log('🔔 Calculando alarmas por comprador…');
