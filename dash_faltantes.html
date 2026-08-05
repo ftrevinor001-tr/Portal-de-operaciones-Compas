@@ -223,6 +223,13 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
         <div style="position:relative;height:420px"><canvas id="sob-comp-chart"></canvas></div>
       </div>
 
+      <!-- Gráfica de sobre inventario promedio por comprador (barras horizontales) -->
+      <div class="card" style="margin-bottom:16px">
+        <h2>Sobre inventario promedio por comprador</h2>
+        <p style="font-size:12px;color:#6b7a99;margin:-4px 0 12px">Meses de inventario que están por encima del objetivo (promedio meses inv. − promedio objetivo), ordenado de mayor a menor. Responde a los filtros de arriba.</p>
+        <div style="position:relative;height:440px"><canvas id="sob-exceso-chart"></canvas></div>
+      </div>
+
       <!-- Gráfica de marcas críticas -->
       <div class="card" style="margin-bottom:16px">
         <h2 id="sob-marcas-titulo">Marcas que más afectan el inventario</h2>
@@ -1179,6 +1186,41 @@ function renderSobreInv(){
         plugins:{legend:{position:'top'},tooltip:{callbacks:{afterlabel:c=>{const r=rows[c.dataIndex];return r?`${r.n} claves`:'';}}}},
         scales:{y:{beginAtZero:true,title:{display:true,text:'Meses'}}}},
       plugins:[valuePlugin]});
+  }
+
+  // ── Gráfica de SOBRE INVENTARIO PROMEDIO por comprador (barras horizontales) ──
+  const ctxE=document.getElementById('sob-exceso-chart');
+  if(ctxE){
+    // exceso = promedio meses inv − promedio objetivo (solo lo que está por encima)
+    const exRows=rows.map(r=>({comp:r.comp,exceso:r.promMeses-r.promObj,promMeses:r.promMeses,promObj:r.promObj,n:r.n}))
+      .filter(r=>r.exceso>0)                 // solo compradores por encima del objetivo
+      .sort((a,b)=>b.exceso-a.exceso);       // de mayor a menor
+    if(window._sobExcesoChart)window._sobExcesoChart.destroy();
+    if(!exRows.length){
+      const cx=ctxE.getContext('2d');cx.clearRect(0,0,ctxE.width,ctxE.height);
+      cx.fillStyle='#8a97ad';cx.font='14px sans-serif';cx.textAlign='center';
+      cx.fillText('Ningún comprador está por encima del objetivo con los filtros aplicados',ctxE.width/2,50);
+    }else{
+      // color por severidad del exceso
+      const colEx=e=>e>=6?'#8b1a1a':e>=3?'#c0392b':e>=1.5?'#e08a2b':'#e0c020';
+      const exLabelPlugin={id:'exLabels',afterDatasetsDraw(chart){
+        const {ctx:cx}=chart;cx.save();cx.textAlign='left';cx.font='bold 11px sans-serif';cx.fillStyle='#2c3e50';
+        chart.getDatasetMeta(0).data.forEach((bar,i)=>{
+          const r=exRows[i];if(!r)return;
+          cx.fillText('+'+r.exceso.toFixed(1)+' meses  ('+r.promMeses.toFixed(1)+' vs '+r.promObj.toFixed(1)+')',bar.x+6,bar.y+4);
+        });cx.restore();
+      }};
+      window._sobExcesoChart=new Chart(ctxE,{type:'bar',data:{
+        labels:exRows.map(r=>r.comp),
+        datasets:[{label:'Sobre inventario promedio (meses sobre objetivo)',data:exRows.map(r=>+r.exceso.toFixed(2)),
+          backgroundColor:exRows.map(r=>colEx(r.exceso)),borderRadius:3}]},
+        options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+          layout:{padding:{right:150}},
+          plugins:{legend:{display:false},
+            tooltip:{callbacks:{label:c=>{const r=exRows[c.dataIndex];return ['Sobre objetivo: +'+r.exceso.toFixed(1)+' meses','Prom. inventario: '+r.promMeses.toFixed(1),'Prom. objetivo: '+r.promObj.toFixed(1),'Claves: '+r.n];}}}},
+          scales:{x:{beginAtZero:true,title:{display:true,text:'Meses por encima del objetivo'}},y:{ticks:{font:{size:11}}}}},
+        plugins:[exLabelPlugin]});
+    }
   }
 
   // Tabla

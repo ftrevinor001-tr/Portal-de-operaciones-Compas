@@ -376,7 +376,7 @@ function switchTab(i){
   document.querySelectorAll('.frame-wrap').forEach((f,j)=>f.classList.toggle('active',j===i));
   loadTab(i);
   if(i===0){ cargarResumen(); ajustarBotonesResumen(); }
-  if(i===5&&esAdmin){document.getElementById('adm-lock').style.display='none';document.getElementById('adm-open').style.display='block';}
+  if(i===5&&esAdmin){document.getElementById('adm-lock').style.display='none';document.getElementById('adm-open').style.display='block';try{cargarDiasDisponibles();}catch(e){}}
 }
 function hideLd(i){const l=document.getElementById('ld-'+i);if(l)l.classList.add('hidden');}
 window.hideLd=hideLd;
@@ -1013,7 +1013,7 @@ async function respaldarRango(){
   const err=document.getElementById('bk-err'), lg=document.getElementById('bk-log');
   err.textContent='';lg.textContent='';
   const desde=document.getElementById('bk-desde').value, hasta=document.getElementById('bk-hasta').value;
-  if(!desde||!hasta){err.textContent='Elige la fecha desde y hasta.';return;}
+  if(!desde||!hasta){err.style.display='block';err.style.color='#c0392b';err.textContent='⚠️ Elige la fecha "Desde" y "Hasta" antes de descargar.';return;}
   if(desde>hasta){err.textContent='La fecha "desde" no puede ser mayor que "hasta".';return;}
   const btn=document.getElementById('bk-btn-resp');
   btn.disabled=true;btn.textContent='⏳ Descargando…';
@@ -1583,15 +1583,53 @@ function renderMetChart(){
     .filter(r=>{if(!sem)return true;const d=+r.creado_en.slice(8,10);return d>=(sem-1)*7+1&&d<=sem*7;});
   const dias=[...new Set(rows.map(r=>r.creado_en.slice(0,10)))].sort();
   const users=[...new Set(rows.map(r=>r.usuario))].sort();
+  // horas por usuario y día, y nº de ingresos
+  const horasUD=(u,d)=>+rows.filter(r=>r.usuario===u&&r.creado_en.slice(0,10)===d).reduce((s,r)=>s+durH(r),0).toFixed(2);
+  const ingresosUD=(u,d)=>rows.filter(r=>r.usuario===u&&r.creado_en.slice(0,10)===d).length;
   const datasets=users.map((u,i)=>({label:u,backgroundColor:PALETA[i%PALETA.length],
-    data:dias.map(d=>+rows.filter(r=>r.usuario===u&&r.creado_en.slice(0,10)===d).reduce((s,r)=>s+durH(r),0).toFixed(2))}));
+    data:dias.map(d=>horasUD(u,d))}));
   const ctx=document.getElementById('met-chart');
   if(MET.chart)MET.chart.destroy();
   MET.chart=new Chart(ctx,{type:'bar',data:{labels:dias.map(d=>d.slice(8)+'/'+d.slice(5,7)),datasets},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:10}}},
-        tooltip:{callbacks:{label:c2=>{const n=rows.filter(r=>r.usuario===c2.dataset.label&&r.creado_en.slice(0,10)===dias[c2.dataIndex]).length;return c2.dataset.label+': '+c2.raw+' h ('+n+' ingreso'+(n===1?'':'s')+')';}}}},
+        tooltip:{callbacks:{label:c2=>{const n=ingresosUD(c2.dataset.label,dias[c2.dataIndex]);return c2.dataset.label+': '+c2.raw+' h ('+n+' ingreso'+(n===1?'':'s')+')';}}}},
       scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,title:{display:true,text:'Horas conectado'}}}}});
+
+  // ── TABLA debajo de la gráfica: compradores (filas) × días (columnas) ──
+  const cont=document.getElementById('mtx');
+  if(!cont)return;
+  if(!users.length||!dias.length){cont.innerHTML='<p style="color:#8a97ad;font-size:13px;margin-top:12px">Sin ingresos para el periodo seleccionado.</p>';return;}
+  const fmtDiaCol=d=>d.slice(8)+'/'+d.slice(5,7);
+  let html='<div style="overflow-x:auto;margin-top:16px"><table style="border-collapse:collapse;font-size:12px;width:100%">';
+  // encabezado
+  html+='<thead><tr style="background:#1c3557;color:#fff">';
+  html+='<th style="padding:7px 10px;text-align:left;position:sticky;left:0;background:#1c3557;z-index:2">Comprador</th>';
+  dias.forEach(d=>{html+=`<th style="padding:7px 8px;text-align:center;white-space:nowrap">${fmtDiaCol(d)}</th>`;});
+  html+='<th style="padding:7px 10px;text-align:center;background:#2d6a4f">Días</th>';
+  html+='</tr></thead><tbody>';
+  // filas por comprador
+  users.forEach((u,ui)=>{
+    html+=`<tr style="border-bottom:1px solid #eef1f7;background:${ui%2?'#f8fafd':'#fff'}">`;
+    html+=`<td style="padding:6px 10px;font-weight:600;position:sticky;left:0;background:${ui%2?'#f8fafd':'#fff'};z-index:1">${u}</td>`;
+    let diasEntrados=0;
+    dias.forEach(d=>{
+      const h=horasUD(u,d);
+      if(h>0){
+        diasEntrados++;
+        // mostrar el tiempo; color por intensidad
+        const col=h>=4?'#1e7a4a':h>=1?'#2d8a5a':'#7cb89a';
+        html+=`<td style="padding:6px 8px;text-align:center;color:${col};font-weight:600" title="${ingresosUD(u,d)} ingreso(s)">${h.toFixed(1)}h</td>`;
+      }else{
+        html+='<td style="padding:6px 8px;text-align:center;color:#d0d5dd">·</td>';
+      }
+    });
+    html+=`<td style="padding:6px 10px;text-align:center;font-weight:700;color:#2d6a4f">${diasEntrados}</td>`;
+    html+='</tr>';
+  });
+  html+='</tbody></table></div>';
+  html+='<p style="font-size:11px;color:#8a97ad;margin-top:8px">Cada celda muestra las horas conectado ese día. Un punto (·) = no ingresó. La última columna cuenta cuántos días ingresó cada comprador.</p>';
+  cont.innerHTML=html;
 }
 function renderTablaMetricas(){
   const box=document.getElementById('mtx');
