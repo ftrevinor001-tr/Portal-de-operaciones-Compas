@@ -990,18 +990,26 @@ async function publicarDataset(clave,meta){
   if(ds.error)throw new Error('datasets ('+clave+'): '+ds.error.message);
 }
 // ── Respaldo y borrado por rango de fechas (liberar espacio) ──
+// Helper: ejecuta una promesa con límite de tiempo (evita que el botón se cuelgue)
+function conTimeout(promesa, ms, etiqueta){
+  return Promise.race([
+    promesa,
+    new Promise((_,rej)=>setTimeout(()=>rej(new Error('Tiempo agotado'+(etiqueta?' ('+etiqueta+')':'')+'. Revisa tu conexión o vuelve a iniciar sesión.')), ms))
+  ]);
+}
+
 let _bkRespaldado=null;  // guarda el rango que ya se respaldó, para permitir borrar
 
 async function cargarDiasDisponibles(){
   const info=document.getElementById('bk-info');
+  if(!info)return;
   try{
-    const {data,error}=await sb.from('dias_cargados').select('fecha,filas').order('fecha',{ascending:true});
+    const {data,error}=await conTimeout(sb.from('dias_cargados').select('fecha,filas').order('fecha',{ascending:true}),12000,'leer días');
     if(error)throw new Error(error.message);
     if(!data||!data.length){info.textContent='La base no tiene días guardados todavía.';return;}
     const min=data[0].fecha, max=data[data.length-1].fecha;
     const totalFilas=data.reduce((a,d)=>a+(d.filas||0),0);
     info.innerHTML=`La base tiene <b>${data.length}</b> días (del <b>${min}</b> al <b>${max}</b>), ~<b>${totalFilas.toLocaleString()}</b> filas.`;
-    // preseleccionar: desde el más viejo, hasta un mes después (sugerencia)
     const de=document.getElementById('bk-desde'), ha=document.getElementById('bk-hasta');
     if(de&&!de.value)de.value=min;
     if(ha&&!ha.value)ha.value=min;
@@ -1011,20 +1019,26 @@ async function cargarDiasDisponibles(){
 // Descarga a Excel todas las filas del rango [desde, hasta]
 async function respaldarRango(){
   const err=document.getElementById('bk-err'), lg=document.getElementById('bk-log');
-  err.textContent='';lg.textContent='';
+  err.style.display='none';err.textContent='';lg.textContent='';
   const desde=document.getElementById('bk-desde').value, hasta=document.getElementById('bk-hasta').value;
   if(!desde||!hasta){err.style.display='block';err.style.color='#c0392b';err.textContent='⚠️ Elige la fecha "Desde" y "Hasta" antes de descargar.';return;}
-  if(desde>hasta){err.textContent='La fecha "desde" no puede ser mayor que "hasta".';return;}
+  if(desde>hasta){err.style.display='block';err.style.color='#c0392b';err.textContent='La fecha "Desde" no puede ser mayor que "Hasta".';return;}
   const btn=document.getElementById('bk-btn-resp');
   btn.disabled=true;btn.textContent='⏳ Descargando…';
   try{
+    // Verificar que la sesión siga activa (si no, la consulta se colgaría)
+    const {data:sess}=await conTimeout(sb.auth.getSession(),8000,'verificar sesión');
+    if(!sess||!sess.session){throw new Error('Tu sesión expiró. Sal y vuelve a entrar con tu contraseña, luego reintenta.');}
+
     lg.textContent='Leyendo filas del '+desde+' al '+hasta+'…';
     const PAGE=1000;let desdeIdx=0,todo=[];
     while(true){
-      const {data,error}=await sb.from('detalle_diario')
-        .select('fecha,clave,nombre,marca,unidad,clasificacion,existencias,grupo,comprador,rotacion,t_entrega,obj_meses,meses_inv,estatus,reorden,back_order')
-        .gte('fecha',desde).lte('fecha',hasta)
-        .order('fecha',{ascending:true}).range(desdeIdx,desdeIdx+PAGE-1);
+      const {data,error}=await conTimeout(
+        sb.from('detalle_diario')
+          .select('fecha,clave,nombre,marca,unidad,clasificacion,existencias,grupo,comprador,rotacion,t_entrega,obj_meses,meses_inv,estatus,reorden,back_order')
+          .gte('fecha',desde).lte('fecha',hasta)
+          .order('fecha',{ascending:true}).range(desdeIdx,desdeIdx+PAGE-1),
+        20000,'leer datos');
       if(error)throw new Error(error.message);
       if(!data||!data.length)break;
       todo=todo.concat(data);
@@ -1032,8 +1046,7 @@ async function respaldarRango(){
       if(data.length<PAGE)break;
       desdeIdx+=PAGE;
     }
-    if(!todo.length){err.textContent='No hay filas en ese rango.';btn.disabled=false;btn.textContent='⬇ Paso 1 · Descargar respaldo (Excel)';return;}
-    // Generar Excel con SheetJS
+    if(!todo.length){err.style.display='block';err.style.color='#c0392b';err.textContent='No hay filas guardadas en ese rango de fechas.';return;}
     lg.textContent='Generando Excel con '+todo.length.toLocaleString()+' filas…';
     const ws=XLSX.utils.json_to_sheet(todo);
     const wb=XLSX.utils.book_new();
@@ -1042,35 +1055,46 @@ async function respaldarRango(){
     XLSX.writeFile(wb,nombre);
     _bkRespaldado={desde,hasta,filas:todo.length};
     lg.textContent='✅ Respaldo descargado: '+nombre+' ('+todo.length.toLocaleString()+' filas).\nYa puedes borrar este rango con el Paso 2.';
-    // habilitar el botón de borrar
     const del=document.getElementById('bk-btn-del');
     del.disabled=false;del.style.background='#c0392b';del.style.cursor='pointer';
-  }catch(e){err.textContent='Error al respaldar: '+e.message;}
-  finally{btn.disabled=false;btn.textContent='⬇ Paso 1 · Descargar respaldo (Excel)';}
+  }catch(e){
+    err.style.display='block';err.style.color='#c0392b';
+    err.textContent='Error al respaldar: '+e.message;
+  }finally{
+    btn.disabled=false;btn.textContent='⬇ Paso 1 · Descargar respaldo (Excel)';
+  }
 }
 
 // Borra de la base el rango YA respaldado (con doble confirmación)
 async function borrarRango(){
   const err=document.getElementById('bk-err'), lg=document.getElementById('bk-log');
-  err.textContent='';
+  err.style.display='none';err.textContent='';
   const desde=document.getElementById('bk-desde').value, hasta=document.getElementById('bk-hasta').value;
   if(!_bkRespaldado||_bkRespaldado.desde!==desde||_bkRespaldado.hasta!==hasta){
-    err.textContent='Primero descarga el respaldo de ESTE rango (Paso 1) antes de borrar.';return;
+    err.style.display='block';err.style.color='#c0392b';err.textContent='Primero descarga el respaldo de ESTE rango (Paso 1) antes de borrar.';return;
   }
   if(!confirm('¿Seguro que quieres BORRAR de la base los días del '+desde+' al '+hasta+'?\n\nYa descargaste el respaldo. Esta acción no se puede deshacer, pero tienes el Excel de respaldo.')) return;
   const btn=document.getElementById('bk-btn-del');
   btn.disabled=true;btn.textContent='⏳ Borrando…';
   try{
+    const {data:sess}=await conTimeout(sb.auth.getSession(),8000,'verificar sesión');
+    if(!sess||!sess.session){throw new Error('Tu sesión expiró. Sal y vuelve a entrar, luego reintenta.');}
     lg.textContent='Borrando detalle del '+desde+' al '+hasta+'…';
-    const {error:e1}=await sb.from('detalle_diario').delete().gte('fecha',desde).lte('fecha',hasta);
+    const {error:e1}=await conTimeout(sb.from('detalle_diario').delete().gte('fecha',desde).lte('fecha',hasta),20000,'borrar detalle');
     if(e1)throw new Error('borrar detalle: '+e1.message);
-    const {error:e2}=await sb.from('dias_cargados').delete().gte('fecha',desde).lte('fecha',hasta);
+    const {error:e2}=await conTimeout(sb.from('dias_cargados').delete().gte('fecha',desde).lte('fecha',hasta),15000,'borrar control');
     if(e2)throw new Error('borrar control de días: '+e2.message);
     lg.textContent='✅ Borrados los días del '+desde+' al '+hasta+'. Espacio liberado.';
     _bkRespaldado=null;
-    btn.style.background='#adb5bd';btn.style.cursor='not-allowed';
+    btn.style.background='#adb5bd';btn.style.cursor='not-allowed';btn.disabled=true;
     await cargarDiasDisponibles();
-  }catch(e){err.textContent='Error al borrar: '+e.message;btn.disabled=false;btn.textContent='🗑 Paso 2 · Borrar de la base';}
+  }catch(e){
+    err.style.display='block';err.style.color='#c0392b';
+    err.textContent='Error al borrar: '+e.message;
+    btn.disabled=false;
+  }finally{
+    btn.textContent='🗑 Paso 2 · Borrar de la base';
+  }
 }
 
 // ── Descargar TODO el detalle histórico desde Supabase (paginado) ──
