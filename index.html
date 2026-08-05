@@ -966,6 +966,57 @@ async function publicarDataset(clave,meta){
   const ds=await sb.from('datasets').upsert({clave:clave,payload:meta,actualizado_por:usuarioActual||'admin'});
   if(ds.error)throw new Error('datasets ('+clave+'): '+ds.error.message);
 }
+// ── Descargar TODO el detalle histórico desde Supabase (paginado) ──
+async function descargarDetalleBase(log){
+  const PAGE=1000; let desde=0, todo=[];
+  while(true){
+    const {data,error}=await sb.from('detalle_diario')
+      .select('fecha,clave,nombre,marca,unidad,clasificacion,existencias,grupo,comprador,rotacion,t_entrega,obj_meses,meses_inv,estatus,reorden,back_order')
+      .order('fecha',{ascending:true}).range(desde,desde+PAGE-1);
+    if(error)throw new Error('leer detalle_diario: '+error.message);
+    if(!data||!data.length)break;
+    todo=todo.concat(data);
+    if(log&&todo.length%10000<PAGE)log('   … '+todo.length.toLocaleString()+' filas leídas');
+    if(data.length<PAGE)break;
+    desde+=PAGE;
+  }
+  return todo;
+}
+
+// Convierte una fila de la base al formato que espera buildData (como si viniera del Excel Detalle)
+function filaBaseADetalle(r){
+  return {
+    'Fecha':r.fecha,'Clave':r.clave,'Nombre':r.nombre||'','Marca':r.marca||'',
+    'Unidad':r.unidad||'','Clasificación':r.clasificacion||'','Existencias':r.existencias,
+    'GRUPO':r.grupo||'','COMPRADOR':r.comprador||'','Clasificación por movimiento':r.rotacion||'',
+    'Tiempo de entrega':r.t_entrega,'Objetivo_Meses de inventario':r.obj_meses,
+    'Meses de inventario':r.meses_inv,'Clasificacion_estatus de inventario':r.estatus||'',
+    'Clasificacion_Punto de reorden':r.reorden||'','Back Order':r.back_order
+  };
+}
+
+// Reconstruye Hoja1 (raw) desde el detalle: comprador × rotación × estatus → cuenta de claves.
+// Excluye NUEVOS y SIN COMPRA para coincidir exactamente con la Hoja1 original.
+function reconstruirHoja1(rawD){
+  const ROT_OK=['SAGRADOS','ALTA ROTACIÓN','MEDIA ROTACIÓN','LENTA ROTACIÓN'];
+  const acc={};
+  rawD.forEach(r=>{
+    const f=String(r['Fecha']||'');
+    const c=String(r['COMPRADOR']||'').trim().toUpperCase();
+    if(!c||c==='PRODUCCION')return;
+    const rot=String(r['Clasificación por movimiento']||'').trim().toUpperCase();
+    if(!ROT_OK.includes(rot))return;
+    const est=String(r['Clasificacion_estatus de inventario']||'').trim().toUpperCase();
+    if(!est)return;
+    const k=f+'||'+c+'||'+rot+'||'+est;
+    acc[k]=(acc[k]||0)+1;
+  });
+  return Object.keys(acc).map(k=>{
+    const [f,c,rot,est]=k.split('||');
+    return {'Fecha':f,'COMPRADOR':c,'Clasificacion':rot,'Clasificacion de mov':est,'Claves':acc[k]};
+  });
+}
+
 // ── Guardar el detalle diario en Supabase, solo los días que aún no están ──
 async function guardarDiasNuevos(rawD){
   if(!rawD||!rawD.length){log('   (sin filas de Detalle para guardar)');return;}
@@ -1058,9 +1109,30 @@ async function procesarExcel(file){
     log('⚙️ Procesando Detalle…');
     const rawD=XLSX.utils.sheet_to_json(wsD,{raw:false,defval:''});
     log('   '+rawD.length.toLocaleString()+' filas');
+    // ── GUARDAR el/los día(s) nuevo(s) del Excel en la base ──
+    log('💾 Guardando en base de datos…');
+    try{ await guardarDiasNuevos(rawD); }
+    catch(e){ log('⚠️ Guardado en base: '+e.message+' (se continúa con el Excel)'); }
+
+    // ── RECONSTRUIR todo el histórico desde la base de datos ──
+    let rawUse=raw, rawDUse=rawD;
+    try{
+      log('📥 Leyendo histórico completo desde la base…');
+      const baseRows=await descargarDetalleBase(log);
+      if(baseRows&&baseRows.length){
+        rawDUse=baseRows.map(filaBaseADetalle);
+        rawUse=reconstruirHoja1(rawDUse);
+        log('   ✅ '+rawDUse.length.toLocaleString()+' filas de detalle desde la base ('+new Set(rawDUse.map(r=>r['Fecha'])).size+' días).');
+      }else{
+        log('   ⚠️ La base está vacía; se usa solo el Excel.');
+      }
+    }catch(e){
+      log('⚠️ No se pudo leer la base ('+e.message+'). Se usa el Excel completo.');
+    }
+
     log('🧮 Calculando dashboard de Faltantes (lógica original)…');
     await new Promise(r=>setTimeout(r,50));
-    const payload=buildData(raw,rawD,file.name);
+    const payload=buildData(rawUse,rawDUse,file.name);
     if(!payload||!payload.fechas||!payload.fechas.length) throw new Error('El procesamiento no generó fechas. Revisa que Hoja1 tenga las columnas Fecha, COMPRADOR, Clasificacion, Clasificacion de mov y Claves.');
     log('✅ Periodo: '+payload.pf+' → '+payload.uf+' · '+payload.fechas.length+' días · '+payload.compradores.length+' compradores');
 
@@ -1087,10 +1159,6 @@ async function procesarExcel(file){
 
     const cg=await sb.from('cargas').insert({archivo:file.name,usuario:usuarioActual||'admin',periodo_inicio:payload.pf,periodo_fin:payload.uf,resumen:{hoja1:raw.length,detalle:rawD.length,dashboard:'faltantes'}});
     if(cg.error) log('⚠️ Historial de cargas: '+cg.error.message);
-
-    // ── GUARDAR DETALLE DIARIO EN LA BASE (solo días nuevos) ──
-    try{ await guardarDiasNuevos(rawD); }
-    catch(e){ log('⚠️ Guardado en base de datos: '+e.message); }
 
     // ── ALARMAS POR COMPRADOR ──
     log('🔔 Calculando alarmas por comprador…');
