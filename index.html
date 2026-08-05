@@ -227,6 +227,28 @@
         </div>
 
         <div class="admin-card">
+          <h2>🗄️ Liberar espacio (respaldar y borrar días)</h2>
+          <p class="desc">Descarga a Excel un rango de días guardados en la base y, una vez respaldados, bórralos de la base de datos para liberar espacio. <b>Paso 1:</b> descarga el respaldo. <b>Paso 2:</b> confirma el borrado.</p>
+          <div id="bk-info" style="font-size:12px;color:#6b7a99;margin-bottom:10px">Cargando días disponibles…</div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">Desde</label>
+              <input type="date" id="bk-desde" style="font-size:13px;padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">Hasta</label>
+              <input type="date" id="bk-hasta" style="font-size:13px;padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px">
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="abtn" onclick="respaldarRango()" id="bk-btn-resp" style="background:#2d6a4f">⬇ Paso 1 · Descargar respaldo (Excel)</button>
+            <button class="abtn" onclick="borrarRango()" id="bk-btn-del" style="background:#adb5bd;cursor:not-allowed" disabled>🗑 Paso 2 · Borrar de la base</button>
+          </div>
+          <div class="gate-err" id="bk-err" style="margin-top:8px"></div>
+          <div id="bk-log" style="font-size:12px;color:#495057;margin-top:8px;white-space:pre-line"></div>
+        </div>
+
+        <div class="admin-card">
           <h2>👤 Asignar comprador a OCs pendientes</h2>
           <p class="desc">Órdenes con Back Order PENDIENTE. La app infiere el comprador del nombre de quien capturó la OC; <b>cualquier asignación puede corregirse aquí</b> y la corrección manual siempre gana. Todo se guarda y se conserva en las cargas futuras.</p>
           <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px">
@@ -630,6 +652,7 @@ async function adminLogin(){
   esAdmin=true;
   document.getElementById('adm-lock').style.display='none';
   document.getElementById('adm-open').style.display='block';
+  try{ cargarDiasDisponibles(); }catch(e){}
 }
 function log(msg){const p=document.getElementById('prog');p.style.display='block';p.textContent+=msg+'\n';p.scrollTop=p.scrollHeight;}
 function logClear(){const p=document.getElementById('prog');p.textContent='';p.style.display='block';}
@@ -966,6 +989,90 @@ async function publicarDataset(clave,meta){
   const ds=await sb.from('datasets').upsert({clave:clave,payload:meta,actualizado_por:usuarioActual||'admin'});
   if(ds.error)throw new Error('datasets ('+clave+'): '+ds.error.message);
 }
+// ── Respaldo y borrado por rango de fechas (liberar espacio) ──
+let _bkRespaldado=null;  // guarda el rango que ya se respaldó, para permitir borrar
+
+async function cargarDiasDisponibles(){
+  const info=document.getElementById('bk-info');
+  try{
+    const {data,error}=await sb.from('dias_cargados').select('fecha,filas').order('fecha',{ascending:true});
+    if(error)throw new Error(error.message);
+    if(!data||!data.length){info.textContent='La base no tiene días guardados todavía.';return;}
+    const min=data[0].fecha, max=data[data.length-1].fecha;
+    const totalFilas=data.reduce((a,d)=>a+(d.filas||0),0);
+    info.innerHTML=`La base tiene <b>${data.length}</b> días (del <b>${min}</b> al <b>${max}</b>), ~<b>${totalFilas.toLocaleString()}</b> filas.`;
+    // preseleccionar: desde el más viejo, hasta un mes después (sugerencia)
+    const de=document.getElementById('bk-desde'), ha=document.getElementById('bk-hasta');
+    if(de&&!de.value)de.value=min;
+    if(ha&&!ha.value)ha.value=min;
+  }catch(e){info.textContent='No se pudieron leer los días: '+e.message;}
+}
+
+// Descarga a Excel todas las filas del rango [desde, hasta]
+async function respaldarRango(){
+  const err=document.getElementById('bk-err'), lg=document.getElementById('bk-log');
+  err.textContent='';lg.textContent='';
+  const desde=document.getElementById('bk-desde').value, hasta=document.getElementById('bk-hasta').value;
+  if(!desde||!hasta){err.textContent='Elige la fecha desde y hasta.';return;}
+  if(desde>hasta){err.textContent='La fecha "desde" no puede ser mayor que "hasta".';return;}
+  const btn=document.getElementById('bk-btn-resp');
+  btn.disabled=true;btn.textContent='⏳ Descargando…';
+  try{
+    lg.textContent='Leyendo filas del '+desde+' al '+hasta+'…';
+    const PAGE=1000;let desdeIdx=0,todo=[];
+    while(true){
+      const {data,error}=await sb.from('detalle_diario')
+        .select('fecha,clave,nombre,marca,unidad,clasificacion,existencias,grupo,comprador,rotacion,t_entrega,obj_meses,meses_inv,estatus,reorden,back_order')
+        .gte('fecha',desde).lte('fecha',hasta)
+        .order('fecha',{ascending:true}).range(desdeIdx,desdeIdx+PAGE-1);
+      if(error)throw new Error(error.message);
+      if(!data||!data.length)break;
+      todo=todo.concat(data);
+      lg.textContent='Leídas '+todo.length.toLocaleString()+' filas…';
+      if(data.length<PAGE)break;
+      desdeIdx+=PAGE;
+    }
+    if(!todo.length){err.textContent='No hay filas en ese rango.';btn.disabled=false;btn.textContent='⬇ Paso 1 · Descargar respaldo (Excel)';return;}
+    // Generar Excel con SheetJS
+    lg.textContent='Generando Excel con '+todo.length.toLocaleString()+' filas…';
+    const ws=XLSX.utils.json_to_sheet(todo);
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'detalle_diario');
+    const nombre='respaldo_detalle_'+desde+'_a_'+hasta+'.xlsx';
+    XLSX.writeFile(wb,nombre);
+    _bkRespaldado={desde,hasta,filas:todo.length};
+    lg.textContent='✅ Respaldo descargado: '+nombre+' ('+todo.length.toLocaleString()+' filas).\nYa puedes borrar este rango con el Paso 2.';
+    // habilitar el botón de borrar
+    const del=document.getElementById('bk-btn-del');
+    del.disabled=false;del.style.background='#c0392b';del.style.cursor='pointer';
+  }catch(e){err.textContent='Error al respaldar: '+e.message;}
+  finally{btn.disabled=false;btn.textContent='⬇ Paso 1 · Descargar respaldo (Excel)';}
+}
+
+// Borra de la base el rango YA respaldado (con doble confirmación)
+async function borrarRango(){
+  const err=document.getElementById('bk-err'), lg=document.getElementById('bk-log');
+  err.textContent='';
+  const desde=document.getElementById('bk-desde').value, hasta=document.getElementById('bk-hasta').value;
+  if(!_bkRespaldado||_bkRespaldado.desde!==desde||_bkRespaldado.hasta!==hasta){
+    err.textContent='Primero descarga el respaldo de ESTE rango (Paso 1) antes de borrar.';return;
+  }
+  if(!confirm('¿Seguro que quieres BORRAR de la base los días del '+desde+' al '+hasta+'?\n\nYa descargaste el respaldo. Esta acción no se puede deshacer, pero tienes el Excel de respaldo.')) return;
+  const btn=document.getElementById('bk-btn-del');
+  btn.disabled=true;btn.textContent='⏳ Borrando…';
+  try{
+    lg.textContent='Borrando detalle del '+desde+' al '+hasta+'…';
+    const {error:e1}=await sb.from('detalle_diario').delete().gte('fecha',desde).lte('fecha',hasta);
+    if(e1)throw new Error('borrar detalle: '+e1.message);
+    const {error:e2}=await sb.from('dias_cargados').delete().gte('fecha',desde).lte('fecha',hasta);
+    if(e2)throw new Error('borrar control de días: '+e2.message);
+    lg.textContent='✅ Borrados los días del '+desde+' al '+hasta+'. Espacio liberado.';
+    _bkRespaldado=null;
+    btn.style.background='#adb5bd';btn.style.cursor='not-allowed';
+    await cargarDiasDisponibles();
+  }catch(e){err.textContent='Error al borrar: '+e.message;btn.disabled=false;btn.textContent='🗑 Paso 2 · Borrar de la base';}
+}
+
 // ── Descargar TODO el detalle histórico desde Supabase (paginado) ──
 async function descargarDetalleBase(log){
   const PAGE=1000; let desde=0, todo=[];
