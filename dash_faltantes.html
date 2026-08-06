@@ -455,14 +455,17 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
           <h3 style="font-size:13px;font-weight:700;color:#5a5a99">🔄 Reclasificadas / Descontinuadas</h3>
           <button class="bsm" style="margin-left:auto" onclick="expCmpExcel('resDesc')">⬇ Excel</button>
         </div>
+        <p style="font-size:11px;color:#6b7a99;margin:-2px 0 8px">Todas las claves que estaban en el Día A (cualquier estatus) y ya no aparecen en el Día B: les cambiaron el estatus de compra y salieron del universo analizado. El "Estatus en A" y el "BO" ayudan a identificar bajo qué condiciones se les cambió.</p>
         <div class="dtw"><table class="dt resizable">
-          <colgroup><col style="width:70px"><col style="min-width:240px"><col style="width:80px"><col style="width:80px"><col style="width:110px"></colgroup>
+          <colgroup><col style="width:70px"><col style="min-width:240px"><col style="width:80px"><col style="width:80px"><col style="width:110px"><col style="width:120px"><col style="width:80px"></colgroup>
           <thead><tr>
             <th onclick="srtCmp('resDesc','clave')">Clave<span class="si"></span><span class="rsz"></span></th>
             <th onclick="srtCmp('resDesc','nombre')">Nombre<span class="si"></span><span class="rsz"></span></th>
             <th onclick="srtCmp('resDesc','marca')">Marca<span class="si"></span><span class="rsz"></span></th>
             <th onclick="srtCmp('resDesc','comprador')">Comprador<span class="si"></span><span class="rsz"></span></th>
-            <th onclick="srtCmp('resDesc','clmov')">Clasif.Mov.<span class="si"></span></th>
+            <th onclick="srtCmp('resDesc','clmov')">Clasif.Mov.<span class="si"></span><span class="rsz"></span></th>
+            <th onclick="srtCmp('resDesc','estatus')" title="Estatus que tenía la clave en el día A">Estatus en A<span class="si"></span><span class="rsz"></span></th>
+            <th onclick="srtCmp('resDesc','bo')" title="Tenía Back Order / pedido vigente en A">BO<span class="si"></span></th>
           </tr></thead><tbody id="cmp-resDesc-body"></tbody></table></div>
         <div id="cmp-resDesc-empty" style="display:none;text-align:center;padding:24px;color:#6b7a99">Sin claves en esta categoría</div>
       </div>
@@ -1719,18 +1722,28 @@ let cmpSort={nuevas:{col:null,dir:'asc'},resInv:{col:null,dir:'asc'},resDesc:{co
 function calcCambios(detR, fechaA, fechaB){
   const rowsA_falt = detR.filter(r=>r.fecha===fechaA && r.estatus==='FALTANTE');
   const rowsB_falt = detR.filter(r=>r.fecha===fechaB && r.estatus==='FALTANTE');
-  const rowsB_all  = detR.filter(r=>r.fecha===fechaB); // todas las filas de B, no solo faltantes
+  const rowsA_all  = detR.filter(r=>r.fecha===fechaA); // TODAS las filas de A (cualquier estatus)
+  const rowsB_all  = detR.filter(r=>r.fecha===fechaB); // TODAS las filas de B
   const clavesA_falt = new Set(rowsA_falt.map(r=>r.clave));
   const clavesB_falt = new Set(rowsB_falt.map(r=>r.clave));
   const clavesB_all   = new Set(rowsB_all.map(r=>r.clave));
 
   const nuevas = rowsB_falt.filter(r=>!clavesA_falt.has(r.clave));
 
-  // Resueltas: claves que eran FALTANTE en A y ya no son FALTANTE en B
+  // Resueltas: claves que eran FALTANTE en A y ya no son FALTANTE en B (pero siguen existiendo en B)
   const resueltasRaw = rowsA_falt.filter(r=>!clavesB_falt.has(r.clave));
-  // Subdividir: con inventario (sigue existiendo en B, con otro estatus) vs desaparecida/reclasificada (ya no aparece en B)
   const resueltasConInventario = resueltasRaw.filter(r=>clavesB_all.has(r.clave));
-  const resueltasDesaparecidas = resueltasRaw.filter(r=>!clavesB_all.has(r.clave));
+
+  // Reclasificadas/Descontinuadas: TODAS las claves que estaban en A (cualquier estatus)
+  // y YA NO aparecen en B. Si desaparecieron, es que les cambiaron el estatus de compra
+  // y salieron del universo analizado. (Una fila por clave, tomando su registro en A.)
+  const vistasA = new Set();
+  const resueltasDesaparecidas = rowsA_all.filter(r=>{
+    if(clavesB_all.has(r.clave)) return false;   // sigue en B → no desapareció
+    if(vistasA.has(r.clave)) return false;        // evitar duplicados por clave
+    vistasA.add(r.clave);
+    return true;
+  });
 
   return {
     nuevas,
@@ -1887,13 +1900,26 @@ function renderCmpTbl(which){
   const tb=document.getElementById('cmp-'+which+'-body'), em=document.getElementById('cmp-'+which+'-empty');
   if(!rows.length){ tb.innerHTML=''; em.style.display='block'; return; }
   em.style.display='none';
-  tb.innerHTML = rows.map(r=>`<tr>
+  // La tabla de Reclasificadas/Descontinuadas lleva 2 columnas extra: Estatus (en A) y BO
+  const esDesc = which==='resDesc';
+  tb.innerHTML = rows.map(r=>{
+    let extra='';
+    if(esDesc){
+      const est=r.estatus||'—';
+      const bo=(+r.bo>0)?('Sí ('+(+r.bo)+')'):'No';
+      const boCol=(+r.bo>0)?'#1e7a4a':'#b0b7c3';
+      extra=`<td style="font-size:10px;font-weight:600" title="Estatus en el día A">${est}</td>`+
+            `<td style="font-size:10px;font-weight:700;color:${boCol}" title="Back Order / pedido vigente en A">${bo}</td>`;
+    }
+    return `<tr>
     <td style="font-weight:600;color:#1e3a5f" title="${r.clave}">${r.clave}</td>
     <td style="white-space:normal;word-break:break-word;line-height:1.3;overflow:visible" title="${r.nombre}">${r.nombre}</td>
     <td title="${r.marca||''}">${r.marca||'—'}</td>
     <td title="${r.comprador||''}">${S2N(r.comprador)}</td>
     <td style="font-size:9.5px" title="${r.clmov||''}">${(r.clmov||'—').replace(' ROTACIÓN','')}</td>
-  </tr>`).join('');
+    ${extra}
+  </tr>`;
+  }).join('');
 }
 function buildCmpSheetRows(which){
   const rows = [...cmpData[which]];
@@ -1904,7 +1930,11 @@ function buildCmpSheetRows(which){
       return (va<vb?-1:va>vb?1:0)*(dir==='asc'?1:-1);
     });
   }
-  return rows.map(r=>({ 'Clave':r.clave, 'Nombre':r.nombre, 'Marca':r.marca||'', 'Comprador':r.comprador||'', 'Clasif.Mov.':r.clmov||'' }));
+  return rows.map(r=>{
+    const base={ 'Clave':r.clave, 'Nombre':r.nombre, 'Marca':r.marca||'', 'Comprador':r.comprador||'', 'Clasif.Mov.':r.clmov||'' };
+    if(which==='resDesc'){ base['Estatus en A']=r.estatus||''; base['BO']=(+r.bo>0)?('Sí ('+(+r.bo)+')'):'No'; }
+    return base;
+  });
 }
 const CMP_SHEET_NAME = { nuevas:'Nuevas Faltantes', resInv:'Resueltas c-Inventario', resDesc:'Reclasificadas-Desc' };
 function expCmpExcel(which){
