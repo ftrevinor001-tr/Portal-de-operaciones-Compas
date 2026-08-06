@@ -215,6 +215,7 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
       <div class="card" style="margin-bottom:16px">
         <h2>Promedio de meses de inventario vs objetivo — por comprador</h2>
         <p style="font-size:12px;color:#6b7a99;margin:-4px 0 8px">Promedio simple de todas las claves con inventario (meses &gt; 0). Cada clave pesa igual.</p>
+        <div style="font-size:11px;color:#b8860b;font-style:italic;margin:-2px 0 10px">Nota: se excluye la familia TORNILLOS, TUERCAS Y REMACHES.</div>
         <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-bottom:12px;padding:8px 12px;background:#f5f6fa;border-radius:8px;font-size:11px">
           <span style="display:flex;align-items:center;gap:5px"><span style="width:14px;height:14px;background:#c0582a;border-radius:3px;display:inline-block"></span> <b>Barra:</b> meses de inventario promedio</span>
           <span style="display:flex;align-items:center;gap:5px"><span style="width:20px;height:3px;background:#1e7a4a;display:inline-block"></span> <b>Línea:</b> meses objetivo promedio</span>
@@ -227,6 +228,7 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
       <div class="card" style="margin-bottom:16px">
         <h2>Sobre inventario promedio por comprador</h2>
         <p style="font-size:12px;color:#6b7a99;margin:-4px 0 12px">Meses de inventario que están por encima del objetivo (promedio meses inv. − promedio objetivo), ordenado de mayor a menor. Responde a los filtros de arriba.</p>
+        <div style="font-size:11px;color:#b8860b;font-style:italic;margin:-2px 0 10px">Nota: se excluye la familia TORNILLOS, TUERCAS Y REMACHES.</div>
         <div style="position:relative;height:440px"><canvas id="sob-exceso-chart"></canvas></div>
       </div>
 
@@ -234,6 +236,7 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
       <div class="card" style="margin-bottom:16px">
         <h2 id="sob-marcas-titulo">Marcas que más afectan el inventario</h2>
         <p style="font-size:12px;color:#6b7a99;margin:-4px 0 8px">Ordenadas por exceso sobre objetivo (meses acumulados por encima del objetivo). Entre paréntesis, la familia y el número de claves.</p>
+        <div style="font-size:11px;color:#b8860b;font-style:italic;margin:-2px 0 10px">Nota: se excluye la familia TORNILLOS, TUERCAS Y REMACHES.</div>
         <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-bottom:12px;padding:8px 12px;background:#f5f6fa;border-radius:8px;font-size:11px">
           <span style="font-weight:700;color:#6b7a99">Color = meses de inventario promedio:</span>
           <span style="display:flex;align-items:center;gap:5px"><span style="width:14px;height:14px;background:#3a9688;border-radius:3px;display:inline-block"></span> menos de 4</span>
@@ -249,6 +252,7 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
       <!-- Tabla detalle por comprador -->
       <div class="card">
         <h2>Detalle por comprador</h2>
+        <div style="font-size:11px;color:#b8860b;font-style:italic;margin:-2px 0 10px">Nota: se excluye la familia TORNILLOS, TUERCAS Y REMACHES.</div>
         <div style="overflow-x:auto">
           <table id="sob-tabla" style="width:100%;border-collapse:collapse;font-size:12px">
             <thead><tr style="background:#1c3557;color:#fff">
@@ -1116,7 +1120,8 @@ function limpiarSobreInv(){
 
 function renderSobreInv(){
   const S=G.sobreInv; if(!S||!S.celdas)return;
-  const celdas=sobFiltrado(null);
+  const EXCL_FAM='TORNILLOS, TUERCAS Y REMACHES';   // familia excluida de este tablero
+  const celdas=sobFiltrado(null).filter(x=>String(x.g||'').trim().toUpperCase()!==EXCL_FAM);
   // Agregar por comprador: sumar meses y objetivo, contar claves
   const porComp={};
   celdas.forEach(x=>{
