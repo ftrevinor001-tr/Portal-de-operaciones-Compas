@@ -750,6 +750,27 @@ function buildData(raw,rawD,fn){
     sobreInv.comps=[...comps].sort();
   })();
 
+  // Pre-agregado TOP EXCESO: claves con más meses sobre su objetivo individual.
+  // Guarda top 40 por día×comprador (excluye TORNILLOS), para la tabla top 10 filtrable.
+  const topExceso={porDiaComp:{},dias:[]};
+  (function(){
+    const EXCL_FAM='TORNILLOS, TUERCAS Y REMACHES';
+    const tmp={};
+    detR.forEach(x=>{
+      const mi=+x.meses_inv;if(!(mi>0))return;
+      const obj=+x.obj_meses||0;const exc=mi-obj;if(exc<=0)return;
+      const c=String(x.comprador||'').trim().toUpperCase();if(!c||c==='PRODUCCION')return;
+      const g=String(x.grupo||'').trim().toUpperCase();if(g===EXCL_FAM)return;
+      const f=String(x.fecha||'');if(!f)return;
+      const k=f+'||'+c;
+      (tmp[k]=tmp[k]||[]).push({clave:x.clave,nombre:String(x.nombre||'').slice(0,45),
+        marca:String(x.marca||''),grupo:g,rot:String(x.clmov||'').trim().toUpperCase(),
+        mi:+mi.toFixed(1),obj:+obj.toFixed(1),exc:+exc.toFixed(1),bo:+x.bo||0});
+    });
+    Object.keys(tmp).forEach(k=>{tmp[k].sort((a,b)=>b.exc-a.exc);topExceso.porDiaComp[k]=tmp[k].slice(0,40);});
+    topExceso.dias=[...new Set(Object.keys(tmp).map(k=>k.split('||')[0]))].sort();
+  })();
+
   // Pre-agregado ABC para la Comparativa (por DÍA, para pico correcto):
   //  · faltДiarios: faltantes (estatus FALTANTE) por día × comprador × rotación × ABC
   //  · skusCierre: total SKUs por comprador × rotación × ABC en el cierre de cada mes
@@ -787,7 +808,7 @@ function buildData(raw,rawD,fn){
     abcCmp.abcList=[...abcSet].sort();
     abcCmp.rotList=[...rotSet].sort();
   })();
-  return{fechas,compradores,totalByDay,clavesTotal,clasByDay,compByDay,compClByDay,CDATA,AREA,uf,pf,mA,mAn,fU,meses:mes,skuMes,sobreInv,abcCmp,rowsRes:rows,totalHoy:totalByDay[uf]||0,clavesHoy:clavesTotal[uf]||0,filename:fn,detR,detF:ufd,detM:uq('marca'),detCM:uq('clmov'),detG:uq('grupo'),detC:uq('comprador'),detE:uq('estatus'),detRd:uq('reorden'),detFalt};
+  return{fechas,compradores,totalByDay,clavesTotal,clasByDay,compByDay,compClByDay,CDATA,AREA,uf,pf,mA,mAn,fU,meses:mes,skuMes,sobreInv,abcCmp,topExceso,rowsRes:rows,totalHoy:totalByDay[uf]||0,clavesHoy:clavesTotal[uf]||0,filename:fn,detR,detF:ufd,detM:uq('marca'),detCM:uq('clmov'),detG:uq('grupo'),detC:uq('comprador'),detE:uq('estatus'),detRd:uq('reorden'),detFalt};
 }
 
 

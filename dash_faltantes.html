@@ -196,7 +196,7 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
     </div>
     </div><!-- fin cn-falt -->
 <div id="cn-sob" style="display:none">
-      <div class="fbox" style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px">
+      <div class="fbox" style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;position:sticky;top:0;z-index:50;background:#fff;padding:12px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.06);border:1px solid #eef1f7">
         <div><div class="flbl">📅 Día</div><select id="sob-mes" onchange="renderSobreInv()" style="font-size:13px;padding:6px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:130px"></select></div>
         <div><div class="flbl">👤 Comprador</div><select id="sob-comp" onchange="sobCascada('comp')" style="font-size:13px;padding:6px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:170px"></select></div>
         <div><div class="flbl">📂 Familia (GRUPO)</div><select id="sob-fam" onchange="sobCascada('fam')" style="font-size:13px;padding:6px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:170px"></select></div>
@@ -267,6 +267,29 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
         </div>
       </div>
     </div>
+
+      <!-- Top 10 claves con más meses sobre objetivo -->
+      <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px">
+          <h2 style="margin:0">Top 10 claves con más meses sobre el objetivo</h2>
+          <div style="display:flex;flex-direction:column;gap:3px;margin-left:auto">
+            <label style="font-size:10px;font-weight:700;color:#6b7a99;text-transform:uppercase">Comprador</label>
+            <select id="top-comp" onchange="renderTopExceso()" style="font-size:12px;padding:6px 10px;border:1.5px solid #c9d4f0;border-radius:7px">
+              <option value="">— Todos —</option>
+            </select>
+          </div>
+        </div>
+        <p style="font-size:12px;color:#6b7a99;margin:-2px 0 4px">Claves cuyo nivel de inventario (meses) más excede su objetivo individual. Exceso = meses de inventario − objetivo de la clave.</p>
+        <div style="font-size:11px;color:#b8860b;font-style:italic;margin:-2px 0 10px">Nota: se excluye la familia TORNILLOS, TUERCAS Y REMACHES.</div>
+        <div class="dtw"><table class="dt">
+          <colgroup><col style="width:70px"><col style="min-width:220px"><col style="width:90px"><col style="width:130px"><col style="width:80px"><col style="width:80px"><col style="width:90px"><col style="width:60px"></colgroup>
+          <thead><tr>
+            <th>Clave</th><th>Nombre</th><th>Marca</th><th>Comprador</th>
+            <th style="text-align:right">Meses Inv.</th><th style="text-align:right">Objetivo</th>
+            <th style="text-align:right">Exceso</th><th style="text-align:center">BO</th>
+          </tr></thead><tbody id="top-exceso-body"></tbody></table></div>
+        <p id="top-exceso-empty" style="display:none;color:#8a97ad;font-size:13px;margin-top:8px">Sin claves sobre objetivo para el filtro seleccionado.</p>
+      </div>
   </div><!-- fin panel-clasif -->
 
   <div id="panel-resumen" class="panel">
@@ -274,7 +297,16 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
       <h2>Comparativo de Faltantes</h2><p id="res-sub">Cierre mes anterior vs mes actual · sin PRODUCCION</p>
       <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:16px;padding:14px;background:#f5f6fa;border-radius:10px;border:1px solid #e2e6ed">
         <div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">👤 Comprador</label>
-          <select id="r-comp" onchange="renderRes()"><option value="TODOS">— Todos —</option><option value="__A__">▶ Área General</option></select></div>
+          <div style="position:relative">
+            <button type="button" id="r-comp-btn" onclick="toggleCompMenu()" style="font-size:13px;padding:8px 12px;border:1.5px solid #c9d4f0;border-radius:7px;background:#fff;cursor:pointer;text-align:left;min-width:180px">Todos ▾</button>
+            <div id="r-comp-menu" style="display:none;position:absolute;top:100%;left:0;z-index:60;background:#fff;border:1px solid #c9d4f0;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);padding:8px;margin-top:2px;min-width:220px;max-height:300px;overflow:auto">
+              <div style="display:flex;gap:8px;padding:2px 6px 8px;border-bottom:1px solid #eef1f7;margin-bottom:4px">
+                <button type="button" onclick="compTodos(true)" style="font-size:11px;padding:3px 8px;border:1px solid #c9d4f0;border-radius:5px;background:#f0f4fb;cursor:pointer">Todos</button>
+                <button type="button" onclick="compTodos(false)" style="font-size:11px;padding:3px 8px;border:1px solid #c9d4f0;border-radius:5px;background:#f0f4fb;cursor:pointer">Ninguno</button>
+              </div>
+              <div id="r-comp-list"></div>
+            </div>
+          </div></div>
         <div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">📂 Clasificación</label>
           <select id="r-clas" onchange="renderRes()"><option value="TODAS">— Todas —</option><option value="TOTAL">Global</option><option value="SAGRADOS">Sagrados</option><option value="ALTA ROTACIÓN">Alta Rotación</option><option value="MEDIA ROTACIÓN">Media Rotación</option><option value="LENTA ROTACIÓN">Lenta Rotación</option></select></div>
         <div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">📅 Mes de análisis</label>
@@ -287,7 +319,7 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
           </div></div>
         <div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">🎯 Objetivo</label>
           <select id="r-obj" onchange="renderRes()"><option value="si">Mostrar</option><option value="no">Ocultar</option></select></div>
-        <button onclick="document.getElementById('r-comp').value='TODOS';document.getElementById('r-clas').value='TODAS';document.getElementById('r-mes').value=G.mA;renderRes()" style="padding:7px 12px;background:#fff;border:1.5px solid #c9d4f0;border-radius:7px;color:#1e3a5f;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">↺ Limpiar</button>
+        <button onclick="compTodos(true);document.getElementById('r-clas').value='TODAS';document.getElementById('r-mes').value=G.mA;renderRes()" style="padding:7px 12px;background:#fff;border:1.5px solid #c9d4f0;border-radius:7px;color:#1e3a5f;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">↺ Limpiar</button>
         <div id="r-cnt" style="margin-left:auto;font-size:12px;color:#6b7a99"></div>
       </div>
       <div style="overflow-x:auto"><table class="rt" style="min-width:860px">
@@ -956,6 +988,27 @@ function buildData(raw,rawD,fn){
     sobreInv.comps=[...comps].sort();
   })();
 
+  // Pre-agregado TOP EXCESO: claves con más meses sobre su objetivo individual.
+  // Guarda top 40 por día×comprador (excluye TORNILLOS), para la tabla top 10 filtrable.
+  const topExceso={porDiaComp:{},dias:[]};
+  (function(){
+    const EXCL_FAM='TORNILLOS, TUERCAS Y REMACHES';
+    const tmp={};
+    detR.forEach(x=>{
+      const mi=+x.meses_inv;if(!(mi>0))return;
+      const obj=+x.obj_meses||0;const exc=mi-obj;if(exc<=0)return;
+      const c=String(x.comprador||'').trim().toUpperCase();if(!c||c==='PRODUCCION')return;
+      const g=String(x.grupo||'').trim().toUpperCase();if(g===EXCL_FAM)return;
+      const f=String(x.fecha||'');if(!f)return;
+      const k=f+'||'+c;
+      (tmp[k]=tmp[k]||[]).push({clave:x.clave,nombre:String(x.nombre||'').slice(0,45),
+        marca:String(x.marca||''),grupo:g,rot:String(x.clmov||'').trim().toUpperCase(),
+        mi:+mi.toFixed(1),obj:+obj.toFixed(1),exc:+exc.toFixed(1),bo:+x.bo||0});
+    });
+    Object.keys(tmp).forEach(k=>{tmp[k].sort((a,b)=>b.exc-a.exc);topExceso.porDiaComp[k]=tmp[k].slice(0,40);});
+    topExceso.dias=[...new Set(Object.keys(tmp).map(k=>k.split('||')[0]))].sort();
+  })();
+
   // Pre-agregado ABC para la Comparativa (por DÍA, para pico correcto):
   //  · faltДiarios: faltantes (estatus FALTANTE) por día × comprador × rotación × ABC
   //  · skusCierre: total SKUs por comprador × rotación × ABC en el cierre de cada mes
@@ -993,7 +1046,7 @@ function buildData(raw,rawD,fn){
     abcCmp.abcList=[...abcSet].sort();
     abcCmp.rotList=[...rotSet].sort();
   })();
-  return{fechas,compradores,totalByDay,clavesTotal,clasByDay,compByDay,compClByDay,CDATA,AREA,uf,pf,mA,mAn,fU,meses:mes,skuMes,sobreInv,abcCmp,rowsRes:rows,totalHoy:totalByDay[uf]||0,clavesHoy:clavesTotal[uf]||0,filename:fn,detR,detF:ufd,detM:uq('marca'),detCM:uq('clmov'),detG:uq('grupo'),detC:uq('comprador'),detE:uq('estatus'),detRd:uq('reorden'),detFalt};
+  return{fechas,compradores,totalByDay,clavesTotal,clasByDay,compByDay,compClByDay,CDATA,AREA,uf,pf,mA,mAn,fU,meses:mes,skuMes,sobreInv,abcCmp,topExceso,rowsRes:rows,totalHoy:totalByDay[uf]||0,clavesHoy:clavesTotal[uf]||0,filename:fn,detR,detF:ufd,detM:uq('marca'),detCM:uq('clmov'),detG:uq('grupo'),detC:uq('comprador'),detE:uq('estatus'),detRd:uq('reorden'),detFalt};
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────────────
@@ -1119,6 +1172,65 @@ function limpiarSobreInv(){
   const mesSel=document.getElementById('sob-mes');
   if(mesSel&&S&&S.meses.length)mesSel.value=S.meses[S.meses.length-1];
   initSobreInv();  // repuebla opciones completas
+}
+
+// ── Top 10 claves con más meses sobre objetivo individual ──
+let _topCompInit=false;
+function initTopComp(){
+  if(_topCompInit)return;
+  const sel=document.getElementById('top-comp');
+  const T=G.topExceso;
+  if(!sel||!T)return;
+  // compradores disponibles en el pre-agregado
+  const comps=[...new Set(Object.keys(T.porDiaComp).map(k=>k.split('||')[1]))].sort();
+  sel.innerHTML='<option value="">— Todos —</option>'+comps.map(c=>`<option value="${c}">${c}</option>`).join('');
+  _topCompInit=true;
+}
+function renderTopExceso(){
+  const T=G.topExceso;
+  const tb=document.getElementById('top-exceso-body'), em=document.getElementById('top-exceso-empty');
+  if(!tb)return;
+  if(!T||!T.porDiaComp){tb.innerHTML='';if(em){em.style.display='block';em.textContent='Este dato no está disponible. Recarga el Excel en Admin.';}return;}
+  initTopComp();
+  // filtros de la pestaña
+  const dia=document.getElementById('sob-mes').value;             // '' = todos los días → usar el más reciente
+  const fam=document.getElementById('sob-fam').value;
+  const rot=document.getElementById('sob-rot').value;
+  const mar=(document.getElementById('sob-marca').value||'').trim().toUpperCase();
+  const compTop=document.getElementById('top-comp').value;         // filtro propio de la tabla
+  // día efectivo: el seleccionado, o el más reciente si es "todos"
+  const diaEf = dia || (T.dias.length?T.dias[T.dias.length-1]:'');
+  // reunir claves del día efectivo, de los compradores que apliquen
+  let claves=[];
+  Object.keys(T.porDiaComp).forEach(k=>{
+    const [d2,c2]=k.split('||');
+    if(d2!==diaEf)return;
+    if(compTop&&c2!==compTop)return;
+    T.porDiaComp[k].forEach(x=>{claves.push({...x,comp:c2});});
+  });
+  // aplicar filtros de familia, rotación, marca (los mismos de la pestaña)
+  if(fam&&fam!=='TODAS'&&fam!=='— Todas —')claves=claves.filter(x=>x.grupo===fam.toUpperCase());
+  if(rot&&rot!=='TODAS'&&rot!=='— Todas —')claves=claves.filter(x=>x.rot===rot.toUpperCase());
+  if(mar)claves=claves.filter(x=>String(x.marca||'').toUpperCase().includes(mar));
+  // ordenar por exceso y tomar top 10
+  claves.sort((a,b)=>b.exc-a.exc);
+  const top=claves.slice(0,10);
+  if(!top.length){tb.innerHTML='';if(em){em.style.display='block';em.textContent='Sin claves sobre objetivo para el filtro seleccionado.';}return;}
+  if(em)em.style.display='none';
+  tb.innerHTML=top.map(x=>{
+    const bo=(+x.bo>0)?('Sí ('+(+x.bo)+')'):'No';
+    const boCol=(+x.bo>0)?'#1e7a4a':'#b0b7c3';
+    return `<tr>
+      <td style="font-weight:600;color:#1e3a5f">${x.clave}</td>
+      <td style="white-space:normal;line-height:1.3">${x.nombre}</td>
+      <td>${x.marca||'—'}</td>
+      <td>${x.comp}</td>
+      <td style="text-align:right;font-weight:600">${x.mi.toFixed(1)}</td>
+      <td style="text-align:right;color:#6b7a99">${x.obj.toFixed(1)}</td>
+      <td style="text-align:right;font-weight:700;color:#c0392b">+${x.exc.toFixed(1)}</td>
+      <td style="text-align:center;font-weight:700;color:${boCol};font-size:11px">${bo}</td>
+    </tr>`;
+  }).join('');
 }
 
 function renderSobreInv(){
@@ -1249,6 +1361,7 @@ function renderSobreInv(){
 
   // ── Gráfica de MARCAS CRÍTICAS (barras horizontales, ordenadas por exceso sobre objetivo) ──
   renderMarcasCriticas(celdas);
+  renderTopExceso();
 }
 
 function renderMarcasCriticas(celdas){
@@ -1556,6 +1669,41 @@ function calcResMesABC(mSel){
   return {CDATA:CD,AREA:AR,cierre,cierrePrev,mSel,mPrev,aprox:false};
 }
 
+// ── Filtro múltiple de comprador (Comparativo) ──
+let _compSel=null;  // Set de compradores seleccionados; null = aún no inicializado
+
+function initCompFiltro(){
+  const cont=document.getElementById('r-comp-list');
+  if(!cont||!G.compradores)return;
+  _compSel=new Set(G.compradores);   // por defecto todos
+  cont.innerHTML=G.compradores.map(c=>
+    `<label style="display:flex;align-items:center;gap:7px;padding:4px 6px;font-size:13px;cursor:pointer;border-radius:5px" onmouseover="this.style.background='#f0f4fb'" onmouseout="this.style.background=''">
+      <input type="checkbox" value="${c}" checked onchange="onCompToggle()" style="width:15px;height:15px;cursor:pointer"> ${c}</label>`).join('');
+  actualizarCompBtn();
+}
+function toggleCompMenu(){const m=document.getElementById('r-comp-menu');if(m)m.style.display=m.style.display==='none'?'block':'none';}
+function compTodos(v){
+  document.querySelectorAll('#r-comp-list input[type=checkbox]').forEach(c=>c.checked=v);
+  onCompToggle();
+}
+function onCompToggle(){
+  _compSel=new Set();
+  document.querySelectorAll('#r-comp-list input[type=checkbox]').forEach(c=>{if(c.checked)_compSel.add(c.value);});
+  actualizarCompBtn();renderRes();
+}
+function actualizarCompBtn(){
+  const btn=document.getElementById('r-comp-btn');if(!btn||!G.compradores)return;
+  const total=G.compradores.length, sel=_compSel?_compSel.size:0;
+  if(sel===total)btn.textContent='Todos ▾';
+  else if(sel===0)btn.textContent='Ninguno ▾';
+  else if(sel===1)btn.textContent=[..._compSel][0]+' ▾';
+  else btn.textContent=sel+' de '+total+' ▾';
+}
+document.addEventListener('click',e=>{
+  const menu=document.getElementById('r-comp-menu'),btn=document.getElementById('r-comp-btn');
+  if(menu&&btn&&menu.style.display==='block'&&!menu.contains(e.target)&&e.target!==btn){menu.style.display='none';}
+});
+
 function renderRes(){
   if(!G.compradores) return;
   const selMes=document.getElementById('r-mes');
@@ -1573,21 +1721,42 @@ function renderRes(){
     const sub=document.getElementById('res-sub');
     if(sub)sub.textContent='Cierre '+(calc.mPrev?mesLbl(calc.mPrev):'inicio')+(calc.cierrePrev?' ('+calc.cierrePrev.split('-').reverse().join('/')+')':'')+' vs '+mesLbl(calc.mSel)+' · cierre al '+calc.cierre.split('-').reverse().join('/')+' · sin PRODUCCION'+(calc.aprox?' · Total SKU\'s aproximado (recarga el Excel en Admin para el histórico exacto)':'');
   }
-  const sC=document.getElementById('r-comp').value,sCl=document.getElementById('r-clas').value;
+  if(!_compSel){initCompFiltro();}
+  const sCl=document.getElementById('r-clas').value;
   const showObj=document.getElementById('r-obj').value==='si';
   document.getElementById('th-obj').style.display=showObj?'':'none';
   const sClForKpi = (sCl && sCl!=='TODAS' && sCl!=='TOTAL') ? sCl : null;
-  if(sC&&sC!=='TODOS'&&sC!=='__A__') updateKPIs(sC, sClForKpi);
+  // compradores seleccionados en el filtro múltiple
+  const selArr=compradores.filter(c=>_compSel.has(c));
+  const todosSel=selArr.length===compradores.length;
+  // KPIs: si es un solo comprador, mostrar el suyo; si no, el global de los seleccionados
+  if(selArr.length===1) updateKPIs(selArr[0], sClForKpi);
   else updateKPIs(null, sClForKpi);
   const CLA=['TOTAL','SAGRADOS','ALTA ROTACIÓN','MEDIA ROTACIÓN','LENTA ROTACIÓN'];
-  const comps=sC==='TODOS'?compradores:sC==='__A__'?[]:[sC];
+  const comps=selArr;
   const cls=sCl==='TODAS'?CLA:[sCl];
   let rows='',cnt=0;
   comps.forEach(comp=>{const dat=CDATA[comp];if(!dat)return;const clf=cls.filter(cl=>dat[cl]&&(dat[cl].skus>0||dat[cl].f1>0||dat[cl].f2>0));if(!clf.length)return;clf.forEach((cl,i)=>{rows+=bRow(comp,cl,dat[cl],showObj,false,i===0,clf.length);cnt++;});});
-  let foot='';cls.forEach((cl,i)=>{const d=AREA[cl];if(!d)return;foot+=bRow('ÁREA GENERAL',cl,d,showObj,true,i===0,cls.length);});
+  // Área General: si están todos, usar AREA precalculado; si no, sumar los seleccionados
+  const areaUse={};
+  cls.forEach(cl=>{
+    if(todosSel){ areaUse[cl]=AREA[cl]; return; }
+    // sumar skus, f1, f2, pico de los compradores seleccionados para esta clasificación
+    let sk=0,skA=0,f1=0,f2=0,pk=0,hay=false;
+    selArr.forEach(comp=>{const dat=CDATA[comp];if(!dat||!dat[cl])return;hay=true;
+      sk+=dat[cl].skus||0;f1+=dat[cl].f1||0;f2+=dat[cl].f2||0;pk+=dat[cl].pico||0;
+      skA+=Math.round((dat[cl].f1||0)/((dat[cl].pct_f1||0)/100||1));});
+    if(!hay){areaUse[cl]=null;return;}
+    areaUse[cl]={skus:sk,f1,f2,pico:pk,
+      pct_f1:sk>0?+(f1/sk*100).toFixed(2):0,
+      pct_f2:sk>0?+(f2/sk*100).toFixed(2):0,
+      pct_pico:sk>0?+(pk/sk*100).toFixed(2):0,
+      objetivo:AREA[cl]?AREA[cl].objetivo:null};
+  });
+  let foot='';cls.forEach((cl,i)=>{const d=areaUse[cl];if(!d)return;foot+=bRow('ÁREA GENERAL',cl,d,showObj,true,i===0,cls.length);});
   document.getElementById('res-body').innerHTML=rows;
   document.getElementById('res-foot').innerHTML=foot;
-  document.getElementById('res-empty').style.display=cnt===0&&sC!=='__A__'?'block':'none';
+  document.getElementById('res-empty').style.display=cnt===0?'block':'none';
   document.getElementById('r-cnt').innerHTML=cnt>0?`<span style="background:#e8f0fe;color:#1e3a5f;border-radius:6px;padding:4px 10px;font-weight:700">${cnt} filas</span>`:'';
 }
 function bRow(comp,cl,d,showObj,isA,isF,rs){
