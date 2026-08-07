@@ -1063,9 +1063,7 @@ function render(){
   document.getElementById('th-act').textContent=MN[+mA.split('-')[1]];
   // Populate comprador selector
   llenarMesesRes();
-  const sc=document.getElementById('r-comp');
-  sc.innerHTML='<option value="TODOS">— Todos —</option><option value="__A__">▶ Área General</option>';
-  compradores.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sc.appendChild(o);});
+  initCompFiltro();   // filtro múltiple de comprador (checkboxes)
   initAbcFiltro();   // poblar el filtro de Clasificación ABC
   // Reset charts
   Object.values(CH).forEach(ch=>{try{ch.destroy();}catch(e){}});CH={};
