@@ -297,16 +297,7 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
       <h2>Comparativo de Faltantes</h2><p id="res-sub">Cierre mes anterior vs mes actual · sin PRODUCCION</p>
       <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:16px;padding:14px;background:#f5f6fa;border-radius:10px;border:1px solid #e2e6ed">
         <div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">👤 Comprador</label>
-          <div style="position:relative">
-            <button type="button" id="r-comp-btn" onclick="toggleCompMenu()" style="font-size:13px;padding:8px 12px;border:1.5px solid #c9d4f0;border-radius:7px;background:#fff;cursor:pointer;text-align:left;min-width:180px">Todos ▾</button>
-            <div id="r-comp-menu" style="display:none;position:absolute;top:100%;left:0;z-index:60;background:#fff;border:1px solid #c9d4f0;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);padding:8px;margin-top:2px;min-width:220px;max-height:300px;overflow:auto">
-              <div style="display:flex;gap:8px;padding:2px 6px 8px;border-bottom:1px solid #eef1f7;margin-bottom:4px">
-                <button type="button" onclick="compTodos(true)" style="font-size:11px;padding:3px 8px;border:1px solid #c9d4f0;border-radius:5px;background:#f0f4fb;cursor:pointer">Todos</button>
-                <button type="button" onclick="compTodos(false)" style="font-size:11px;padding:3px 8px;border:1px solid #c9d4f0;border-radius:5px;background:#f0f4fb;cursor:pointer">Ninguno</button>
-              </div>
-              <div id="r-comp-list"></div>
-            </div>
-          </div></div>
+          <select id="r-comp" onchange="renderRes()"><option value="TODOS">— Todos —</option><option value="__A__">▶ Área General</option></select></div>
         <div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">📂 Clasificación</label>
           <select id="r-clas" onchange="renderRes()"><option value="TODAS">— Todas —</option><option value="TOTAL">Global</option><option value="SAGRADOS">Sagrados</option><option value="ALTA ROTACIÓN">Alta Rotación</option><option value="MEDIA ROTACIÓN">Media Rotación</option><option value="LENTA ROTACIÓN">Lenta Rotación</option></select></div>
         <div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">📅 Mes de análisis</label>
@@ -319,7 +310,7 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
           </div></div>
         <div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">🎯 Objetivo</label>
           <select id="r-obj" onchange="renderRes()"><option value="si">Mostrar</option><option value="no">Ocultar</option></select></div>
-        <button onclick="compTodos(true);document.getElementById('r-clas').value='TODAS';document.getElementById('r-mes').value=G.mA;renderRes()" style="padding:7px 12px;background:#fff;border:1.5px solid #c9d4f0;border-radius:7px;color:#1e3a5f;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">↺ Limpiar</button>
+        <button onclick="document.getElementById('r-comp').value='TODOS';document.getElementById('r-clas').value='TODAS';document.getElementById('r-mes').value=G.mA;renderRes()" style="padding:7px 12px;background:#fff;border:1.5px solid #c9d4f0;border-radius:7px;color:#1e3a5f;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">↺ Limpiar</button>
         <div id="r-cnt" style="margin-left:auto;font-size:12px;color:#6b7a99"></div>
       </div>
       <div style="overflow-x:auto"><table class="rt" style="min-width:860px">
@@ -941,7 +932,12 @@ function buildData(raw,rawD,fn){
     skuMes[m]=mp;
   });
   const CDATA={};compradores.forEach(c=>{CDATA[c]={};[...CLS,'TOTAL'].forEach(cl=>{CDATA[c][cl]=st(uS(uni,c,cl),uS(uniA,c,cl),cl==='TOTAL'?compByDay[c]:compClByDay[c][cl]);});});
-  const AREA={};[...CLS,'TOTAL'].forEach(cl=>{const fl=falt.filter(r=>cl==='TOTAL'||r.clasificacion===cl);AREA[cl]=st(uS(uni,null,cl),uS(uniA,null,cl),sBy(fl,r=>r.fecha));});
+  // Área General excluye a ALEJANDRO (sus faltantes y SKUs no se suman al área)
+  const EXCL_AREA='ALEJANDRO';
+  const uniSinAl=uni.filter(r=>r.comprador!==EXCL_AREA);
+  const uniASinAl=uniA.filter(r=>r.comprador!==EXCL_AREA);
+  const faltSinAl=falt.filter(r=>r.comprador!==EXCL_AREA);
+  const AREA={};[...CLS,'TOTAL'].forEach(cl=>{const fl=faltSinAl.filter(r=>cl==='TOTAL'||r.clasificacion===cl);AREA[cl]=st(uS(uniSinAl,null,cl),uS(uniASinAl,null,cl),sBy(fl,r=>r.fecha));});
   const detR=rawD.map(r=>({fecha:pD(String(r['Fecha']||'')),clave:r['Clave']||'',nombre:r['Nombre']||'',marca:r['Marca']||'',unidad:r['Unidad']||'',clasificacion:String(r['Clasificación']||'').trim(),existencias:numX(r['Existencias']),grupo:String(r['GRUPO']||'').trim(),comprador:String(r['COMPRADOR']||'').trim().toUpperCase(),clmov:String(r['Clasificación por movimiento']||'').trim().toUpperCase(),t_entrega:numX(r['Tiempo de entrega']),obj_meses:numX(r['Objetivo_Meses de inventario']),meses_inv:numX(r['Meses de inventario']),estatus:String(r['Clasificacion_estatus de inventario']||'').trim().toUpperCase(),reorden:String(r['Clasificacion_Punto de reorden']||'').trim(),bo:numX(r['Back Order'])})).filter(r=>r.fecha&&r.comprador&&!EXCL.includes(r.comprador));
   detR.forEach(r=>{r.semaforo=getSem(r);});
   function uq(f){return[...new Set(detR.map(r=>r[f]))].filter(Boolean).sort();}
@@ -1063,7 +1059,9 @@ function render(){
   document.getElementById('th-act').textContent=MN[+mA.split('-')[1]];
   // Populate comprador selector
   llenarMesesRes();
-  initCompFiltro();   // filtro múltiple de comprador (checkboxes)
+  const sc=document.getElementById('r-comp');
+  sc.innerHTML='<option value="TODOS">— Todos —</option><option value="__A__">▶ Área General</option>';
+  compradores.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sc.appendChild(o);});
   initAbcFiltro();   // poblar el filtro de Clasificación ABC
   // Reset charts
   Object.values(CH).forEach(ch=>{try{ch.destroy();}catch(e){}});CH={};
@@ -1667,41 +1665,6 @@ function calcResMesABC(mSel){
   return {CDATA:CD,AREA:AR,cierre,cierrePrev,mSel,mPrev,aprox:false};
 }
 
-// ── Filtro múltiple de comprador (Comparativo) ──
-let _compSel=null;  // Set de compradores seleccionados; null = aún no inicializado
-
-function initCompFiltro(){
-  const cont=document.getElementById('r-comp-list');
-  if(!cont||!G.compradores)return;
-  _compSel=new Set(G.compradores);   // por defecto todos
-  cont.innerHTML=G.compradores.map(c=>
-    `<label style="display:flex;align-items:center;gap:7px;padding:4px 6px;font-size:13px;cursor:pointer;border-radius:5px" onmouseover="this.style.background='#f0f4fb'" onmouseout="this.style.background=''">
-      <input type="checkbox" value="${c}" checked onchange="onCompToggle()" style="width:15px;height:15px;cursor:pointer"> ${c}</label>`).join('');
-  actualizarCompBtn();
-}
-function toggleCompMenu(){const m=document.getElementById('r-comp-menu');if(m)m.style.display=m.style.display==='none'?'block':'none';}
-function compTodos(v){
-  document.querySelectorAll('#r-comp-list input[type=checkbox]').forEach(c=>c.checked=v);
-  onCompToggle();
-}
-function onCompToggle(){
-  _compSel=new Set();
-  document.querySelectorAll('#r-comp-list input[type=checkbox]').forEach(c=>{if(c.checked)_compSel.add(c.value);});
-  actualizarCompBtn();renderRes();
-}
-function actualizarCompBtn(){
-  const btn=document.getElementById('r-comp-btn');if(!btn||!G.compradores)return;
-  const total=G.compradores.length, sel=_compSel?_compSel.size:0;
-  if(sel===total)btn.textContent='Todos ▾';
-  else if(sel===0)btn.textContent='Ninguno ▾';
-  else if(sel===1)btn.textContent=[..._compSel][0]+' ▾';
-  else btn.textContent=sel+' de '+total+' ▾';
-}
-document.addEventListener('click',e=>{
-  const menu=document.getElementById('r-comp-menu'),btn=document.getElementById('r-comp-btn');
-  if(menu&&btn&&menu.style.display==='block'&&!menu.contains(e.target)&&e.target!==btn){menu.style.display='none';}
-});
-
 function renderRes(){
   if(!G.compradores) return;
   const selMes=document.getElementById('r-mes');
@@ -1719,44 +1682,30 @@ function renderRes(){
     const sub=document.getElementById('res-sub');
     if(sub)sub.textContent='Cierre '+(calc.mPrev?mesLbl(calc.mPrev):'inicio')+(calc.cierrePrev?' ('+calc.cierrePrev.split('-').reverse().join('/')+')':'')+' vs '+mesLbl(calc.mSel)+' · cierre al '+calc.cierre.split('-').reverse().join('/')+' · sin PRODUCCION'+(calc.aprox?' · Total SKU\'s aproximado (recarga el Excel en Admin para el histórico exacto)':'');
   }
-  if(!_compSel){initCompFiltro();}
-  const sCl=document.getElementById('r-clas').value;
+  const sC=document.getElementById('r-comp').value,sCl=document.getElementById('r-clas').value;
   const showObj=document.getElementById('r-obj').value==='si';
   document.getElementById('th-obj').style.display=showObj?'':'none';
   const sClForKpi = (sCl && sCl!=='TODAS' && sCl!=='TOTAL') ? sCl : null;
-  // compradores seleccionados en el filtro múltiple
-  const selArr=compradores.filter(c=>_compSel.has(c));
-  const todosSel=selArr.length===compradores.length;
-  // KPIs: si es un solo comprador, mostrar el suyo; si no, el global de los seleccionados
-  if(selArr.length===1) updateKPIs(selArr[0], sClForKpi);
+  if(sC&&sC!=='TODOS'&&sC!=='__A__') updateKPIs(sC, sClForKpi);
   else updateKPIs(null, sClForKpi);
   const CLA=['TOTAL','SAGRADOS','ALTA ROTACIÓN','MEDIA ROTACIÓN','LENTA ROTACIÓN'];
-  const comps=selArr;
+  const comps=sC==='TODOS'?compradores:sC==='__A__'?[]:[sC];
   const cls=sCl==='TODAS'?CLA:[sCl];
   let rows='',cnt=0;
   comps.forEach(comp=>{const dat=CDATA[comp];if(!dat)return;const clf=cls.filter(cl=>dat[cl]&&(dat[cl].skus>0||dat[cl].f1>0||dat[cl].f2>0));if(!clf.length)return;clf.forEach((cl,i)=>{rows+=bRow(comp,cl,dat[cl],showObj,false,i===0,clf.length);cnt++;});});
-  // Área General: si están todos, usar AREA precalculado; si no, sumar los seleccionados
-  const areaUse={};
-  cls.forEach(cl=>{
-    if(todosSel){ areaUse[cl]=AREA[cl]; return; }
-    // sumar skus, f1, f2, pico de los compradores seleccionados para esta clasificación
-    let sk=0,skA=0,f1=0,f2=0,pk=0,hay=false;
-    selArr.forEach(comp=>{const dat=CDATA[comp];if(!dat||!dat[cl])return;hay=true;
-      sk+=dat[cl].skus||0;f1+=dat[cl].f1||0;f2+=dat[cl].f2||0;pk+=dat[cl].pico||0;
-      skA+=Math.round((dat[cl].f1||0)/((dat[cl].pct_f1||0)/100||1));});
-    if(!hay){areaUse[cl]=null;return;}
-    areaUse[cl]={skus:sk,f1,f2,pico:pk,
-      pct_f1:sk>0?+(f1/sk*100).toFixed(2):0,
-      pct_f2:sk>0?+(f2/sk*100).toFixed(2):0,
-      pct_pico:sk>0?+(pk/sk*100).toFixed(2):0,
-      objetivo:AREA[cl]?AREA[cl].objetivo:null};
-  });
-  let foot='';cls.forEach((cl,i)=>{const d=areaUse[cl];if(!d)return;foot+=bRow('ÁREA GENERAL',cl,d,showObj,true,i===0,cls.length);});
+  let foot='';cls.forEach((cl,i)=>{const d=AREA[cl];if(!d)return;foot+=bRow('ÁREA GENERAL',cl,d,showObj,true,i===0,cls.length);});
   document.getElementById('res-body').innerHTML=rows;
   document.getElementById('res-foot').innerHTML=foot;
-  document.getElementById('res-empty').style.display=cnt===0?'block':'none';
+  document.getElementById('res-empty').style.display=cnt===0&&sC!=='__A__'?'block':'none';
   document.getElementById('r-cnt').innerHTML=cnt>0?`<span style="background:#e8f0fe;color:#1e3a5f;border-radius:6px;padding:4px 10px;font-weight:700">${cnt} filas</span>`:'';
 }
+// Máximos de faltantes permitidos en ALTA ROTACIÓN por comprador
+const MAX_ALTA={
+  'ALEJANDRO':2,'ARICELIA':2,'ESTELA':1,'FRANCISCO JAVIER':2,'IVAN':2,
+  'JISHELL MARINTHYA':1,'KARLA ANAID':1,'LEONELA':1,'LUCIA':2,
+  'MARIA VICTORIA':1,'MYRIAM VIDA CHRISTELL':2,'SILVINO':2
+};
+
 function bRow(comp,cl,d,showObj,isA,isF,rs){
   if(!d)return'';
   const dot=`<span class="dot" style="background:${cl==='TOTAL'?'#c0392b':CLC[cl]||'#c0392b'}"></span>`;
@@ -1765,12 +1714,21 @@ function bRow(comp,cl,d,showObj,isA,isF,rs){
   const aS2=isA?'background:#e8f0fe;color:#1a2035;':'';
   const cTd=isF?`<td rowspan="${rs}" style="font-weight:700;vertical-align:middle;border-right:1px solid #dde2ec;${aS2}">${isA?'🏢 ÁREA GENERAL':comp}</td>`:'';
   const objTd=showObj?(OBJ[cl]===null?'<td class="num" style="color:#a0a9be">—</td>':`<td class="num" style="font-weight:600;color:#1e3a5f">${OBJ[cl].toFixed(2)}%</td>`):'';
-  const pc=(v,c)=>{if(v===undefined||v===null||isNaN(v))return'<td class="num" style="color:#a0a9be">—</td>';const o=OBJ[c];if(o===null)return`<td class="num">${(+v).toFixed(2)}%</td>`;return`<td class="num" style="font-weight:700;color:${v<=o?'#2e7d32':'#c0392b'}">${(+v).toFixed(2)}%</td>`;};
+  const pc=(v,c,fAbs)=>{
+    if(v===undefined||v===null||isNaN(v))return'<td class="num" style="color:#a0a9be">—</td>';
+    // Alta Rotación (comprador individual): evaluar contra cantidad fija
+    if(c==='ALTA ROTACIÓN'&&!isA&&MAX_ALTA[comp]!==undefined&&fAbs!==undefined){
+      const cumple=fAbs<=MAX_ALTA[comp];
+      return`<td class="num" style="font-weight:700;color:${cumple?'#2e7d32':'#c0392b'}">${(+v).toFixed(2)}%</td>`;
+    }
+    const o=OBJ[c];if(o===null)return`<td class="num">${(+v).toFixed(2)}%</td>`;
+    return`<td class="num" style="font-weight:700;color:${v<=o?'#2e7d32':'#c0392b'}">${(+v).toFixed(2)}%</td>`;
+  };
   const ek=`${isA?'__A__':comp}||${cl}`;
   const canX=cl!=='TOTAL';
   const xBtn=canX?`<button class="xbtn" id="xb-${ek}" onclick="togX('${ek}')">▶ Ver</button>`:'';
   const xRow=canX?`<tr id="xr-${ek}" class="xrow" style="display:none"><td colspan="20"><div></div></td></tr>`:'';
-  return`<tr style="${bg}${bt}">${cTd}<td style="border-right:1px solid #dde2ec;${bg}">${dot}${CLL[cl]||cl}</td><td class="num" style="border-right:1px solid #dde2ec">${(d.skus||0).toLocaleString()}</td>${objTd}<td class="num" style="background:#f0faf3">${d.f1||0}</td>${pc(d.pct_f1!=null?d.pct_f1:undefined,cl)}<td class="num" style="background:#f0f4ff;border-left:2px solid #1e3a5f">${d.f2||0}</td>${pc(d.pct_f2,cl)}<td class="num" style="background:#f0f4ff">${d.pico||0}</td>${pc(d.pct_pico,cl)}<td style="text-align:center">${xBtn}</td></tr>${xRow}`;
+  return`<tr style="${bg}${bt}">${cTd}<td style="border-right:1px solid #dde2ec;${bg}">${dot}${CLL[cl]||cl}</td><td class="num" style="border-right:1px solid #dde2ec">${(d.skus||0).toLocaleString()}</td>${objTd}<td class="num" style="background:#f0faf3">${d.f1||0}</td>${pc(d.pct_f1!=null?d.pct_f1:undefined,cl)}<td class="num" style="background:#f0f4ff;border-left:2px solid #1e3a5f">${d.f2||0}</td>${pc(d.pct_f2,cl,d.f2)}<td class="num" style="background:#f0f4ff">${d.pico||0}</td>${pc(d.pct_pico,cl,d.pico)}<td style="text-align:center">${xBtn}</td></tr>${xRow}`;
 }
 function togX(key){const row=document.getElementById('xr-'+key);if(!row)return;if(xRows.has(key)){xRows.delete(key);row.style.display='none';const b=document.getElementById('xb-'+key);if(b)b.textContent='▶ Ver';}else{xRows.add(key);row.style.display='table-row';const b=document.getElementById('xb-'+key);if(b)b.textContent='▼ Ocultar';if(!row.dataset.r)renderX(key,row);}}
 function renderX(key,row){
