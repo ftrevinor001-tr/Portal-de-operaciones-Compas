@@ -869,6 +869,24 @@ function applyData(d){
   d.fU=d.fU||d.fechasUltimoMes||d.fechas.filter(f=>f.startsWith(d.mA));
   d.meses=d.meses||[...new Set(d.fechas.map(f=>f.slice(0,7)))].sort();
   d.AREA=d.AREA||d.AREA_DATA||{};
+  // Recalcular AREA excluyendo a ALEJANDRO directamente en el cliente
+  const _EXCL='ALEJANDRO';
+  if(d.CDATA&&d.CDATA[_EXCL]){
+    const _ale=d.CDATA[_EXCL];
+    Object.keys(d.AREA).forEach(cl=>{
+      const a=d.AREA[cl], al=_ale[cl];
+      if(!a||!al)return;
+      const sk=Math.max(0,(a.skus||0)-(al.skus||0));
+      const f1=Math.max(0,(a.f1||0)-(al.f1||0));
+      const f2=Math.max(0,(a.f2||0)-(al.f2||0));
+      const pico=Math.max(0,(a.pico||0)-(al.pico||0));
+      d.AREA[cl]={skus:sk,f1,f2,pico,
+        pct_f1:sk>0?+(f1/sk*100).toFixed(2):0,
+        pct_f2:sk>0?+(f2/sk*100).toFixed(2):0,
+        pct_pico:sk>0?+(pico/sk*100).toFixed(2):0,
+        objetivo:a.objetivo};
+    });
+  }
   d.detR=d.detR||d.detalleRows||[];
   d.detF=d.detF||d.detFechas||[];
   d.detM=d.detM||d.detMarcas||[];
