@@ -1503,9 +1503,13 @@ function calcResMes(mSel){
   const CD={};compradores.forEach(c=>{CD[c]={};[...CLSL,'TOTAL'].forEach(cl=>{
     const fl=falt.filter(r=>r.comprador===c&&(cl==='TOTAL'||r.clasificacion===cl));
     CD[c][cl]=st2(uS2(uni,c,cl),uS2(uniA,c,cl),sByL(fl,r=>r.fecha));});});
+  // Área General excluye a ALEJANDRO
+  const _uniSA=uni.filter(r=>r.comprador!=='ALEJANDRO');
+  const _uniASA=uniA.filter(r=>r.comprador!=='ALEJANDRO');
+  const _faltSA=falt.filter(r=>r.comprador!=='ALEJANDRO');
   const AR={};[...CLSL,'TOTAL'].forEach(cl=>{
-    const fl=falt.filter(r=>cl==='TOTAL'||r.clasificacion===cl);
-    AR[cl]=st2(uS2(uni,null,cl),uS2(uniA,null,cl),sByL(fl,r=>r.fecha));});
+    const fl=_faltSA.filter(r=>cl==='TOTAL'||r.clasificacion===cl);
+    AR[cl]=st2(uS2(_uniSA,null,cl),uS2(_uniASA,null,cl),sByL(fl,r=>r.fecha));});
   return{CDATA:CD,AREA:AR,cierre,cierrePrev,mSel,mPrev};
 }
 // Cálculo alterno usando las series diarias ya publicadas (sin necesidad de recargar el Excel)
@@ -1657,14 +1661,16 @@ function calcResMesABC(mSel){
   const aggSkus=(fecha,c,cl)=>{
     const m=A.skusCierre[fecha];if(!m)return 0;
     let s=0;Object.keys(m).forEach(k=>{const[kc,krot,kabc]=k.split('||');
-      if(c&&kc!==c)return;if(cl&&cl!=='TOTAL'&&krot!==cl)return;if(!incluir(kabc))return;s+=m[k];});
+      if(c&&kc!==c)return;if(!c&&kc==='ALEJANDRO')return;   // AREA excluye ALEJANDRO
+      if(cl&&cl!=='TOTAL'&&krot!==cl)return;if(!incluir(kabc))return;s+=m[k];});
     return s;
   };
   // Faltantes en un día dado, excluyendo letras
   const aggFalt=(fecha,c,cl)=>{
     const m=A.faltDiarios[fecha];if(!m)return 0;
     let s=0;Object.keys(m).forEach(k=>{const[kc,krot,kabc]=k.split('||');
-      if(c&&kc!==c)return;if(cl&&cl!=='TOTAL'&&krot!==cl)return;if(!incluir(kabc))return;s+=m[k];});
+      if(c&&kc!==c)return;if(!c&&kc==='ALEJANDRO')return;   // AREA excluye ALEJANDRO
+      if(cl&&cl!=='TOTAL'&&krot!==cl)return;if(!incluir(kabc))return;s+=m[k];});
     return s;
   };
   const st=(c,cl)=>{
@@ -1731,9 +1737,26 @@ function bRow(comp,cl,d,showObj,isA,isF,rs){
   const bt=cl==='TOTAL'&&!isA?'border-top:2px solid #c9d4f0;':'';
   const aS2=isA?'background:#e8f0fe;color:#1a2035;':'';
   const cTd=isF?`<td rowspan="${rs}" style="font-weight:700;vertical-align:middle;border-right:1px solid #dde2ec;${aS2}">${isA?'🏢 ÁREA GENERAL':comp}</td>`:'';
-  const objTd=showObj?(OBJ[cl]===null?'<td class="num" style="color:#a0a9be">—</td>':`<td class="num" style="font-weight:600;color:#1e3a5f">${OBJ[cl].toFixed(2)}%</td>`):'';
+  let objTd='';
+  if(showObj){
+    if(cl==='ALTA ROTACIÓN'&&isA){
+      // Área General en Alta Rotación: sin objetivo (—)
+      objTd='<td class="num" style="color:#a0a9be">—</td>';
+    }else if(cl==='ALTA ROTACIÓN'&&!isA&&MAX_ALTA[comp]!==undefined){
+      // Comprador individual en Alta Rotación: mostrar el MÁXIMO de faltantes permitido
+      objTd=`<td class="num" style="font-weight:700;color:#1e3a5f">${MAX_ALTA[comp]}</td>`;
+    }else if(OBJ[cl]===null){
+      objTd='<td class="num" style="color:#a0a9be">—</td>';
+    }else{
+      objTd=`<td class="num" style="font-weight:600;color:#1e3a5f">${OBJ[cl].toFixed(2)}%</td>`;
+    }
+  }
   const pc=(v,c,fAbs)=>{
     if(v===undefined||v===null||isNaN(v))return'<td class="num" style="color:#a0a9be">—</td>';
+    // Área General en Alta Rotación: % en color neutro (sin objetivo)
+    if(c==='ALTA ROTACIÓN'&&isA){
+      return`<td class="num">${(+v).toFixed(2)}%</td>`;
+    }
     // Alta Rotación (comprador individual): evaluar contra cantidad fija
     if(c==='ALTA ROTACIÓN'&&!isA&&MAX_ALTA[comp]!==undefined&&fAbs!==undefined){
       const cumple=fAbs<=MAX_ALTA[comp];
