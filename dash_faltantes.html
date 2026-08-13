@@ -318,7 +318,7 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
           <th rowspan="2" style="vertical-align:middle;border-right:1px solid #dde2ec">Comprador</th>
           <th rowspan="2" style="vertical-align:middle;border-right:1px solid #dde2ec">Clasificación</th>
           <th rowspan="2" class="num" style="vertical-align:middle;border-right:1px solid #dde2ec">Total Sku's</th>
-          <th rowspan="2" class="num" id="th-obj" style="vertical-align:middle;border-right:2px solid #1e3a5f">Objetivo</th>
+          <th rowspan="2" class="num" id="th-obj" style="vertical-align:middle;border-right:2px solid #1e3a5f">Objetivo Número de claves</th>
           <th colspan="2" style="text-align:center;background:#1e7a4a;color:#fff;border-radius:4px 4px 0 0;padding:5px 8px" id="th-ant">Cierre Mes Ant.</th>
           <th colspan="4" style="text-align:center;background:#1e3a5f;color:#fff;border-radius:4px 4px 0 0;padding:5px 8px" id="th-act">Mes Actual</th>
         </tr><tr>
@@ -1739,12 +1739,25 @@ function bRow(comp,cl,d,showObj,isA,isF,rs){
   const cTd=isF?`<td rowspan="${rs}" style="font-weight:700;vertical-align:middle;border-right:1px solid #dde2ec;${aS2}">${isA?'🏢 ÁREA GENERAL':comp}</td>`:'';
   let objTd='';
   if(showObj){
-    if(cl==='ALTA ROTACIÓN'&&isA){
+    const skusFila=d.skus||0;
+    if(cl==='TOTAL'){
+      // Global: sin objetivo
+      objTd='<td class="num" style="color:#a0a9be">—</td>';
+    }else if(cl==='SAGRADOS'){
+      // Sagrados: objetivo fijo 0
+      objTd='<td class="num" style="font-weight:600;color:#1e3a5f">0</td>';
+    }else if(cl==='ALTA ROTACIÓN'&&isA){
       // Área General en Alta Rotación: sin objetivo (—)
       objTd='<td class="num" style="color:#a0a9be">—</td>';
     }else if(cl==='ALTA ROTACIÓN'&&!isA&&MAX_ALTA[comp]!==undefined){
-      // Comprador individual en Alta Rotación: mostrar el MÁXIMO de faltantes permitido
+      // Comprador individual en Alta Rotación: máximo fijo de faltantes
       objTd=`<td class="num" style="font-weight:700;color:#1e3a5f">${MAX_ALTA[comp]}</td>`;
+    }else if(cl==='MEDIA ROTACIÓN'){
+      // Media Rotación: 3% del Total SKU's, redondeado hacia abajo
+      objTd=`<td class="num" style="font-weight:600;color:#1e3a5f">${Math.floor(skusFila*0.03)}</td>`;
+    }else if(cl==='LENTA ROTACIÓN'){
+      // Lenta Rotación: 5% del Total SKU's, redondeado hacia abajo
+      objTd=`<td class="num" style="font-weight:600;color:#1e3a5f">${Math.floor(skusFila*0.05)}</td>`;
     }else if(OBJ[cl]===null){
       objTd='<td class="num" style="color:#a0a9be">—</td>';
     }else{
