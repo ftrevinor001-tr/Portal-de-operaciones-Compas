@@ -67,9 +67,11 @@ h1{font-size:20px;font-weight:700;color:#1a2035}
 .rt td{padding:9px 10px;border-bottom:1px solid #f0f2f8;color:#1a2035;vertical-align:middle}
 .rt tr:hover td{background:#f8f9fd}
 .rt tfoot td{background:#e8f0fe;color:#1a2035;font-weight:700;border-bottom:none;border-top:2px solid #1e3a5f}
+.res-sticky{border-collapse:separate;border-spacing:0}
 .res-sticky thead th{position:sticky;z-index:20;background:#fff}
 .res-sticky thead tr:first-child th{top:0}
-.res-sticky thead tr:nth-child(2) th{top:34px}
+.res-sticky thead tr:nth-child(2) th{top:0}
+@media(max-width:900px){#res-scroll{overflow-x:auto}}
 .num{text-align:right}
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
 .xbtn{background:none;border:none;cursor:pointer;color:#1e3a5f;font-size:12px;font-weight:700;padding:0;font-family:inherit}
@@ -316,7 +318,7 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
         <button onclick="document.getElementById('r-comp').value='TODOS';document.getElementById('r-clas').value='TODAS';document.getElementById('r-mes').value=G.mA;renderRes()" style="padding:7px 12px;background:#fff;border:1.5px solid #c9d4f0;border-radius:7px;color:#1e3a5f;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">↺ Limpiar</button>
         <div id="r-cnt" style="margin-left:auto;font-size:12px;color:#6b7a99"></div>
       </div>
-      <div id="res-scroll" style="overflow-x:auto;overflow-y:visible"><table class="rt res-sticky" style="min-width:860px">
+      <div id="res-scroll"><table class="rt res-sticky" style="min-width:860px">
         <thead><tr>
           <th rowspan="2" style="vertical-align:middle;border-right:1px solid #dde2ec;background:#fff">Comprador</th>
           <th rowspan="2" style="vertical-align:middle;border-right:1px solid #dde2ec;background:#fff">Clasificación</th>
@@ -1731,12 +1733,16 @@ function renderRes(){
 function syncResHead(){
   const f=document.getElementById('res-filtros');const tbl=document.querySelector('.res-sticky');
   if(!f||!tbl)return;
-  const h=f.getBoundingClientRect().height;
-  const r1=tbl.querySelectorAll('thead tr:first-child th');
-  const r2=tbl.querySelectorAll('thead tr:nth-child(2) th');
-  r1.forEach(th=>th.style.top=h+'px');
-  const h1=r1.length?r1[0].getBoundingClientRect().height:34;
-  r2.forEach(th=>th.style.top=(h+h1)+'px');
+  const hF=Math.round(f.getBoundingClientRect().height);
+  // Fila 1: th con rowspan (Comprador…Objetivo) + th de grupos (Cierre/Mes) => se pegan a hF
+  const th1=tbl.querySelectorAll('thead tr:first-child th');
+  th1.forEach(th=>th.style.top=hF+'px');
+  // Altura de la fila 1 = alto del th de grupo "Mes Actual" (no tiene rowspan)
+  const thGroup=document.getElementById('th-act');
+  const hRow1=thGroup?Math.round(thGroup.getBoundingClientRect().height):34;
+  // Fila 2: subencabezados => se pegan bajo la fila 1
+  const th2=tbl.querySelectorAll('thead tr:nth-child(2) th');
+  th2.forEach(th=>th.style.top=(hF+hRow1)+'px');
 }
 window.addEventListener('resize',()=>{try{syncResHead();}catch(e){}});
 // Máximos de faltantes permitidos en ALTA ROTACIÓN por comprador
