@@ -850,9 +850,9 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
         <p>Compara la <b>cantidad que el sistema proponía</b> al momento de levantar la OC (capturada manualmente) contra la <b>cantidad real</b> con que se colocó. Requiere llenar 2 columnas nuevas en la hoja <em>OTIF PEDIDOS</em> del Excel, después de Observaciones:</p>
         <ul style="margin:6px 0 6px 18px;padding:0">
           <li><b>Cantidad Propuesta</b> (columna X) — valor de "Asignación" que mostraba el sistema el día que se generó la OC.</li>
-          <li><b>Motivo</b> (columna Y) — obligatorio si Real = 0 o si la desviación supera ±20%. Usar uno de: <em>ERROR DE CALCULO, NO CUMPLE CANTIDAD MINIMA, VARIACION DE PRECIO, DECISION DE GERENCIA, OTRO</em>.</li>
+          <li><b>Motivo</b> (columna Y) — obligatorio si Real = 0 o si la desviación supera ±20%. Usar uno de: <em>ASIGNADO POR SURTIMIENTO, ERROR DE CALCULO, VENTAS ESPECIALES, NUEVOS PRODUCTOS, COMPRAS ESPECIALES, MONTO MINIMO, RENTABILIDAD, POR CUBICAJE, VARIACION DE PRECIO, DECISION DE GERENCIA, OTRO</em>.</li>
         </ul>
-        <p><b>Clasificación:</b> Real = 0 → <em>No colocada</em> · desviación ≤ ±20% → <em>Acertada</em> · desviación &gt; ±20% → <em>Desviada</em>. Cada motivo se traduce automáticamente a un responsable (Planeación, Proveedor, Compras o Gerencia).</p>
+        <p><b>Clasificación:</b> Real = 0 → <em>No colocada</em> · desviación ≤ ±20% → <em>Acertada</em> · desviación &gt; ±20% → <em>Desviada</em>. Cada motivo se traduce automáticamente a un responsable (Planeación, Portal de compras, Ventas, Desarrollos, Compras, Gerencia).</p>
       </div>
     </div>
   </div><!-- /tab-prec -->
@@ -891,11 +891,18 @@ const MES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Di
 function curMonthKey(){ return mKey(new Date()); } // mes actual, usado como default en filtros de mes
 function nextMonthKey(){ const d=new Date(); d.setMonth(d.getMonth()+1); return mKey(d); } // mes siguiente
 const MOTIVO_RESP={
-  'ERROR DE CALCULO':'Planeación',
-  'NO CUMPLE CANTIDAD MINIMA':'Proveedor',
+  'ASIGNADO POR SURTIMIENTO':'Planeación',
+  'ERROR DE CALCULO':'Portal de compras',
+  'VENTAS ESPECIALES':'Ventas',
+  'NUEVOS PRODUCTOS':'Desarrollos',
+  'COMPRAS ESPECIALES':'Compras',
+  'MONTO MINIMO':'Compras',
+  'RENTABILIDAD':'Compras',
+  'POR CUBICAJE':'Compras',
   'VARIACION DE PRECIO':'Compras',
   'DECISION DE GERENCIA':'Gerencia',
   'OTRO':'Sin clasificar',
+  'NO CUMPLE CANTIDAD MINIMA':'Proveedor',  // histórico: fuera del desplegable, se conserva su área para registros antiguos
 };
 const TOLERANCIA_PCT=20;
 
@@ -1789,8 +1796,8 @@ function renderPrecisionTab(){
     const resp=MOTIVO_RESP[m]||'Sin motivo';
     byResp.set(resp,(byResp.get(resp)||0)+1);
   });
-  const respColors={'Planeación':'var(--navy)','Proveedor':'var(--red)','Compras':'var(--purple)','Gerencia':'var(--amber)','Sin clasificar':'var(--tx3)','Sin motivo':'var(--tx3)'};
-  const respColorsHex={'Planeación':'#1c3557','Proveedor':'#8b1a1a','Compras':'#5c3a9a','Gerencia':'#7a4f00','Sin clasificar':'#6b6960','Sin motivo':'#6b6960'};
+  const respColors={'Planeación':'var(--navy)','Portal de compras':'var(--green)','Ventas':'#0f766e','Desarrollos':'var(--amber)','Proveedor':'var(--red)','Compras':'var(--purple)','Gerencia':'var(--amber)','Sin clasificar':'var(--tx3)','Sin motivo':'var(--tx3)'};
+  const respColorsHex={'Planeación':'#1c3557','Portal de compras':'#0a7d55','Ventas':'#0f766e','Desarrollos':'#7a4f00','Proveedor':'#8b1a1a','Compras':'#5c3a9a','Gerencia':'#a06a00','Sin clasificar':'#6b6960','Sin motivo':'#6b6960'};
   document.getElementById('prec-resp-grid').innerHTML=[...byResp.entries()].filter(([,v])=>v>0||failRows.length===0).map(([resp,cnt])=>
     `<div class="prec-resp-card"><div class="prec-resp-val" style="color:${respColors[resp]||'var(--tx2)'}">${cnt}</div><div class="prec-resp-lbl">${resp}</div></div>`
   ).join('')||'<div style="font-size:11px;color:var(--tx3)">Sin desviaciones.</div>';
@@ -1830,8 +1837,8 @@ function renderPrecisionTab(){
     }
     return `<button onclick="guardarComentarioPrec('${r.key}')" style="font-size:10px;padding:3px 9px;border:1px dashed var(--brd2);background:none;border-radius:6px;cursor:pointer;color:var(--tx2)">✏️ Agregar</button>`;
   };
-  const MOTIVO_OPTS=['','ERROR DE CALCULO','NO CUMPLE CANTIDAD MINIMA','VARIACION DE PRECIO','DECISION DE GERENCIA','OTRO'];
-  const motivoLbl={'':'— Seleccionar —','ERROR DE CALCULO':'Error de cálculo','NO CUMPLE CANTIDAD MINIMA':'No cumple cant. mínima','VARIACION DE PRECIO':'Variación de precio','DECISION DE GERENCIA':'Decisión de gerencia','OTRO':'Otro'};
+  const MOTIVO_OPTS=['','ASIGNADO POR SURTIMIENTO','ERROR DE CALCULO','VENTAS ESPECIALES','NUEVOS PRODUCTOS','COMPRAS ESPECIALES','MONTO MINIMO','RENTABILIDAD','POR CUBICAJE','VARIACION DE PRECIO','DECISION DE GERENCIA','OTRO'];
+  const motivoLbl={'':'— Seleccionar —','ASIGNADO POR SURTIMIENTO':'Asignado por surtimiento','ERROR DE CALCULO':'Error de cálculo','VENTAS ESPECIALES':'Ventas especiales','NUEVOS PRODUCTOS':'Nuevos productos','COMPRAS ESPECIALES':'Compras especiales','MONTO MINIMO':'Monto mínimo','RENTABILIDAD':'Rentabilidad','POR CUBICAJE':'Por cubicaje','VARIACION DE PRECIO':'Variación de precio','DECISION DE GERENCIA':'Decisión de gerencia','OTRO':'Otro','NO CUMPLE CANTIDAD MINIMA':'No cumple cant. mínima'};
 
   document.getElementById('prec-tbody').innerHTML=rows.map(r=>{
     const isPend=r.status==='pendiente';
@@ -1839,7 +1846,8 @@ function renderPrecisionTab(){
     const resp=MOTIVO_RESP[(r.motivo||'').toUpperCase()]||(r.motivo?'Sin clasificar':'—');
     const needsMotivo=(r.status==='desviada'||r.status==='no_colocada');
     const motivoActive=(needsMotivo||isPend); // only desviada, no_colocada y pendiente pueden editar motivo
-    const selOpts=MOTIVO_OPTS.map(v=>`<option value="${v}"${v===r.motivo?' selected':''}>${motivoLbl[v]}</option>`).join('');
+    const optsList=(r.motivo&&!MOTIVO_OPTS.includes(r.motivo))?[...MOTIVO_OPTS,r.motivo]:MOTIVO_OPTS;
+    const selOpts=optsList.map(v=>`<option value="${v}"${v===r.motivo?' selected':''}>${motivoLbl[v]||v}</option>`).join('');
     const motivoCell=motivoActive
       ?`<select class="msel" style="font-size:10.5px;width:100%;${needsMotivo&&!r.motivo?'border-color:var(--red)':''}" onchange="updateMotivo('${r.key}',this.value)">${selOpts}</select>`
       :'<span class="dash">—</span>';

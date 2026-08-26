@@ -401,7 +401,7 @@ tr.detail-row td{padding:0;background:#F0F7FF;border-bottom:2px solid var(--sky-
           <th onclick="sortBy('_folio')" class="sort-desc">Folio OC</th>
           <th onclick="sortBy('Fecha')">Fecha OC</th>
           <th onclick="sortBy('Proveedor')">Proveedor</th>
-          <th onclick="sortBy('Comprador Capturo')">Comprador</th>
+          <th onclick="sortBy('_comp')">Comprador</th>
           <th onclick="sortBy('_estadoOC')">Estado Recepción</th>
           <th onclick="sortBy('_estatus')">Estatus</th>
           <th onclick="sortBy('_bo')">Back Order</th>
@@ -518,6 +518,48 @@ function badgeCompra(s){
   return 'otro';
 }
 
+// ── RESOLUCIÓN DE COMPRADOR DE LA OC ───────────────────────────────────────
+// Misma lógica que el Admin (index.html): 1) asignación manual (Supabase
+// oc_compradores)  2) columna COMPRADOR del reporte  3) inferido por capturista
+const COMPRADORES_FIJOS=['ALEJANDRO','ARICELIA','ESTELA','FRANCISCO JAVIER','IVAN',
+  'JISHELL MARINTHYA','KARLA ANAID','LEONELA','LUCIA','MARIA VICTORIA',
+  'MYRIAM VIDA CHRISTELL','SILVINO'];
+let mapaManualOC = {};   // folio -> comprador (asignación manual del Admin)
+function normNom(s){return String(s==null?'':s).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();}
+function nombreValido(s){
+  const t=normNom(s);
+  return t&&t!=='NAN'&&t!=='NULL'&&t!=='UNDEFINED'&&t!=='-'&&t!=='N/A'&&t!=='#N/A'&&t!=='0'?t:'';
+}
+function resolverComprador(o){
+  const folio=String(o['Folio']||'').trim();
+  // 1) La corrección manual del Admin SIEMPRE gana
+  if(mapaManualOC[folio])return normNom(mapaManualOC[folio]);
+  // 2) Columna COMPRADOR del reporte, solo si trae un nombre real
+  const directo=nombreValido(o['COMPRADOR']);
+  if(directo)return directo;
+  // 3) Inferencia por el nombre de quien capturó la OC
+  const cap=nombreValido(o['Comprador Capturo']);
+  if(cap){for(const cn of COMPRADORES_FIJOS){if(cap===cn||cap.startsWith(cn+' '))return cn;}}
+  return 'SIN ASIGNAR';
+}
+// Lee el mapa de asignaciones manuales desde Supabase (una sola vez por carga)
+async function cargarMapaManualOC(){
+  try{
+    const sb=window.sbGet();
+    const{data,error}=await sb.from('oc_compradores').select('folio,comprador');
+    if(error)throw error;
+    mapaManualOC={};
+    (data||[]).forEach(r=>{ if(r.folio!=null) mapaManualOC[String(r.folio).trim()]=r.comprador; });
+    return true;
+  }catch(err){ console.warn('oc_compradores no disponible:', err.message||err); return false; }
+}
+// Si el mapa aún no se ha cargado (p. ej. carga manual de Excel antes del INIT),
+// lo carga y ejecuta el callback para re-normalizar y re-render.
+function asegurarMapaManualOC(cb){
+  if(Object.keys(mapaManualOC).length>0)return;   // ya estaba cargado, nada que hacer
+  cargarMapaManualOC().then(ok=>{ if(ok&&typeof cb==='function')cb(); });
+}
+
 // ── NORMALIZE ORDERS ───────────────────────────────────────────────────────
 function normalizeOrders(estadoMap){
   allOrders.forEach(o => {
@@ -527,7 +569,7 @@ function normalizeOrders(estadoMap){
     o._estatus  = String(o['Estatus']||'').trim().toUpperCase();
     o._bo       = String(o['Back Order']||'').trim().toUpperCase();
     o._prov     = String(o['Proveedor']||'').trim();
-    o._comp     = String(o['COMPRADOR']||o['Comprador Capturo']||'').trim();  // comprador de clave
+    o._comp     = resolverComprador(o);  // comprador de la OC (manual → reporte → capturista)
     // Estado OC: from map (Excel load) or from JSON field
     o._estadoOC = (estadoMap && estadoMap[o._folio])
       || String(o['Estado OC']||'').trim().toUpperCase()
@@ -619,6 +661,7 @@ function processWorkbook(buf){
     if(eoc2){ selectDefaultEstadoOC(eoc2); }
     applyFilters();
     hideLoading(); showDashboard();
+    asegurarMapaManualOC(()=>{ normalizeOrders(estadoMap); buildDropdowns(); applyFilters(); });
   }catch(err){
     hideLoading();
     console.error(err);
@@ -694,6 +737,7 @@ function processJson(json){
 
     // 3) Aplicar filtros
     applyFilters();
+    asegurarMapaManualOC(()=>{ normalizeOrders(null); buildDropdowns(); applyFilters(); });
   }catch(err){
     console.error(err);
     throw err;
@@ -925,7 +969,7 @@ function sortBy(col){
 function sortFiltered(){
   // Mapa: columna del header → campo interno a usar para comparar
   const dateMap   = { 'Fecha':'_fechaOC', 'Fecha Entrega':'_fechaEnt' };
-  const innerMap  = { 'Proveedor':'_prov', 'Comprador Capturo':'_comp',
+  const innerMap  = { 'Proveedor':'_prov', 'Comprador Capturo':'_comp', '_comp':'_comp',
                       'Estatus':'_estatus', 'Back Order':'_bo',
                       '_estadoOC':'_estadoOC', 'Folio':'_folio', '_folio':'_folio' };
 
@@ -1094,8 +1138,10 @@ function exportToExcel(){
 
 // ── INIT ───────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',()=>{
-  // Auto-carga desde Supabase
-  sbLoadBO(()=>{ showDashboard(); }, err=>{ console.warn('BO:', err.message); /* splash manual */ });
+  // 1) Carga el mapa de asignaciones manuales, 2) luego los datos de BO
+  cargarMapaManualOC().finally(()=>{
+    sbLoadBO(()=>{ showDashboard(); }, err=>{ console.warn('BO:', err.message); /* splash manual */ });
+  });
 });
 </script>
 </body>
