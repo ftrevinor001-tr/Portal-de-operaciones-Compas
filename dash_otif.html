@@ -422,7 +422,11 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
 #otif-detalle-wrap table td[style*="white-space:normal"]{white-space:normal}
 #otif-detalle-wrap .tbl-scroll{overflow-x:auto}
 /* En modo separado, las columnas visibles ocupan todo el ancho */
-#otif-detalle-wrap[data-mode="otif"] table,#otif-detalle-wrap[data-mode="target"] table{min-width:0}
+#otif-detalle-wrap[data-mode="otif"] table{min-width:0}
+/* En modo target: tabla ajustada al contenido para que Descripción no se estire a toda la pantalla */
+#otif-detalle-wrap[data-mode="target"] table{min-width:0;width:auto}
+#otif-detalle-wrap[data-mode="target"] .sc-ident[data-ocol="desc"],
+#otif-detalle-wrap[data-mode="target"] td.sc-ident[style*="white-space:normal"]{max-width:240px;white-space:normal;word-break:break-word}
 </style>
 </head>
 <body>
@@ -700,7 +704,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
             <tr>
               <th data-ocol="oc" data-sec="ident" class="sc-ident"      style="width:72px">OC<span class="sarr">↕</span></th>
               <th data-ocol="clave" data-sec="ident" class="sc-ident"   style="width:62px">Clave<span class="sarr">↕</span></th>
-              <th data-ocol="desc" data-sec="ident" class="sc-ident"    style="min-width:175px">Descripción<span class="sarr">↕</span></th>
+              <th data-ocol="desc" data-sec="ident" class="sc-ident"    style="width:200px;min-width:150px;max-width:240px">Descripción<span class="sarr">↕</span></th>
               <th data-ocol="prov" data-sec="ident" class="sc-ident"    style="width:80px">Proveedor<span class="sarr">↕</span></th>
               <th data-ocol="qty" data-sec="ident"     class="sc-ident num" style="width:54px">Cant.<span class="sarr">↕</span></th>
               <th data-ocol="foc" data-sec="target"     class="sc-target ctr" style="width:90px">F. OC Real<span class="sarr">↕</span></th>
@@ -849,8 +853,8 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
         <div style="font-weight:700;color:var(--purple);margin-bottom:4px">🎯 Precisión del Pedido Propuesto — Cálculo vs. Real</div>
         <p>Compara la <b>cantidad que el sistema proponía</b> al momento de levantar la OC (capturada manualmente) contra la <b>cantidad real</b> con que se colocó. Requiere llenar 2 columnas nuevas en la hoja <em>OTIF PEDIDOS</em> del Excel, después de Observaciones:</p>
         <ul style="margin:6px 0 6px 18px;padding:0">
-          <li><b>Cantidad Propuesta</b> (columna X) — valor de "Asignación" que mostraba el sistema el día que se generó la OC.</li>
-          <li><b>Motivo</b> (columna Y) — obligatorio si Real = 0 o si la desviación supera ±20%. Usar uno de: <em>ASIGNADO POR SURTIMIENTO, ERROR DE CALCULO, VENTAS ESPECIALES, NUEVOS PRODUCTOS, COMPRAS ESPECIALES, MONTO MINIMO, RENTABILIDAD, POR CUBICAJE, VARIACION DE PRECIO, DECISION DE GERENCIA, OTRO</em>.</li>
+          <li><b>Cantidad Propuesta</b> (columna S) — valor de "Asignación" que mostraba el sistema el día que se generó la OC.</li>
+          <li><b>Motivo</b> (columna T) — obligatorio si Real = 0 o si la desviación supera ±20%. Usar uno de: <em>ASIGNADO POR SURTIMIENTO, ERROR DE CALCULO, VENTAS ESPECIALES, NUEVOS PRODUCTOS, COMPRAS ESPECIALES, MONTO MINIMO, RENTABILIDAD, POR CUBICAJE, VARIACION DE PRECIO, DECISION DE GERENCIA, OTRO</em>.</li>
         </ul>
         <p><b>Clasificación:</b> Real = 0 → <em>No colocada</em> · desviación ≤ ±20% → <em>Acertada</em> · desviación &gt; ±20% → <em>Desviada</em>. Cada motivo se traduce automáticamente a un responsable (Planeación, Portal de compras, Ventas, Desarrollos, Compras, Gerencia).</p>
       </div>
@@ -1628,6 +1632,7 @@ function buildPrecisionRows(){
     let status=null, desv=null;
     if(hasProp){
       if(real===0){ status='no_colocada'; }
+      else if(!d.cantPropuesta){ desv=0; status=Math.abs(desv)<=TOLERANCIA_PCT?'acertada':'desviada'; } // propuesta 0 → evitar Infinity, mostrar +0%
       else{
         desv=Math.round((real-d.cantPropuesta)/d.cantPropuesta*100);
         status=Math.abs(desv)<=TOLERANCIA_PCT?'acertada':'desviada';
@@ -1859,7 +1864,7 @@ function renderPrecisionTab(){
       <td style="font-size:10px">${r.status==='acertada'?'<span class="dash">—</span>':(r.fechaPropuesta?mLabel(mKey(r.fechaPropuesta)):'<span class="dash">—</span>')}</td>
       <td style="text-align:right">${r.hasProp?fmt(r.cantPropuesta):'<span class="dash">—</span>'}</td>
       <td style="text-align:right;font-weight:700">${isPend?'<span class="dash">—</span>':fmt(r.real)}</td>
-      <td style="text-align:center;font-weight:700;color:${r.desv===null?'var(--tx3)':Math.abs(r.desv)<=TOLERANCIA_PCT?'var(--green)':'var(--red)'}">${r.desv!==null?(r.desv>0?'+':'')+r.desv+'%':'—'}</td>
+      <td style="text-align:center;font-weight:700;color:${r.desv===null?'var(--tx3)':Math.abs(r.desv)<=TOLERANCIA_PCT?'var(--green)':'var(--red)'}">${r.desv!==null?(r.desv>=0?'+':'')+r.desv+'%':'—'}</td>
       <td>${statusChip(r.status)}</td>
       <td>${motivoCell}</td>
       <td style="font-size:10px;color:var(--tx2)">${resp}</td>
@@ -1962,23 +1967,38 @@ function parseOTIF(raw){
   let hdr=-1;
   for(let i=0;i<Math.min(raw.length,10);i++){if(String(raw[i][0]||'').trim().toUpperCase()==='ESTATUS'){hdr=i;break;}}
   if(hdr<0)return[];
+  // Mapeo por NOMBRE de columna (robusto ante columnas agregadas/eliminadas)
+  const H=raw[hdr].map(h=>String(h==null?'':h).trim().toUpperCase());
+  const ci=(...alts)=>{for(const a of alts){const k=a.toUpperCase();const idx=H.findIndex(h=>h===k);if(idx>=0)return idx;}
+                        for(const a of alts){const k=a.toUpperCase();const idx=H.findIndex(h=>h.includes(k));if(idx>=0)return idx;}return -1;};
+  const cEstatus=ci('ESTATUS'), cClave=ci('CLAVE'), cDesc=ci('DESCRIPCION DEL ARTICULO','DESCRIPCION','DESCRIPCIÓN');
+  const cQty=ci('C/CARGO','CARGO'),                 // cantidad pedida/colocada de la OC
+        cOc=ci('OC'), cProv=ci('PROVEEDOR'),
+        cFoc=ci('FECHA DE OC','FECHA OC'), cFreq=ci('FECHA REQ','FECHA REQ. SIG OC'),
+        cOtifC=ci('EN TIEMPO'), cEntSol=ci('ENTREGA SOLICITADA'),
+        cEta=ci('ETA ESTIMADA'), cEtaR=ci('ETA REAL'),
+        cOtifE=ci('OTIF ENTREGA'), cRecib=ci('RECIBIDO REAL'),
+        cIfOk=ci('IF ENTREGA'), cObs=ci('OBSERVACIONES'),
+        cProp=ci('CANTIDAD PROPUESTA'), cMotivo=ci('MOTIVO');
+  const g=(r,idx)=>idx>=0?r[idx]:undefined;
+  const num=v=>typeof v==='number'?v:(v!=null&&v!==''&&!isNaN(parseFloat(v))?parseFloat(v):null);
   const toDate=v=>{
     if(!v)return null;
     if(v instanceof Date)return(isNaN(v)||v.getFullYear()<1900)?null:v;
     if(typeof v==='number'){if(v<=0)return null;const d=new Date(Math.round((v-25569)*86400000));return(isNaN(d)||d.getFullYear()<1900)?null:d;}
     return null;
   };
-  return raw.slice(hdr+1).filter(r=>r[0]&&String(r[0]).trim()).map(r=>({
-    estatus:String(r[0]||'').trim(), clave:String(r[1]||'').trim(), desc:String(r[2]||'').trim(),
-    qty:typeof r[8]==='number'?r[8]:0, oc:String(r[11]||'').trim(), prov:String(r[12]||'').trim(),
-    foc:toDate(r[13]), freq:toDate(r[14]), otifC:String(r[15]||'').trim(),
-    entregaSol:toDate(r[16]),
-    eta:toDate(r[17]), etaR:toDate(r[18]), otifE:String(r[19]||'').trim(),
-    recibReal:typeof r[20]==='number'?r[20]:null,
-    ifOk:String(r[21]||'').trim(),
-    obs:String(r[22]||'').trim(),
-    cantPropuesta:typeof r[23]==='number'?r[23]:null,
-    motivo:String(r[24]||'').trim(),
+  return raw.slice(hdr+1).filter(r=>g(r,cEstatus)&&String(g(r,cEstatus)).trim()).map(r=>({
+    estatus:String(g(r,cEstatus)||'').trim(), clave:String(g(r,cClave)||'').trim(), desc:String(g(r,cDesc)||'').trim(),
+    qty:num(g(r,cQty))||0, oc:String(g(r,cOc)||'').trim(), prov:String(g(r,cProv)||'').trim(),
+    foc:toDate(g(r,cFoc)), freq:toDate(g(r,cFreq)), otifC:String(g(r,cOtifC)||'').trim(),
+    entregaSol:toDate(g(r,cEntSol)),
+    eta:toDate(g(r,cEta)), etaR:toDate(g(r,cEtaR)), otifE:String(g(r,cOtifE)||'').trim(),
+    recibReal:num(g(r,cRecib)),
+    ifOk:String(g(r,cIfOk)||'').trim(),
+    obs:String(g(r,cObs)||'').trim(),
+    cantPropuesta:num(g(r,cProp)),
+    motivo:String(g(r,cMotivo)||'').trim(),
     get difDias(){const f=this.foc,q=this.freq;return(f&&q)?Math.round((f.getTime()-q.getTime())/86400000):null;},
     get difEntrega(){const r=this.etaR,s=this.entregaSol;return(r&&s)?Math.round((r.getTime()-s.getTime())/86400000):null;},
 
