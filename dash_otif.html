@@ -159,6 +159,8 @@ main{max-width:1700px;margin:0 auto;padding:20px 20px 60px}
 .clear-btn{font-size:11px;color:var(--tx3);cursor:pointer;background:none;border:none;text-decoration:underline;white-space:nowrap}
 .clear-btn:hover{color:var(--red)}
 .filter-count{font-size:11px;color:var(--tx3);margin-left:auto}
+#tfoot-inv .tfoot-row td{position:sticky;bottom:0;background:#eef2f8;border-top:2px solid var(--navy);font-weight:700;font-size:12px;padding:8px 7px;z-index:40}
+#tfoot-inv .tf-lbl{text-align:right;color:var(--navy);letter-spacing:.4px}
 
 /* ── TABLE ── */
 .tbl-card{background:var(--surface);border:1px solid var(--brd);border-radius:10px;overflow:visible}
@@ -563,6 +565,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
             </tr>
           </thead>
           <tbody id="tbody"></tbody>
+          <tfoot id="tfoot-inv"></tfoot>
         </table>
       </div>
       <div class="legend-strip">
@@ -1116,7 +1119,7 @@ function buildGroups(){
   const map=new Map();
   ALL.forEach(d=>{
     if(d.isMain){
-      map.set(d.id,{...d,children:[],asig_total:d.asig,provList:[{prov:d.prov,origen:d.origen,asig:d.asig}]});  // directriz already in ...d
+      map.set(d.id,{...d,children:[],asig_total:d.asig,bo_total:d.bo,provList:[{prov:d.prov,origen:d.origen,asig:d.asig}]});  // directriz already in ...d
     }
   });
   ALL.forEach(d=>{
@@ -1124,9 +1127,12 @@ function buildGroups(){
       const p=map.get(d.parent_id);
       p.children.push(d);
       p.asig_total+=d.asig;
+      p.bo_total+=d.bo;                         // el BO puede venir en la fila del 2º/3º proveedor
       p.provList.push({prov:d.prov,origen:d.origen,asig:d.asig});
     }
   });
+  // bo_total = BO de la clave completa (principal + secundarias) para KPIs.
+  // d.bo se conserva como el BO del proveedor principal para la tabla de detalle.
   return [...map.values()];
 }
 
@@ -1294,13 +1300,13 @@ function renderAll(){
 // ── KPIs ─────────────────────────────────────────────────────────
 function renderKPIs(data){
   const totInv=data.reduce((a,d)=>a+(d.inv||0),0);
-  const totBO=data.reduce((a,d)=>a+(d.bo||0),0);
+  const totBO=data.reduce((a,d)=>a+(d.bo_total!=null?d.bo_total:(d.bo||0)),0);
   const totFinal=data.reduce((a,d)=>a+(d.inv_final||0),0);
   const totAsig=data.filter(d=>d.fecha_pedido).reduce((a,d)=>a+(d.asig_total||0),0);
   const active=data.filter(d=>d.vm>0);
   const crit=data.filter(d=>d.lvlNow==='crit').length;
   const sinStock=data.filter(d=>d.inv===0&&d.vm>0).length;
-  const conBO=data.filter(d=>d.bo>0).length;
+  const conBO=data.filter(d=>(d.bo_total!=null?d.bo_total:d.bo)>0).length;
   document.getElementById('kpis').innerHTML=[
     {l:'Inventario actual', v:fmt(totInv),    s:'unidades en existencia',   c:'var(--navy)'},
     {l:'Back orders',       v:fmt(totBO),     s:'unidades en tránsito',     c:'var(--red)'},
@@ -1541,6 +1547,21 @@ function renderTable(data){
     }
   }
   document.getElementById('tbody').innerHTML=html;
+  // ── Totales (pie de tabla) ──────────────────────────────────
+  const tBO   = sorted.reduce((a,d)=>a+(d.bo_total!=null?d.bo_total:(d.bo||0)),0);
+  const tInv  = sorted.reduce((a,d)=>a+(d.inv||0),0);
+  const tAsig = sorted.reduce((a,d)=>a+((d.asig_total!=null?d.asig_total:d.asig)&&d.fecha_pedido?(d.asig_total!=null?d.asig_total:d.asig):0),0);
+  const tf=document.getElementById('tfoot-inv');
+  if(tf){
+    tf.innerHTML=`<tr class="tfoot-row">
+      <td class="tf-lbl" colspan="4">TOTAL · ${sorted.length} claves</td>
+      <td class="num">${fmt(tInv)}</td>
+      <td></td><td></td>
+      <td class="num" style="color:var(--red);font-weight:800">${fmt(tBO)}</td>
+      <td></td><td></td><td></td><td></td><td></td>
+      <td class="num" style="font-weight:800">${fmt(tAsig)}</td>
+    </tr>`;
+  }
   updateSortArrows();
 }
 
