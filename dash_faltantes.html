@@ -85,7 +85,7 @@ h1{font-size:20px;font-weight:700;color:#1a2035}
 .sr{background:#e53935}.sy{background:#f9a825}.so{background:#f57c00}
 .sp{background:#7b1fa2}.sg{background:#2e7d32}.sb{background:#1565c0}
 .dt{width:100%;border-collapse:collapse;font-size:11.5px}
-.dt th{padding:7px 8px;font-size:10px;color:#6b7a99;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #e2e6ed;font-weight:600;background:#f8f9fd;position:sticky;top:0;z-index:1;white-space:nowrap;cursor:pointer;user-select:none}
+.dt th{padding:7px 8px;font-size:10px;color:#6b7a99;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #e2e6ed;font-weight:600;background:#f8f9fd;position:sticky;top:0;z-index:20;white-space:nowrap;cursor:pointer;user-select:none}
 .dt{table-layout:fixed}
 .dt th:hover{background:#edf0f7;color:#1e3a5f}
 .dt th .si{display:inline-block;margin-left:4px;font-size:10px;color:#b0bac9}
@@ -99,6 +99,8 @@ h1{font-size:20px;font-weight:700;color:#1a2035}
 .dt td{padding:6px 8px;border-bottom:1px solid #f0f2f8;vertical-align:middle;white-space:nowrap}.dt td.wrap{white-space:normal}
 .dt tr:hover td{background:#f8f9fd}
 .dtw{overflow:auto;max-height:520px;border:1px solid #e2e6ed;border-radius:8px}
+.dt td{padding:6px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
+.dt td.wrap{white-space:normal;word-break:break-word}
 #cmptab-riesgo .dt{font-size:9.5px}
 #cmptab-riesgo .dt th{padding:5px 4px;font-size:8.5px;letter-spacing:.2px}
 #cmptab-riesgo .dt td{padding:4px 4px;line-height:1.25}
@@ -386,22 +388,21 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
         <col style="width:75px">
       </colgroup>
       <thead><tr>
-        <th onclick="srtD('fecha')">Fecha<span class="si"></span></th>
-        <th onclick="srtD('semaforo')" style="text-align:center">Sem.<span class="si"></span></th>
-        <th onclick="srtD('clave')">Clave<span class="si"></span></th>
-        <th onclick="srtD('nombre')">Nombre<span class="si"></span></th>
-        <th onclick="srtD('marca')">Marca<span class="si"></span></th>
-        <th onclick="srtD('meses_inv')" class="num">Meses Inv.<span class="si"></span></th>
-        <th onclick="srtD('obj_meses')" class="num">Obj.<span class="si"></span></th>
-        <th onclick="srtD('t_entrega')" class="num">T.Entrega<span class="si"></span></th>
-        <th onclick="srtD('existencias')" class="num">Existencias<span class="si"></span></th>
-        <th onclick="srtD('unidad')">Unidad<span class="si"></span></th>
-        <th onclick="srtD('bo')" class="num">Back Order<span class="si"></span></th>
-        <th onclick="srtD('estatus')">Estatus<span class="si"></span></th>
-        <th onclick="srtD('reorden')">Pto.Reorden<span class="si"></span></th>
-        <th onclick="srtD('clasificacion')">Clasif.<span class="si"></span></th>
-        
-        <th onclick="srtD('comprador')">Comprador<span class="si"></span></th>
+        <th onclick="srtD('fecha')">Fecha<span class="si"></span><span class="rsz"></span></th>
+        <th onclick="srtD('semaforo')" style="text-align:center">Sem.<span class="si"></span><span class="rsz"></span></th>
+        <th onclick="srtD('clave')">Clave<span class="si"></span><span class="rsz"></span></th>
+        <th onclick="srtD('nombre')">Nombre<span class="si"></span><span class="rsz"></span></th>
+        <th onclick="srtD('marca')">Marca<span class="si"></span><span class="rsz"></span></th>
+        <th onclick="srtD('meses_inv')" class="num">Meses Inv.<span class="si"></span><span class="rsz"></span></th>
+        <th onclick="srtD('obj_meses')" class="num">Obj.<span class="si"></span><span class="rsz"></span></th>
+        <th onclick="srtD('t_entrega')" class="num">T.Entrega<span class="si"></span><span class="rsz"></span></th>
+        <th onclick="srtD('existencias')" class="num">Existencias<span class="si"></span><span class="rsz"></span></th>
+        <th onclick="srtD('unidad')">Unidad<span class="si"></span><span class="rsz"></span></th>
+        <th onclick="srtD('bo')" class="num">Back Order<span class="si"></span><span class="rsz"></span></th>
+        <th onclick="srtD('estatus')">Estatus<span class="si"></span><span class="rsz"></span></th>
+        <th onclick="srtD('reorden')">Pto.Reorden<span class="si"></span><span class="rsz"></span></th>
+        <th onclick="srtD('clasificacion')">Clasif.<span class="si"></span><span class="rsz"></span></th>
+        <th onclick="srtD('comprador')">Comprador<span class="si"></span><span class="rsz"></span></th>
       </tr></thead><tbody id="det-body"></tbody></table></div>
       <div id="det-pgr" style="padding:8px 0"></div>
       <div id="det-empty" style="display:none;text-align:center;padding:24px;color:#6b7a99">Sin datos</div>
