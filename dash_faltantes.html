@@ -75,6 +75,8 @@ h1{font-size:20px;font-weight:700;color:#1a2035}
 .num{text-align:right}
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
 .xbtn{background:none;border:none;cursor:pointer;color:#1e3a5f;font-size:12px;font-weight:700;padding:0;font-family:inherit}
+.pico-btn{background:none;border:none;cursor:pointer;color:#1e3a5f;font-weight:700;padding:2px 4px;font-family:inherit;border-radius:4px}
+.pico-btn:hover{background:#dbe4f5;text-decoration:underline}
 .xrow td{padding:0!important;border:none!important}
 .xin{background:#f8f9fd;border-top:1px solid #e2e6ed;padding:10px 14px;overflow-x:auto}
 .mt{border-collapse:collapse;font-size:11.5px;width:100%;min-width:560px}
@@ -1695,6 +1697,111 @@ function calcResMesABC(mSel){
   return {CDATA:CD,AREA:AR,cierre,cierrePrev,mSel,mPrev,aprox:false};
 }
 
+// Devuelve el día pico (día con más faltantes en el mes) y las claves FALTANTE de ese día,
+// para un comprador (o Área General si comp==='__A__'), respetando el filtro ABC activo.
+// Solo funciona para meses con detalle (detR); para meses de Hoja1 no hay claves.
+function clavesDelPico(comp, cl){
+  const A=G.abcCmp;
+  const selMes=document.getElementById('r-mes');
+  const mSel=selMes?selMes.value:(G.mA||'');
+  if(!A||!A.faltDiarios||!mesTieneABC(mSel)) return {dia:null,claves:[],sinDetalle:true};
+  const fechas=G.fechas||A.dias||[];
+  const fMes=fechas.filter(x=>x.startsWith(mSel));
+  if(!fMes.length) return {dia:null,claves:[],sinDetalle:true};
+  const esArea = comp==='__A__';
+  const incluir=l=>!_abcExcluidas.has(l);
+  // Faltantes de un día para el comprador/área y rotación, respetando ABC (igual que aggFalt)
+  const faltDia=(fecha)=>{
+    const m=A.faltDiarios[fecha];if(!m)return 0;
+    let s=0;Object.keys(m).forEach(k=>{const[kc,krot,kabc]=k.split('||');
+      if(esArea){ if(kc==='ALEJANDRO')return; } else { if(kc!==comp)return; }
+      if(cl&&cl!=='TOTAL'&&krot!==cl)return; if(!incluir(kabc))return; s+=m[k];});
+    return s;
+  };
+  // Día pico = día del mes con más faltantes
+  let dia=null, max=-1;
+  fMes.forEach(f=>{ const v=faltDia(f); if(v>max){max=v;dia=f;} });
+  if(!dia||max<=0) return {dia:null,claves:[]};
+  // Claves FALTANTE de ese día para el comprador/área, respetando rotación y ABC
+  const ROT_VALIDAS=['SAGRADOS','ALTA ROTACIÓN','MEDIA ROTACIÓN','LENTA ROTACIÓN'];
+  const claves=(G.detR||[]).filter(x=>{
+    if(String(x.fecha||'')!==dia)return false;
+    const c=String(x.comprador||'').trim().toUpperCase();
+    if(!c||c==='PRODUCCION')return false;
+    if(esArea){ if(c==='ALEJANDRO')return false; } else { if(c!==comp)return false; }
+    const rot=String(x.clmov||'').trim().toUpperCase();
+    if(!ROT_VALIDAS.includes(rot))return false;
+    if(cl&&cl!=='TOTAL'&&rot!==cl)return false;
+    const abc=String(x.clasificacion||'').trim().toUpperCase()||'(SIN ABC)';
+    if(!incluir(abc))return false;
+    return String(x.estatus||'').trim().toUpperCase()==='FALTANTE';
+  });
+  return {dia,claves,total:max};
+}
+
+// Despliega/oculta la tabla de claves del día pico bajo la fila correspondiente
+let _picoActual={ek:null,dia:null,claves:[]};
+function verPico(ek){
+  const [comp,cl]=ek.split('||');
+  const row=document.getElementById('pr-'+ek);
+  if(!row)return;
+  if(row.style.display!=='none'){ row.style.display='none'; const dd=row.querySelector('div'); if(dd)dd.innerHTML=''; return; }
+  document.querySelectorAll('.picorow').forEach(r=>{r.style.display='none';const d=r.querySelector('div');if(d)d.innerHTML='';});
+  const res=clavesDelPico(comp,cl);
+  const cont=row.querySelector('div');
+  if(res.sinDetalle){ cont.innerHTML='<div style="padding:12px;color:#a0a9be;font-size:12px">Este mes no tiene detalle por clave (proviene de Hoja1). Solo los meses con hoja Detalle permiten ver las claves del pico.</div>'; row.style.display=''; return; }
+  if(!res.dia||!res.claves.length){ cont.innerHTML='<div style="padding:12px;color:#a0a9be;font-size:12px">Sin claves faltantes en el día pico.</div>'; row.style.display=''; return; }
+  _picoActual={ek,dia:res.dia,claves:res.claves,comp,cl};
+  const dLbl=(()=>{const p=res.dia.split('-');return p.length>=3?`${p[2]}/${p[1]}/${p[0]}`:res.dia;})();
+  const compLbl=comp==='__A__'?'Área General':comp;
+  const clLbl=cl==='TOTAL'?'todas las rotaciones':(CLL[cl]||cl);
+  const rowsHtml=res.claves.map(x=>`<tr>
+    <td style="font-weight:600;color:#1e3a5f">${x.clave}</td>
+    <td style="max-width:240px;white-space:normal;word-break:break-word">${x.nombre}</td>
+    <td>${x.marca}</td>
+    <td>${x.comprador}</td>
+    <td>${x.clmov}</td>
+    <td style="text-align:center">${x.clasificacion||'—'}</td>
+    <td class="num">${(x.existencias||0).toLocaleString()}</td>
+    <td class="num">${x.meses_inv!=null?(+x.meses_inv).toFixed(1):'—'}</td>
+    <td class="num">${x.bo||0}</td>
+    <td>${x.reorden||'—'}</td>
+    <td>${x.grupo||'—'}</td></tr>`).join('');
+  cont.innerHTML=`
+    <div style="padding:12px;background:#f8f9fd;border-radius:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:12px;color:#1e3a5f"><b>🔍 Claves del día pico</b> · ${compLbl} · ${clLbl} · Día pico: <b>${dLbl}</b> · <b>${res.claves.length}</b> claves faltantes</div>
+        <button class="expBtn" onclick="exportPico()" style="font-size:11px;padding:5px 12px;background:#1e3a5f;color:#fff;border:none;border-radius:6px;cursor:pointer">⬇ Exportar Excel</button>
+      </div>
+      <div style="overflow:auto;max-height:360px;border:1px solid #e2e6ed;border-radius:6px">
+        <table class="dt" style="font-size:11px">
+          <thead><tr>
+            <th>Clave</th><th>Nombre</th><th>Marca</th><th>Comprador</th><th>Rotación</th>
+            <th style="text-align:center">ABC</th><th class="num">Existencias</th><th class="num">Meses Inv.</th>
+            <th class="num">BO</th><th>Pto.Reorden</th><th>Grupo</th>
+          </tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+    </div>`;
+  row.style.display='';
+}
+function exportPico(){
+  if(!_picoActual.claves||!_picoActual.claves.length){alert('Sin claves para exportar.');return;}
+  if(typeof XLSX==='undefined'){alert('Librería XLSX no disponible.');return;}
+  const dLbl=(()=>{const p=_picoActual.dia.split('-');return p.length>=3?`${p[2]}/${p[1]}/${p[0]}`:_picoActual.dia;})();
+  const rows=_picoActual.claves.map(x=>({
+    'Fecha pico':dLbl,'Clave':x.clave,'Nombre':x.nombre,'Marca':x.marca,'Comprador':x.comprador,
+    'Rotación':x.clmov,'ABC':x.clasificacion,'Existencias':+x.existencias||0,
+    'Meses Inv':x.meses_inv!=null?+(+x.meses_inv).toFixed(2):'','Back Order':+x.bo||0,
+    'Pto.Reorden':x.reorden,'Grupo':x.grupo,'Estatus':x.estatus
+  }));
+  const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb,ws,'Pico');
+  const compTag=(_picoActual.comp==='__A__'?'AreaGeneral':_picoActual.comp).replace(/[^\w]/g,'_');
+  XLSX.writeFile(wb,`Pico_${compTag}_${_picoActual.dia}.xlsx`);
+}
+
 function renderRes(){
   if(!G.compradores) return;
   const selMes=document.getElementById('r-mes');
@@ -1805,7 +1912,14 @@ function bRow(comp,cl,d,showObj,isA,isF,rs){
   const canX=cl!=='TOTAL';
   const xBtn=canX?`<button class="xbtn" id="xb-${ek}" onclick="togX('${ek}')">▶ Ver</button>`:'';
   const xRow=canX?`<tr id="xr-${ek}" class="xrow" style="display:none"><td colspan="20"><div></div></td></tr>`:'';
-  return`<tr style="${bg}${bt}">${cTd}<td style="border-right:1px solid #dde2ec;${bg}">${dot}${CLL[cl]||cl}</td><td class="num" style="border-right:1px solid #dde2ec">${(d.skus||0).toLocaleString()}</td>${objTd}<td class="num" style="background:#f0faf3">${d.f1||0}</td>${pc(d.pct_f1!=null?d.pct_f1:undefined,cl)}<td class="num" style="background:#f0f4ff;border-left:2px solid #1e3a5f">${d.f2||0}</td>${pc(d.pct_f2,cl,d.f2)}<td class="num" style="background:#f0f4ff">${d.pico||0}</td>${pc(d.pct_pico,cl,d.pico)}<td style="text-align:center">${xBtn}</td></tr>${xRow}`;
+  // Celda Pico: si hay pico > 0, se vuelve clickeable para ver las claves del día pico
+  const pkVal=d.pico||0;
+  const pek=`${isA?'__A__':comp}||${cl}`;
+  const picoCell=pkVal>0
+    ? `<td class="num" style="background:#f0f4ff"><button class="pico-btn" title="Ver claves del día pico" onclick="verPico('${pek}')">${pkVal} 🔍</button></td>`
+    : `<td class="num" style="background:#f0f4ff">${pkVal}</td>`;
+  const picoRow=`<tr id="pr-${pek}" class="picorow" style="display:none"><td colspan="20"><div></div></td></tr>`;
+  return`<tr style="${bg}${bt}">${cTd}<td style="border-right:1px solid #dde2ec;${bg}">${dot}${CLL[cl]||cl}</td><td class="num" style="border-right:1px solid #dde2ec">${(d.skus||0).toLocaleString()}</td>${objTd}<td class="num" style="background:#f0faf3">${d.f1||0}</td>${pc(d.pct_f1!=null?d.pct_f1:undefined,cl)}<td class="num" style="background:#f0f4ff;border-left:2px solid #1e3a5f">${d.f2||0}</td>${pc(d.pct_f2,cl,d.f2)}${picoCell}${pc(d.pct_pico,cl,d.pico)}<td style="text-align:center">${xBtn}</td></tr>${picoRow}${xRow}`;
 }
 function togX(key){const row=document.getElementById('xr-'+key);if(!row)return;if(xRows.has(key)){xRows.delete(key);row.style.display='none';const b=document.getElementById('xb-'+key);if(b)b.textContent='▶ Ver';}else{xRows.add(key);row.style.display='table-row';const b=document.getElementById('xb-'+key);if(b)b.textContent='▼ Ocultar';if(!row.dataset.r)renderX(key,row);}}
 function renderX(key,row){
