@@ -1280,11 +1280,13 @@ async function procesarExcel(file){
         rawDUse=baseRows.map(filaBaseADetalle);
         // Hoja1 reconstruida desde el detalle (días con detalle → consistente con ABC)
         const h1Recon=reconstruirHoja1(rawDUse);
-        // Conservar el histórico REAL de Hoja1 del Excel para los días SIN detalle en la base
-        const diasConDetalle=new Set(rawDUse.map(r=>String(r['Fecha']||'')));
-        const h1Historico=raw.filter(r=>!diasConDetalle.has(String(r['Fecha']||'')));
+        // Conservar el histórico REAL de Hoja1 del Excel SOLO para los días SIN detalle en la base.
+        // Se normalizan ambas fechas con pD() porque la base entrega YYYY-MM-DD y el Excel DD/MM/YYYY;
+        // sin normalizar, la comparación falla y se cuenta doble (Hoja1 + detalle) el mismo día.
+        const diasConDetalle=new Set(rawDUse.map(r=>pD(String(r['Fecha']||''))).filter(Boolean));
+        const h1Historico=raw.filter(r=>!diasConDetalle.has(pD(String(r['Fecha']||''))));
         rawUse=h1Historico.concat(h1Recon);
-        log('   ✅ '+rawDUse.length.toLocaleString()+' filas de detalle desde la base ('+diasConDetalle.size+' días) + '+h1Historico.length.toLocaleString()+' filas históricas de Hoja1.');
+        log('   ✅ '+rawDUse.length.toLocaleString()+' filas de detalle desde la base ('+diasConDetalle.size+' días) + '+h1Historico.length.toLocaleString()+' filas históricas de Hoja1 ('+new Set(h1Historico.map(r=>pD(String(r['Fecha']||'')))).size+' días sin detalle).');
       }else{
         log('   ⚠️ La base está vacía; se usa solo el Excel.');
       }
