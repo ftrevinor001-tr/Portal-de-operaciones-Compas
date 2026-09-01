@@ -1278,8 +1278,13 @@ async function procesarExcel(file){
       const baseRows=await descargarDetalleBase(log);
       if(baseRows&&baseRows.length){
         rawDUse=baseRows.map(filaBaseADetalle);
-        rawUse=reconstruirHoja1(rawDUse);
-        log('   ✅ '+rawDUse.length.toLocaleString()+' filas de detalle desde la base ('+new Set(rawDUse.map(r=>r['Fecha'])).size+' días).');
+        // Hoja1 reconstruida desde el detalle (días con detalle → consistente con ABC)
+        const h1Recon=reconstruirHoja1(rawDUse);
+        // Conservar el histórico REAL de Hoja1 del Excel para los días SIN detalle en la base
+        const diasConDetalle=new Set(rawDUse.map(r=>String(r['Fecha']||'')));
+        const h1Historico=raw.filter(r=>!diasConDetalle.has(String(r['Fecha']||'')));
+        rawUse=h1Historico.concat(h1Recon);
+        log('   ✅ '+rawDUse.length.toLocaleString()+' filas de detalle desde la base ('+diasConDetalle.size+' días) + '+h1Historico.length.toLocaleString()+' filas históricas de Hoja1.');
       }else{
         log('   ⚠️ La base está vacía; se usa solo el Excel.');
       }
