@@ -810,7 +810,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
         <div style="position:relative;height:140px"><canvas id="prec-resp-chart"></canvas></div>
         <div class="prec-resp-grid" id="prec-resp-grid" style="margin-top:10px"></div>
         <div style="margin-top:8px;font-size:10px;color:var(--tx3)">
-          Tolerancia: <b>±20%</b> · Real = 0 → <b>No colocada</b>
+          Tolerancia: <b>±40%</b> · Real = 0 → <b>No colocada</b>
         </div>
       </div>
     </div>
@@ -857,9 +857,9 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
         <p>Compara la <b>cantidad que el sistema proponía</b> al momento de levantar la OC (capturada manualmente) contra la <b>cantidad real</b> con que se colocó. Requiere llenar 2 columnas nuevas en la hoja <em>OTIF PEDIDOS</em> del Excel, después de Observaciones:</p>
         <ul style="margin:6px 0 6px 18px;padding:0">
           <li><b>Cantidad Propuesta</b> (columna S) — valor de "Asignación" que mostraba el sistema el día que se generó la OC.</li>
-          <li><b>Motivo</b> (columna T) — obligatorio si Real = 0 o si la desviación supera ±20%. Usar uno de: <em>ASIGNADO POR SURTIMIENTO, ERROR DE CALCULO, VENTAS ESPECIALES, NUEVOS PRODUCTOS, COMPRAS ESPECIALES, MONTO MINIMO, RENTABILIDAD, POR CUBICAJE, VARIACION DE PRECIO, DECISION DE GERENCIA, OTRO</em>.</li>
+          <li><b>Motivo</b> (columna T) — obligatorio si Real = 0 o si la desviación supera ±40%. Usar uno de: <em>ASIGNADO POR SURTIMIENTO, ERROR DE CALCULO, VENTAS ESPECIALES, NUEVOS PRODUCTOS, COMPRAS ESPECIALES, MONTO MINIMO, RENTABILIDAD, POR CUBICAJE, VARIACION DE PRECIO, DECISION DE GERENCIA, OTRO</em>.</li>
         </ul>
-        <p><b>Clasificación:</b> Real = 0 → <em>No colocada</em> · desviación ≤ ±20% → <em>Acertada</em> · desviación &gt; ±20% → <em>Desviada</em>. Cada motivo se traduce automáticamente a un responsable (Planeación, Portal de compras, Ventas, Desarrollos, Compras, Gerencia).</p>
+        <p><b>Clasificación:</b> Real = 0 → <em>No colocada</em> · desviación ≤ ±40% → <em>Acertada</em> · desviación &gt; ±40% → <em>Desviada</em>. Cada motivo se traduce automáticamente a un responsable (Planeación, Portal de compras, Ventas, Desarrollos, Compras, Gerencia).</p>
       </div>
     </div>
   </div><!-- /tab-prec -->
@@ -911,7 +911,7 @@ const MOTIVO_RESP={
   'OTRO':'Sin clasificar',
   'NO CUMPLE CANTIDAD MINIMA':'Proveedor',  // histórico: fuera del desplegable, se conserva su área para registros antiguos
 };
-const TOLERANCIA_PCT=20;
+const TOLERANCIA_PCT=40;
 
 // ══════════════════════════════════════════════════════════════
 // STATE
@@ -1792,7 +1792,7 @@ function renderPrecisionTab(){
   document.getElementById('prec-kpis').innerHTML=[
     {l:'Propuestas pendientes (mes actual y sig.)',v:pendientes.length,s:'por levantar — directriz: Levantar pedido',c:pendientes.length>0?'var(--purple)':'var(--green)'},
     {l:'Claves evaluadas',v:total,s:sinDato>0?`${sinDato} sin dato capturado`:'con propuesta registrada',c:'var(--navy)'},
-    {l:'Acertadas (±20%)',v:acertadas.length,s:total>0?pctAcert+'% del total':'—',c:col(acertadas.length,total,70,40)},
+    {l:'Acertadas (±40%)',v:acertadas.length,s:total>0?pctAcert+'% del total':'—',c:col(acertadas.length,total,70,40)},
     {l:'Desviadas',v:desviadas.length,s:'fuera de tolerancia',c:desviadas.length>0?'var(--amber)':'var(--green)'},
     {l:'No colocadas',v:noColocadas.length,s:'cantidad real = 0',c:noColocadas.length>0?'var(--red)':'var(--green)'},
   ].map(k=>`<div class="prec-kpi" style="border-left:4px solid ${k.c}"><div class="prec-kpi-lbl">${k.l}</div><div class="prec-kpi-val" style="color:${k.c}">${k.v}</div><div class="prec-kpi-sub">${k.s}</div></div>`).join('');
@@ -2397,15 +2397,11 @@ function renderOTIFKPIs(){
   const col=(n,d,g,w)=>{const p=d>0?n/d*100:0;return p>=g?'var(--green)':p>=w?'var(--amber)':'var(--red)';};
   const kpi=(lbl,val,s,c)=>`<div class="kpi" style="--kc:${c};border:1px solid var(--brd);border-radius:8px;padding:12px 14px"><div class="kpi-lbl">${lbl}</div><div class="kpi-val">${val}</div><div class="kpi-sub">${s}</div></div>`;
 
-  // ── TARGET: by OC. OC counts as fulfilled if ≥95% of its lines are EN TIEMPO
-  const targetByOC=new Map();
-  td.forEach(d=>{
-    if(!targetByOC.has(d.oc))targetByOC.set(d.oc,{total:0,ok:0});
-    const o=targetByOC.get(d.oc); o.total++;
-    if(d.otifC==='EN TIEMPO')o.ok++;
-  });
-  const tTotal=targetByOC.size;
-  const tOk=[...targetByOC.values()].filter(o=>o.total>0&&o.ok/o.total>=0.95).length;
+  // ── TARGET DE COMPRADOR: % de líneas/claves colocadas EN TIEMPO (no por OC completa).
+  // Antes se medía por OC (una OC contaba solo si ≥95% de sus líneas iban en tiempo), lo que
+  // daba 0% cuando una OC con muchas líneas en tiempo tenía algunas fuera. Ahora es por línea.
+  const tTotal=td.length;
+  const tOk=td.filter(d=>d.otifC==='EN TIEMPO').length;
 
   // ── MÉTRICAS OTIF: todas por LÍNEA para que sean coherentes entre sí.
   // (Medir On Time por OC e In Full por línea daba resultados ilógicos como
@@ -2423,7 +2419,7 @@ function renderOTIFKPIs(){
   document.getElementById('otif-kpis').innerHTML=`
   <div id="kpi-target-box" style="background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:12px;margin-bottom:0;width:280px;max-width:280px;display:flex;flex-direction:column;justify-content:center">
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx2);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--brd)">🎯 Target de Comprador${mesLbl}</div>
-    ${kpi('Target de Comprador',pct(tOk,tTotal),`${tOk} de ${tTotal} órdenes`,col(tOk,tTotal,70,40))}
+    ${kpi('Target de Comprador',pct(tOk,tTotal),`${tOk} de ${tTotal} líneas En tiempo`,col(tOk,tTotal,70,40))}
   </div>
   <div id="kpi-otif-box" style="background:var(--surface);border:1px solid var(--brd);border-radius:10px;padding:12px;margin-bottom:0;width:600px;max-width:600px;display:flex;flex-direction:column;justify-content:center">
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx2);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--brd)">📦 OTIF de Proveedor${mesRecepLbl}</div>
