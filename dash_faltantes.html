@@ -337,7 +337,6 @@ select{padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;font-size:1
           <th class="num" style="font-size:11px;background:#e8f0fe;color:#1e3a5f">% Falt.</th>
           <th class="num" style="font-size:11px;background:#e8f0fe;color:#1e3a5f">Pico Máx</th>
           <th class="num" style="font-size:11px;background:#e8f0fe;color:#1e3a5f">% Pico</th>
-          <th style="font-size:11px;background:#f5f6fa;color:#6b7a99;text-align:center">Detalle</th>
         </tr></thead>
         <tbody id="res-body"></tbody>
         <tfoot id="res-foot"></tfoot>
@@ -1910,8 +1909,12 @@ function bRow(comp,cl,d,showObj,isA,isF,rs){
   };
   const ek=`${isA?'__A__':comp}||${cl}`;
   const canX=cl!=='TOTAL';
-  const xBtn=canX?`<button class="xbtn" id="xb-${ek}" onclick="togX('${ek}')">▶ Ver</button>`:'';
-  const xRow=canX?`<tr id="xr-${ek}" class="xrow" style="display:none"><td colspan="20"><div></div></td></tr>`:'';
+  const xRow=`<tr id="xr-${ek}" class="xrow" style="display:none"><td colspan="20"><div></div></td></tr>`;
+  // Celda SKU'S FALT. (mes actual): clickeable para ver el detalle de claves faltantes (incluye Global)
+  const f2Val=d.f2||0;
+  const f2Cell=(f2Val>0)
+    ? `<td class="num" style="background:#f0f4ff;border-left:2px solid #1e3a5f"><button class="pico-btn" id="xb-${ek}" title="Ver claves faltantes" onclick="togX('${ek}')">${f2Val} 🔍</button></td>`
+    : `<td class="num" style="background:#f0f4ff;border-left:2px solid #1e3a5f">${f2Val}</td>`;
   // Celda Pico: si hay pico > 0, se vuelve clickeable para ver las claves del día pico
   const pkVal=d.pico||0;
   const pek=`${isA?'__A__':comp}||${cl}`;
@@ -1919,18 +1922,73 @@ function bRow(comp,cl,d,showObj,isA,isF,rs){
     ? `<td class="num" style="background:#f0f4ff"><button class="pico-btn" title="Ver claves del día pico" onclick="verPico('${pek}')">${pkVal} 🔍</button></td>`
     : `<td class="num" style="background:#f0f4ff">${pkVal}</td>`;
   const picoRow=`<tr id="pr-${pek}" class="picorow" style="display:none"><td colspan="20"><div></div></td></tr>`;
-  return`<tr style="${bg}${bt}">${cTd}<td style="border-right:1px solid #dde2ec;${bg}">${dot}${CLL[cl]||cl}</td><td class="num" style="border-right:1px solid #dde2ec">${(d.skus||0).toLocaleString()}</td>${objTd}<td class="num" style="background:#f0faf3">${d.f1||0}</td>${pc(d.pct_f1!=null?d.pct_f1:undefined,cl)}<td class="num" style="background:#f0f4ff;border-left:2px solid #1e3a5f">${d.f2||0}</td>${pc(d.pct_f2,cl,d.f2)}${picoCell}${pc(d.pct_pico,cl,d.pico)}<td style="text-align:center">${xBtn}</td></tr>${picoRow}${xRow}`;
+  return`<tr style="${bg}${bt}">${cTd}<td style="border-right:1px solid #dde2ec;${bg}">${dot}${CLL[cl]||cl}</td><td class="num" style="border-right:1px solid #dde2ec">${(d.skus||0).toLocaleString()}</td>${objTd}<td class="num" style="background:#f0faf3">${d.f1||0}</td>${pc(d.pct_f1!=null?d.pct_f1:undefined,cl)}${f2Cell}${pc(d.pct_f2,cl,d.f2)}${picoCell}${pc(d.pct_pico,cl,d.pico)}</tr>${picoRow}${xRow}`;
 }
-function togX(key){const row=document.getElementById('xr-'+key);if(!row)return;if(xRows.has(key)){xRows.delete(key);row.style.display='none';const b=document.getElementById('xb-'+key);if(b)b.textContent='▶ Ver';}else{xRows.add(key);row.style.display='table-row';const b=document.getElementById('xb-'+key);if(b)b.textContent='▼ Ocultar';if(!row.dataset.r)renderX(key,row);}}
+function togX(key){const row=document.getElementById('xr-'+key);if(!row)return;if(xRows.has(key)){xRows.delete(key);row.style.display='none';}else{xRows.add(key);row.style.display='table-row';if(!row.dataset.r)renderX(key,row);}}
+let _faltActual={key:null,comp:null,cl:null,claves:[]};
 function renderX(key,row){
   const[comp,cl]=key.split('||'),fd=G.detFalt||{};
-  const dat=comp==='__A__'?Object.values(fd).flatMap(cc=>cc[cl]||[]):(fd[comp]?.[cl]||[]);
-  if(!dat.length){row.querySelector('td').innerHTML='<div style="padding:10px;color:#6b7a99;font-size:12px">Sin detalle disponible</div>';row.dataset.r='1';return;}
-  const s=[...dat].sort((a,b)=>(SORD[a.semaforo]??9)-(SORD[b.semaforo]??9));
-  const eBg=e=>({FALTANTE:'#fdecea',RIESGO:'#fff8e1','SOBRE INVENTARIO':'#e8f5e9',OPTIMO:'#e3f2fd'}[e]||'#f5f6fa');
-  const eC=e=>({FALTANTE:'#c0392b',RIESGO:'#f57c00','SOBRE INVENTARIO':'#2e7d32',OPTIMO:'#1565c0'}[e]||'#6b7a99');
-  row.querySelector('td').innerHTML=`<div class="xin"><table class="mt"><thead><tr><th>Sem.</th><th>Clave</th><th>Nombre</th><th>Marca</th><th style="text-align:right">Meses</th><th style="text-align:right">Obj.</th><th style="text-align:right">T.Ent.</th><th style="text-align:right">Exist.</th><th style="text-align:right">BO</th><th>Estatus</th><th>Reorden</th></tr></thead><tbody>${s.map(r=>`<tr><td><span class="sem ${SCSS[r.semaforo]}"></span></td><td style="font-weight:600">${r.clave}</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${r.nombre}">${r.nombre}</td><td>${r.marca||'—'}</td><td style="text-align:right">${(+r.meses_inv).toFixed(2)}</td><td style="text-align:right">${r.obj_meses}</td><td style="text-align:right">${r.t_entrega}</td><td style="text-align:right">${(+r.existencias).toLocaleString()}</td><td style="text-align:right;color:${r.bo>0?'#c0392b':'inherit'};font-weight:${r.bo>0?700:400}">${(+r.bo).toLocaleString()}</td><td><span style="font-size:10px;padding:2px 5px;border-radius:3px;background:${eBg(r.estatus)};color:${eC(r.estatus)};font-weight:600">${r.estatus}</span></td><td style="font-size:11px">${r.reorden||'—'}</td></tr>`).join('')}</tbody></table></div>`;
+  // Rotaciones válidas que cuenta la comparativa (igual que el número): excluye NUEVOS y SIN COMPRA
+  const ROT_VALIDAS=['SAGRADOS','ALTA ROTACIÓN','MEDIA ROTACIÓN','LENTA ROTACIÓN'];
+  const rotDe=cc=>Object.entries(cc).filter(([rot])=>ROT_VALIDAS.includes(rot)).flatMap(([,arr])=>arr);
+  let dat;
+  if(cl==='TOTAL'){
+    // Global: todas las rotaciones VÁLIDAS juntas (sin NUEVOS ni SIN COMPRA)
+    if(comp==='__A__'){ dat=Object.entries(fd).filter(([c])=>c!=='ALEJANDRO').flatMap(([,cc])=>rotDe(cc)); }
+    else { dat=fd[comp]?rotDe(fd[comp]):[]; }
+  } else {
+    dat=comp==='__A__'?Object.entries(fd).filter(([c])=>c!=='ALEJANDRO').flatMap(([,cc])=>cc[cl]||[]):(fd[comp]?.[cl]||[]);
+  }
+  const cont=row.querySelector('td');
+  if(!dat.length){cont.innerHTML='<div style="padding:12px;color:#a0a9be;font-size:12px">Sin claves faltantes disponibles.</div>';row.dataset.r='1';return;}
+  _faltActual={key,comp,cl,claves:dat};
+  const compLbl=comp==='__A__'?'Área General':comp;
+  const clLbl=cl==='TOTAL'?'todas las rotaciones':(CLL[cl]||cl);
+  const rowsHtml=dat.map(x=>`<tr>
+    <td style="font-weight:600;color:#1e3a5f">${x.clave}</td>
+    <td style="max-width:240px;white-space:normal;word-break:break-word">${x.nombre}</td>
+    <td>${x.marca||'—'}</td>
+    <td>${x.comprador}</td>
+    <td>${x.clmov}</td>
+    <td style="text-align:center">${x.clasificacion||'—'}</td>
+    <td class="num">${(+x.existencias||0).toLocaleString()}</td>
+    <td class="num">${x.meses_inv!=null?(+x.meses_inv).toFixed(1):'—'}</td>
+    <td class="num">${x.bo||0}</td>
+    <td>${x.reorden||'—'}</td>
+    <td>${x.grupo||'—'}</td></tr>`).join('');
+  cont.innerHTML=`
+    <div style="padding:12px;background:#f8f9fd;border-radius:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:12px;color:#1e3a5f"><b>🔍 Claves faltantes</b> · ${compLbl} · ${clLbl} · <b>${dat.length}</b> claves faltantes</div>
+        <button class="expBtn" onclick="exportFalt()" style="font-size:11px;padding:5px 12px;background:#1e3a5f;color:#fff;border:none;border-radius:6px;cursor:pointer">⬇ Exportar Excel</button>
+      </div>
+      <div style="overflow:auto;max-height:360px;border:1px solid #e2e6ed;border-radius:6px">
+        <table class="dt" style="font-size:11px">
+          <thead><tr>
+            <th>Clave</th><th>Nombre</th><th>Marca</th><th>Comprador</th><th>Rotación</th>
+            <th style="text-align:center">ABC</th><th class="num">Existencias</th><th class="num">Meses Inv.</th>
+            <th class="num">BO</th><th>Pto.Reorden</th><th>Grupo</th>
+          </tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+    </div>`;
   row.dataset.r='1';
+}
+function exportFalt(){
+  if(!_faltActual.claves||!_faltActual.claves.length){alert('Sin claves para exportar.');return;}
+  if(typeof XLSX==='undefined'){alert('Librería XLSX no disponible.');return;}
+  const rows=_faltActual.claves.map(x=>({
+    'Clave':x.clave,'Nombre':x.nombre,'Marca':x.marca,'Comprador':x.comprador,
+    'Rotación':x.clmov,'ABC':x.clasificacion,'Existencias':+x.existencias||0,
+    'Meses Inv':x.meses_inv!=null?+(+x.meses_inv).toFixed(2):'','Back Order':+x.bo||0,
+    'Pto.Reorden':x.reorden,'Grupo':x.grupo,'Estatus':x.estatus
+  }));
+  const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb,ws,'Faltantes');
+  const compTag=(_faltActual.comp==='__A__'?'AreaGeneral':_faltActual.comp).replace(/[^\w]/g,'_');
+  const clTag=(_faltActual.cl||'').replace(/[^\w]/g,'_');
+  XLSX.writeFile(wb,`Faltantes_${compTag}_${clTag}.xlsx`);
 }
 
 // ── DETALLE ───────────────────────────────────────────────────────────────────
