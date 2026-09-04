@@ -586,10 +586,10 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
       </div>
       <div class="legend-strip">
         <span style="font-weight:700">Meses inv.:</span>
-        <div class="ls-i"><div class="ls-d" style="background:#ff4d4d"></div>Crítico &lt;2m</div>
-        <div class="ls-i"><div class="ls-d" style="background:#ffcc00"></div>Bajo 2–4m</div>
-        <div class="ls-i"><div class="ls-d" style="background:#92d050"></div>Óptimo 4–7m</div>
-        <div class="ls-i"><div class="ls-d" style="background:#7aadd8"></div>Sobre inv. ≥7m</div>
+        <div class="ls-i"><div class="ls-d" style="background:#ff4d4d"></div>Crítico (&lt; entrega)</div>
+        <div class="ls-i"><div class="ls-d" style="background:#ffcc00"></div>Bajo (&lt; objetivo)</div>
+        <div class="ls-i"><div class="ls-d" style="background:#92d050"></div>Óptimo (objetivo)</div>
+        <div class="ls-i"><div class="ls-d" style="background:#7aadd8"></div>Sobre inv. (≥ 1.4× obj.)</div>
         <div class="ls-sep"></div>
         <span style="font-weight:700">M. c/BO:</span>
         <div class="ls-i" style="font-style:italic;color:var(--tx3)">Meses de inventario proyectados al recibir el BO — mismo código de color</div>
@@ -893,11 +893,26 @@ const AUTO_LOAD_ENABLED = true;        // Set false to always show drop zone
 // ══════════════════════════════════════════════════════════════
 // CONSTANTS
 // ══════════════════════════════════════════════════════════════
+// Clasificación de meses de inventario relativa al OBJETIVO (col N) y TIEMPO DE ENTREGA (col M):
+//  🔴 Crítico: mi < tiempo de entrega   🟡 Bajo: entrega ≤ mi < objetivo
+//  🟢 Óptimo:  objetivo ≤ mi < objetivo × 1.4   🔵 Sobre: mi ≥ objetivo × 1.4
+//  Respaldo (sin objetivo): umbrales fijos 2/4/7.
+function nivelMeses(mi,obj,lt){
+  if(mi===null||mi===undefined)return null;
+  const o=(obj!=null&&obj>0)?obj:null;
+  const t=(lt!=null&&lt>0)?lt:null;
+  if(o===null){ if(mi<2)return'crit'; if(mi<4)return'low'; if(mi<7)return'opt'; return'over'; }
+  const critHi=(t!==null&&t<o)?t:o*0.5;
+  if(mi<critHi)return'crit';
+  if(mi<o)return'low';
+  if(mi<o*1.4)return'opt';
+  return'over';
+}
 const LEVELS=[
-  {key:'crit',cls:'crit',icon:'🔴',name:'Crítico',   range:'< 2 meses',  lo:0,hi:2,   better:'less'},
-  {key:'low', cls:'low', icon:'🟡',name:'Bajo',      range:'2 – 4 meses',lo:2,hi:4,   better:'less'},
-  {key:'opt', cls:'opt', icon:'🟢',name:'Óptimo',    range:'4 – 7 meses',lo:4,hi:7,   better:'more'},
-  {key:'over',cls:'over',icon:'🔵',name:'Sobre Inv.',range:'≥ 7 meses',  lo:7,hi:9999,better:'neut'},
+  {key:'crit',cls:'crit',icon:'🔴',name:'Crítico',   range:'< tiempo entrega',lo:0,hi:2,   better:'less'},
+  {key:'low', cls:'low', icon:'🟡',name:'Bajo',      range:'< objetivo',     lo:2,hi:4,   better:'less'},
+  {key:'opt', cls:'opt', icon:'🟢',name:'Óptimo',    range:'en objetivo',    lo:4,hi:7,   better:'more'},
+  {key:'over',cls:'over',icon:'🔵',name:'Sobre Inv.',range:'≥ 1.4× objetivo',  lo:7,hi:9999,better:'neut'},
 ];
 // Color palettes assigned by group index — generic, works with any material
 const GP_PALETTE=[
@@ -1086,6 +1101,7 @@ function parseSheet(raw){
   const cProv=ci('PROVEEDOR'), cOrig=ci('ORIGEN');
   const cInv=ci('INVENTARIO ACTUAL'), cVm=ci('VENTAS'), cMi=ci('MESES INV');
   const cBo=ci('BO'), cQ=ci('INVENTARIO FINAL'), cLtEst=ci('ENTREGA MESES');
+  const cObjInv=ci('OBJ. INV'); // columna N: objetivo de inventario en meses (por clave)
   const allH=headers.reduce((acc,h,i)=>{if(h.includes('INVENTARIO HASTA'))acc.push(i);return acc;},[]);
   const cHA=allH[0]??-1, cHD=allH[1]??-1;
   const cFP=ci('LEVANTAR PEDIDO');
@@ -1101,11 +1117,13 @@ function parseSheet(raw){
     if(typeof v==='number'){if(v<=0)return null;const d=new Date(Math.round((v-25569)*86400000));return(isNaN(d)||d.getFullYear()<1900)?null:d;}
     return null;
   };
-  const classifyMi=mi=>{
-    if(mi===null)return null;
-    for(const l of LEVELS)if(mi>=l.lo&&mi<l.hi)return l.key;
-    return null;
-  };
+  // Clasificación relativa al OBJETIVO (col N) y TIEMPO DE ENTREGA (col M) de cada clave:
+  //  🔴 Crítico: mi < tiempo de entrega (no alcanza a reabastecerse)
+  //  🟡 Bajo:    entrega ≤ mi < objetivo
+  //  🟢 Óptimo:  objetivo ≤ mi < objetivo × 1.4
+  //  🔵 Sobre:   mi ≥ objetivo × 1.4
+  // Si falta objetivo, cae a los umbrales fijos clásicos (2/4/7) como respaldo.
+  const classifyMi=(mi,obj,lt)=>nivelMeses(mi,obj,lt);
 
   const result=[];let lastMain=null;
   for(let i=hdr+1;i<raw.length;i++){
@@ -1135,9 +1153,10 @@ function parseSheet(raw){
       proxima_entrada:td(row[cProxEnt]),  // ETA date for this provider's OC
       asig:tn(row[cAsig]),
       ltEstimado:cLtEst>=0&&row[cLtEst]!=null?parseFloat(row[cLtEst])||null:null,
+      objInv:cObjInv>=0&&row[cObjInv]!=null?(parseFloat(row[cObjInv])||null):null,
       isMain,
-      lvlNow:vm>0?classifyMi(mi):null,
-      lvlBO:vm>0?classifyMi(miAfter):null,
+      lvlNow:vm>0?classifyMi(mi, (cObjInv>=0?parseFloat(row[cObjInv])||null:null), (cLtEst>=0?parseFloat(row[cLtEst])||null:null)):null,
+      lvlBO:vm>0?classifyMi(miAfter, (cObjInv>=0?parseFloat(row[cObjInv])||null:null), (cLtEst>=0?parseFloat(row[cLtEst])||null:null)):null,
     });
   }
   return result;
@@ -1190,13 +1209,12 @@ function dateCell(d){
   else if(diff<90){cls='date-warn';chCls='dc-warn';}
   return`<span class="${cls}" style="display:block;line-height:1.3">${txt}</span><span class="diff-chip ${chCls}" style="font-size:8px;margin-left:0">${chTxt}</span>`;
 }
-function miCell(mi,vm){
+function miCell(mi,vm,obj,lt){
   if(mi===null||vm===0)return'<span class="mi-na">—</span>';
   const v=mi.toFixed(1);
-  if(mi<2)return`<span class="mi-crit">${v}</span>`;
-  if(mi<4)return`<span class="mi-low">${v}</span>`;
-  if(mi<7)return`<span class="mi-opt">${v}</span>`;
-  return`<span class="mi-over">${v}</span>`;
+  const nivel=nivelMeses(mi,obj,lt);
+  const cls={crit:'mi-crit',low:'mi-low',opt:'mi-opt',over:'mi-over'}[nivel]||'mi-na';
+  return`<span class="${cls}">${v}</span>`;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1340,8 +1358,7 @@ function clearFilters(){
 function renderGroupColorLegend(){
   const el=document.getElementById('group-color-legend');
   if(!el)return;
-  const items=Object.entries(GP_C).map(([g,c])=>`<div class="ls-i"><div class="ls-d" style="background:${c.bar};border-radius:3px"></div>${tc(g)}</div>`).join('');
-  el.innerHTML=`<span style="font-weight:700">Sub-grupos:</span>${items}<div class="ls-sep"></div>`;
+  el.innerHTML=''; // lista de sub-grupos retirada por no aportar información relevante
 }
 // Panel "Mi Vista": resumen de problemas del comprador seleccionado
 function renderMiVista(data){
@@ -1603,11 +1620,11 @@ function renderTable(data){
         <td style="padding-left:4px">${mainChip}</td>
         <td ${rs} class="num" style="${bb}">${d.vm?fmt(d.vm,1):'<span class="dash">—</span>'}</td>
         <td ${rs} class="num" style="${bb}">${fmt(d.inv)}</td>
-        <td ${rs} class="num" style="${bb}">${miCell(d.mi,d.vm)}</td>
+        <td ${rs} class="num" style="${bb}">${miCell(d.mi,d.vm,d.objInv,d.ltEstimado)}</td>
         <td ${rs} class="ctr" style="white-space:normal;line-height:1.3;${bb}">${dateCell(d.hasta_antes)}</td>
         <td class="num">${boCell}</td>
         <td class="ctr" style="white-space:normal;line-height:1.3">${dateCell(d.proxima_entrada)}</td>
-        <td ${rs} class="num" style="${bb}">${miCell(d.miAfter,d.vm)}</td>
+        <td ${rs} class="num" style="${bb}">${miCell(d.miAfter,d.vm,d.objInv,d.ltEstimado)}</td>
         <td ${rs} class="ctr" style="white-space:normal;line-height:1.3;${bb}">${dateCell(d.hasta_desp)}</td>
         <td ${rs} class="ctr" style="white-space:normal;line-height:1.3;${bb}">${(d.asig>0||d.directriz==='REVISAR CON GERENCIA')?dateCell(d.fecha_pedido):'<span class="date-na">—</span>'}</td>
         <td ${rs} style="white-space:normal;vertical-align:middle;text-align:center;${bb}">${(d.directriz==='LEVANTAR PEDIDO'&&!d.asig)?'<span class="dir-na">—</span>':dirChip(d.directriz)}</td>
@@ -1639,11 +1656,11 @@ function renderTable(data){
         <td>${mainChip}</td>
         <td class="num">${d.vm?fmt(d.vm,1):'<span class="dash">—</span>'}</td>
         <td class="num">${fmt(d.inv)}</td>
-        <td class="num">${miCell(d.mi,d.vm)}</td>
+        <td class="num">${miCell(d.mi,d.vm,d.objInv,d.ltEstimado)}</td>
         <td class="ctr" style="white-space:normal;line-height:1.3">${dateCell(d.hasta_antes)}</td>
         <td class="num">${boCell}</td>
         <td class="ctr" style="white-space:normal;line-height:1.3">${dateCell(d.proxima_entrada)}</td>
-        <td class="num">${miCell(d.miAfter,d.vm)}</td>
+        <td class="num">${miCell(d.miAfter,d.vm,d.objInv,d.ltEstimado)}</td>
         <td class="ctr" style="white-space:normal;line-height:1.3">${dateCell(d.hasta_desp)}</td>
         <td class="ctr" style="white-space:normal;line-height:1.3">${(d.asig>0||d.directriz==='REVISAR CON GERENCIA')?dateCell(d.fecha_pedido):'<span class="date-na">—</span>'}</td>
         <td style="white-space:normal;vertical-align:middle;text-align:center">${(d.directriz==='LEVANTAR PEDIDO'&&!d.asig)?'<span class="dir-na">—</span>':dirChip(d.directriz)}</td>
