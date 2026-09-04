@@ -470,6 +470,15 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
     <!-- KPIs -->
     <div class="kpi-grid" id="kpis"></div>
 
+    <!-- MI VISTA: resumen de problemas del comprador -->
+    <div id="mi-vista" style="display:none;margin:14px 0;background:linear-gradient(135deg,#1e3a5f,#2a4a70);border-radius:12px;padding:16px 20px;color:#fff">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        <div style="font-size:15px;font-weight:700" id="mv-titulo">🎯 Mi vista</div>
+        <div style="font-size:11px;opacity:.85" id="mv-sub"></div>
+      </div>
+      <div id="mv-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px"></div>
+    </div>
+
     <!-- LEVEL CARDS -->
     <div class="lvl-section">
       <div class="lvl-header" style="justify-content:space-between">
@@ -493,8 +502,14 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
     <div class="filter-section">
       <!-- Row 1: Grupo + Proveedor (dropdowns en cascada) -->
       <div class="filter-row">
+        <span class="tb-lbl">Comprador:</span>
+        <select class="msel" id="comp-sel"><option value="">Todos los compradores</option></select>
+        <div class="filter-sep"></div>
         <span class="tb-lbl">Grupo:</span>
         <select class="msel" id="grupo-sel"><option value="">Todos los grupos</option></select>
+        <div class="filter-sep"></div>
+        <span class="tb-lbl">Marca:</span>
+        <select class="msel" id="marca-sel"><option value="">Todas las marcas</option></select>
         <div class="filter-sep"></div>
         <span class="tb-lbl">Proveedor:</span>
         <select class="msel" id="prov-sel"><option value="">Todos los proveedores</option></select>
@@ -524,6 +539,7 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
         <div class="sort-row">
           Ordenar:
           <select id="sort-sel">
+            <option value="urgencia">🔴 Prioridad (urgencia)</option>
             <option value="mi">Meses inv. ↑</option>
             <option value="miAfter">Meses c/BO ↑</option>
             <option value="hasta_antes">Agota sin BO ↑</option>
@@ -916,9 +932,18 @@ const TOLERANCIA_PCT=40;
 // STATE
 // ══════════════════════════════════════════════════════════════
 let ALL=[], GROUPED=[];
-let activeGroup='', activeProv='';
+// OTIF_DATA filtrado por el comprador activo (para pestañas OTIF/Pedidos/Target)
+function otifBase(){ return activeComp?OTIF_DATA.filter(d=>(d.comprador||'')===activeComp):OTIF_DATA; }
+// Al cambiar comprador/marca, refresca la pestaña que esté visible (además de inventario)
+function refrescarPestanas(){
+  try{
+    if(currentMainTab==='otif'||currentMainTab==='target'){ if(OTIF_DATA.length){buildOTIFFilters();renderOTIF();} }
+    else if(currentMainTab==='prec'){ if(OTIF_DATA.length) renderPrecisionTab(); }
+  }catch(e){ console.warn('refrescarPestanas:',e.message); }
+}
+let activeComp='', activeMarca='', activeGroup='', activeProv='';
 let activeTermMonth='', activePedMonth='', activeDirectriz='';
-let searchText='', sortCol='mi', sortDir=1;
+let searchText='', sortCol='urgencia', sortDir=1;
 let activeLvlProv='';
 let lvlVisible=false;
 let charts={urgency:null,scatter:null,boImpact:null,calendar:null};
@@ -1005,16 +1030,25 @@ function processWorkbook(wb, filename){
       GROUPED=buildGroups();
     // Build clave→ltEstimado lookup FIRST so OTIF rows can use it
     window._ltMap=new Map(ALL.filter(d=>d.isMain&&d.ltEstimado!=null).map(d=>[d.id,d.ltEstimado]));
+    // Mapa clave→comprador (desde Asignacion) para poder filtrar las pestañas OTIF/Pedidos/Target por comprador
+    window._compMap=new Map(ALL.filter(d=>d.isMain&&d.comprador).map(d=>[String(d.id),d.comprador]));
       OTIF_DATA=parseOTIF(rawPed);
-    // Attach ltEstimado from Asignacion to each OTIF row by clave
-    OTIF_DATA.forEach(d=>{d.ltEstimado=window._ltMap.get(String(d.clave))||window._ltMap.get(d.clave)||null;});
+    // Attach ltEstimado y comprador a cada OTIF row by clave
+    OTIF_DATA.forEach(d=>{d.ltEstimado=window._ltMap.get(String(d.clave))||window._ltMap.get(d.clave)||null; d.comprador=window._compMap.get(String(d.clave))||'';});
     }else{OTIF_DATA=[];}
     document.getElementById('file-tag').textContent=(OTIF_DATA.length?OTIF_DATA.length.toLocaleString()+' pedidos · ':'')+ALL.filter(d=>d.isMain).length.toLocaleString()+' claves';
     document.getElementById('drop-screen').style.display='none';
     document.getElementById('app').style.display='block';
     activeGroup='';activeProv='';activeTermMonth='';activePedMonth='';
+    activeMarca='';
+    // Auto-seleccionar el comprador que inició sesión en el portal (si tiene claves en los datos)
+    try{
+      const u=(usuarioPortal()||'').trim().toUpperCase();
+      const compsDisp=new Set(GROUPED.map(d=>(d.comprador||'').toUpperCase()));
+      activeComp=(u&&compsDisp.has(u))?u:'';
+    }catch(e){ activeComp=''; }
     otifMonthInited=false;
-    activeLvlProv='';searchText='';sortCol='mi';sortDir=1;
+    activeLvlProv='';searchText='';sortCol='urgencia';sortDir=1;
     buildFilters();renderAll();
   }catch(err){
     showErr('Error al procesar: '+err.message);
@@ -1057,6 +1091,7 @@ function parseSheet(raw){
   const cFP=ci('LEVANTAR PEDIDO');
   const cDir=ci('DIRECTRIZ');
   const cProxEnt=ci('PROXIMA');
+  const cComp=ci('COMPRADOR'), cMarca=ci('MARCA');
   const cAsig=ciLast('ASIGNACION'); // columna V — valor correcto por fila (principal Y secundaria); columna U solo tiene dato en la fila principal
 
   const tn=v=>typeof v==='number'?v:parseFloat(v)||0;
@@ -1089,6 +1124,8 @@ function parseSheet(raw){
       parent_id:!isMain&&lastMain!==null?String(raw[lastMain][0]):null,
       desc:isMain?String(row[cDesc]||'').trim():(lastMain!==null?String(raw[lastMain][cDesc]||'').trim():''),
       grupo:grp, prov:String(row[cProv]||'').trim(), origen:String(row[cOrig]||'').trim(),
+      comprador:(isMain?String(row[cComp]||'').trim():(lastMain!==null?String(raw[lastMain][cComp]||'').trim():'')).toUpperCase(),
+      marca:isMain?String(row[cMarca]||'').trim():(lastMain!==null?String(raw[lastMain][cMarca]||'').trim():''),
       vm, inv, mi, miAfter, inv_final,
       bo:tn(row[cBo]),
       hasta_antes:isMain?td(row[cHA]):null,
@@ -1166,7 +1203,10 @@ function miCell(mi,vm){
 // CASCADE FILTER LOGIC
 // ══════════════════════════════════════════════════════════════
 // Step 1: filter by grupo only
-function step1(){return GROUPED.filter(d=>!activeGroup||d.grupo===activeGroup);}
+// Step 0: comprador (base de todo) + marca
+function step0Comp(){return GROUPED.filter(d=>!activeComp||(d.comprador||'')===activeComp);}
+function step0(){return GROUPED.filter(d=>(!activeComp||(d.comprador||'')===activeComp)&&(!activeMarca||(d.marca||'')===activeMarca));}
+function step1(){return step0().filter(d=>!activeGroup||d.grupo===activeGroup);}
 // Step 2: + prov
 function step2(){return step1().filter(d=>!activeProv||d.prov===activeProv);}
 // Step 3: + termMonth
@@ -1220,8 +1260,26 @@ function fillMonthSelect(id,keys,current){
 // BUILD FILTERS
 // ══════════════════════════════════════════════════════════════
 function buildFilters(){
+  // Comprador dropdown (base de todo)
+  const comps=['',...new Set(GROUPED.map(d=>d.comprador).filter(Boolean))].sort((a,b)=>a===''?-1:b===''?1:a.localeCompare(b));
+  const cs=document.getElementById('comp-sel');
+  if(cs){
+    cs.innerHTML=comps.map(c=>`<option value="${c}">${c===''?'Todos los compradores':tc(c)}</option>`).join('');
+    cs.value=activeComp;
+    cs.className='msel'+(activeComp?' msel-active':'');
+    cs.onchange=()=>{activeComp=cs.value;activeMarca='';activeGroup='';activeProv='';buildFilters();updateCascadeOptions();renderAll();refrescarPestanas();};
+  }
+  // Marca dropdown (depende del comprador)
+  const marcas=['',...new Set(step0Comp().map(d=>d.marca).filter(Boolean))].sort((a,b)=>a===''?-1:b===''?1:a.localeCompare(b));
+  const ms=document.getElementById('marca-sel');
+  if(ms){
+    ms.innerHTML=marcas.map(m=>`<option value="${m}">${m===''?'Todas las marcas':m}</option>`).join('');
+    ms.value=activeMarca;
+    ms.className='msel'+(activeMarca?' msel-active':'');
+    ms.onchange=()=>{activeMarca=ms.value;activeGroup='';activeProv='';buildFilters();updateCascadeOptions();renderAll();refrescarPestanas();};
+  }
   // Grupo dropdown
-  const grupos=['',...new Set(GROUPED.map(d=>d.grupo).filter(Boolean))];
+  const grupos=['',...new Set(step0().map(d=>d.grupo).filter(Boolean))];
   const gs=document.getElementById('grupo-sel');
   gs.innerHTML=grupos.map(g=>`<option value="${g}">${g===''?'Todos los grupos':tc(g)}</option>`).join('');
   gs.value=activeGroup;
@@ -1265,7 +1323,8 @@ function buildFilters(){
 }
 
 function clearFilters(){
-  activeGroup='';activeProv='';activeTermMonth='';activePedMonth='';activeDirectriz='';searchText='';
+  activeComp='';activeMarca='';activeGroup='';activeProv='';activeTermMonth='';activePedMonth='';activeDirectriz='';searchText='';
+  buildFilters();
   const gs=document.getElementById('grupo-sel'); if(gs)gs.value='';
   const ps=document.getElementById('prov-sel'); if(ps)ps.value='';
   document.getElementById('search').value='';
@@ -1284,8 +1343,42 @@ function renderGroupColorLegend(){
   const items=Object.entries(GP_C).map(([g,c])=>`<div class="ls-i"><div class="ls-d" style="background:${c.bar};border-radius:3px"></div>${tc(g)}</div>`).join('');
   el.innerHTML=`<span style="font-weight:700">Sub-grupos:</span>${items}<div class="ls-sep"></div>`;
 }
+// Panel "Mi Vista": resumen de problemas del comprador seleccionado
+function renderMiVista(data){
+  const box=document.getElementById('mi-vista');
+  if(!box)return;
+  // Solo se muestra cuando hay UN comprador seleccionado (vista personal)
+  if(!activeComp){ box.style.display='none'; return; }
+  box.style.display='block';
+  const main=data.filter(d=>d.isMain!==false);
+  const crit=main.filter(d=>d.lvlNow==='crit');
+  const bajo=main.filter(d=>d.lvlNow==='low');
+  const conBO=main.filter(d=>(d.bo_total!=null?d.bo_total:d.bo)>0);
+  const sinStock=main.filter(d=>d.inv===0&&d.vm>0);
+  const porLevantar=main.filter(d=>d.directriz==='LEVANTAR PEDIDO');
+  const revisar=main.filter(d=>d.directriz==='REVISAR CON GERENCIA');
+  // Top marca y grupo con más claves críticas
+  const cuenta=(arr,campo)=>{const m={};arr.forEach(d=>{const k=d[campo]||'—';m[k]=(m[k]||0)+1;});return Object.entries(m).sort((a,b)=>b[1]-a[1])[0];};
+  const topMarca=crit.length?cuenta(crit,'marca'):null;
+  const topGrupo=crit.length?cuenta(crit,'grupo'):null;
+  document.getElementById('mv-titulo').textContent='🎯 Mi vista · '+tc(activeComp);
+  document.getElementById('mv-sub').textContent=`${main.length} claves${activeMarca?' · marca '+activeMarca:''}${activeGroup?' · '+tc(activeGroup):''}`;
+  const card=(icon,val,lbl,color,sub)=>`<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:12px 14px">
+    <div style="font-size:22px;font-weight:800;color:${color};line-height:1">${icon} ${val}</div>
+    <div style="font-size:11px;opacity:.9;margin-top:4px">${lbl}</div>${sub?`<div style="font-size:10px;opacity:.7;margin-top:2px">${sub}</div>`:''}</div>`;
+  document.getElementById('mv-cards').innerHTML=[
+    card('🔴',crit.length,'Claves críticas','#ff8a80',`${sinStock.length} sin stock`),
+    card('🟡',bajo.length,'Inventario bajo','#ffe082','riesgo de faltante'),
+    card('📦',conBO.length,'Con back order','#90caf9','pedidos en tránsito'),
+    card('✅',porLevantar.length,'Por levantar','#a5d6a7','directriz de pedido'),
+    revisar.length?card('⚠️',revisar.length,'Revisar c/gerencia','#ffcc80',''):'',
+    topMarca?card('🏷️',topMarca[1],'Marca más crítica','#ce93d8',topMarca[0]):'',
+    topGrupo?card('📁',topGrupo[1],'Grupo más crítico','#80cbc4',tc(topGrupo[0])):'',
+  ].filter(Boolean).join('');
+}
 function renderAll(){
   const data=filteredFull();
+  renderMiVista(data);
   renderKPIs(data);
   renderLevelCards();
   renderGroupColorLegend();
@@ -1424,10 +1517,23 @@ function updateSortArrows(){
 // ── Table (grouped by clave, Excel-style flat rows) ──────────────────
 function renderTable(data){
   const DATE_COLS=new Set(['hasta_antes','hasta_desp','fecha_pedido','proxima_entrada']);
-  const SDIR={mi:1,miAfter:1,hasta_antes:1,hasta_desp:1,fecha_pedido:1,proxima_entrada:1,asig:-1,asig_total:-1,bo:-1,desc:1,vm:-1,inv:-1,prov:1,directriz:1};
+  const SDIR={urgencia:-1,mi:1,miAfter:1,hasta_antes:1,hasta_desp:1,fecha_pedido:1,proxima_entrada:1,asig:-1,asig_total:-1,bo:-1,desc:1,vm:-1,inv:-1,prov:1,directriz:1};
+  // Score de urgencia: prioriza lo que un comprador debe atender primero.
+  const scoreUrg=d=>{
+    let s=0;
+    if(d.lvlNow==='crit')s+=100;            // inventario crítico (<2 meses)
+    else if(d.lvlNow==='low')s+=50;         // inventario bajo (2-4 meses)
+    if(d.inv===0&&d.vm>0)s+=60;             // sin stock con venta activa
+    if((d.bo_total!=null?d.bo_total:d.bo)>0)s+=15; // tiene back order en camino (mitiga un poco)
+    if(d.directriz==='LEVANTAR PEDIDO')s+=30;      // hay que colocar pedido
+    if(d.directriz==='REVISAR CON GERENCIA')s+=20;
+    if(d.mi!=null)s+=Math.max(0,(7-d.mi));  // mientras menos meses, más urgente
+    return s;
+  };
   const dir=sortDir*(SDIR[sortCol]??1);
   // Effective value: use null when display shows "—" so blanks sort to end
   const effVal=(d,col)=>{
+    if(col==='urgencia') return scoreUrg(d);
     if(col==='fecha_pedido'&&!d.asig&&d.directriz!=='REVISAR CON GERENCIA') return null;
     if(col==='asig'&&d.directriz==='REVISAR CON GERENCIA') return 0;
     return d[col];
@@ -1645,7 +1751,7 @@ function buildPendingProposals(){
     });
 }
 function buildPrecisionRows(){
-  const otifRows=OTIF_DATA.filter(d=>d.oc).map(d=>{
+  const otifRows=otifBase().filter(d=>d.oc).map(d=>{
     const hasProp=d.cantPropuesta!==null&&d.cantPropuesta!==undefined;
     const real=d.qty||0;
     let status=null, desv=null;
@@ -1743,7 +1849,7 @@ async function guardarComentarioPrec(key){
 function buildPrecProvOptions(){
   const sel=document.getElementById('prec-prov-sel');
   if(!sel) return;
-  const provs=['',...new Set(OTIF_DATA.map(d=>d.prov).filter(Boolean))];
+  const provs=['',...new Set(otifBase().map(d=>d.prov).filter(Boolean))];
   sel.innerHTML=provs.map(p=>`<option value="${p}">${p||'Todos'}</option>`).join('');
   sel.value=precProvFilter;
 }
@@ -2050,7 +2156,7 @@ function parseOTIF(raw){
 // Step 1: filter by prov+status (for OC cards and detail table)
 // Base OTIF-Proveedor: proveedor + estatus + Mes RECEPCIÓN (etaR)
 function baseOtifProv(){
-  return OTIF_DATA.filter(d=>{
+  return otifBase().filter(d=>{
     if(otifProv&&d.prov!==otifProv)return false;
     if(otifStatus&&d.estatus!==otifStatus)return false;
     // Con mes seleccionado: la orden debe tener llegada real (etaR) en ESE mes.
@@ -2063,7 +2169,7 @@ function baseOtifProv(){
 }
 // Base Target-Comprador: proveedor + estatus + Mes OC (foc)
 function baseTarget(){
-  return OTIF_DATA.filter(d=>{
+  return otifBase().filter(d=>{
     if(otifProv&&d.prov!==otifProv)return false;
     if(otifStatus&&d.estatus!==otifStatus)return false;
     // Con mes seleccionado: la orden debe tener fecha de colocación real (foc) en ESE mes.
@@ -2098,7 +2204,7 @@ function otifProvData(){
 }
 
 function updateOTIFStatusOptions(){
-  const stats=['',...new Set(OTIF_DATA.filter(d=>!otifProv||d.prov===otifProv).map(d=>d.estatus).filter(Boolean))];
+  const stats=['',...new Set(otifBase().filter(d=>!otifProv||d.prov===otifProv).map(d=>d.estatus).filter(Boolean))];
   const ss=document.getElementById('otif-status-sel');
   ss.innerHTML=`<option value="">Todos los estatus</option>`+stats.filter(v=>v!=='').map(v=>`<option value="${v}">${v}</option>`).join('');
   ss.value=otifStatus;
@@ -2109,7 +2215,7 @@ function toggleOtifMonthFilter(){/* checkboxes eliminados: el filtro de mes se c
 function updateOTIFMonthOptions(){
   // Meses de colocación (foc), en cascada con proveedor y estatus ya elegidos
   const keys=new Set();
-  OTIF_DATA.filter(d=>(!otifProv||d.prov===otifProv)&&(!otifStatus||d.estatus===otifStatus)).forEach(d=>{
+  otifBase().filter(d=>(!otifProv||d.prov===otifProv)&&(!otifStatus||d.estatus===otifStatus)).forEach(d=>{
     if(d.foc)keys.add(mKey(d.foc));
   });
   const sorted=[...keys].filter(Boolean).sort();
@@ -2130,7 +2236,7 @@ function updateOTIFMonthOptions(){
 function updateOTIFMonthRecepOptions(){
   // Meses de llegada real (etaR), en cascada con proveedor y estatus
   const keys=new Set();
-  OTIF_DATA.filter(d=>(!otifProv||d.prov===otifProv)&&d.estatus==='RECIBIDO').forEach(d=>{
+  otifBase().filter(d=>(!otifProv||d.prov===otifProv)&&d.estatus==='RECIBIDO').forEach(d=>{
     if(d.etaR)keys.add(mKey(d.etaR));
   });
   const sorted=[...keys].filter(Boolean).sort();
@@ -2328,7 +2434,7 @@ function renderOTIF(){
   // OC's vigentes: filtro según la pestaña activa.
   // Target-Comprador → filtra por Mes OC (foc). OTIF-Proveedor → filtra por Mes Recepción (etaR).
   const esTarget=(currentMainTab==='target');
-  renderOCCards(OTIF_DATA.filter(d=>{
+  renderOCCards(otifBase().filter(d=>{
     if(otifProv&&d.prov!==otifProv)return false;
     if(otifStatus&&d.estatus!==otifStatus)return false;
     if(esTarget){
@@ -2345,7 +2451,7 @@ function renderOTIF(){
 
 function buildOTIFFilters(){
   // Populate prov dropdown
-  const provs=['',...new Set(OTIF_DATA.map(d=>d.prov).filter(Boolean))];
+  const provs=['',...new Set(otifBase().map(d=>d.prov).filter(Boolean))];
   const ps=document.getElementById('otif-prov-sel');
   ps.innerHTML=`<option value="">Todos los proveedores</option>`+provs.filter(v=>v!=='').map(v=>`<option value="${v}">${v}</option>`).join('');
   ps.value=otifProv;
