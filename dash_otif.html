@@ -468,13 +468,13 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
     <!-- ══ TAB: INVENTARIO ══ -->
     <div id="tab-inv">
     <!-- KPIs -->
-    <div class="kpi-grid" id="kpis"></div>
+    <div class="kpi-grid" id="kpis" style="display:none"></div>
 
     <!-- MI VISTA: resumen de problemas del comprador -->
-    <div id="mi-vista" style="display:none;margin:14px 0;background:linear-gradient(135deg,#1e3a5f,#2a4a70);border-radius:12px;padding:16px 20px;color:#fff">
+    <div id="mi-vista" style="display:none;margin:14px 0;background:#fff;border:1px solid var(--brd);border-radius:12px;padding:16px 20px;color:var(--tx);box-shadow:0 1px 3px rgba(0,0,0,.04)">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-        <div style="font-size:15px;font-weight:700" id="mv-titulo">🎯 Mi vista</div>
-        <div style="font-size:11px;opacity:.85" id="mv-sub"></div>
+        <div style="font-size:15px;font-weight:700;color:var(--navy)" id="mv-titulo">🎯 Mi vista</div>
+        <div style="font-size:11px;color:var(--tx2)" id="mv-sub"></div>
       </div>
       <div id="mv-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px"></div>
     </div>
@@ -1363,17 +1363,17 @@ function renderMiVista(data){
   const topGrupo=crit.length?cuenta(crit,'grupo'):null;
   document.getElementById('mv-titulo').textContent='🎯 Mi vista · '+tc(activeComp);
   document.getElementById('mv-sub').textContent=`${main.length} claves${activeMarca?' · marca '+activeMarca:''}${activeGroup?' · '+tc(activeGroup):''}`;
-  const card=(icon,val,lbl,color,sub)=>`<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:12px 14px">
+  const card=(icon,val,lbl,color,sub)=>`<div style="background:var(--sf2);border:1px solid var(--brd);border-radius:9px;padding:12px 14px">
     <div style="font-size:22px;font-weight:800;color:${color};line-height:1">${icon} ${val}</div>
-    <div style="font-size:11px;opacity:.9;margin-top:4px">${lbl}</div>${sub?`<div style="font-size:10px;opacity:.7;margin-top:2px">${sub}</div>`:''}</div>`;
+    <div style="font-size:11px;color:var(--tx2);margin-top:4px">${lbl}</div>${sub?`<div style="font-size:10px;color:var(--tx3);margin-top:2px">${sub}</div>`:''}</div>`;
   document.getElementById('mv-cards').innerHTML=[
-    card('🔴',crit.length,'Claves críticas','#ff8a80',`${sinStock.length} sin stock`),
-    card('🟡',bajo.length,'Inventario bajo','#ffe082','riesgo de faltante'),
-    card('📦',conBO.length,'Con back order','#90caf9','pedidos en tránsito'),
-    card('✅',porLevantar.length,'Por levantar','#a5d6a7','directriz de pedido'),
-    revisar.length?card('⚠️',revisar.length,'Revisar c/gerencia','#ffcc80',''):'',
-    topMarca?card('🏷️',topMarca[1],'Marca más crítica','#ce93d8',topMarca[0]):'',
-    topGrupo?card('📁',topGrupo[1],'Grupo más crítico','#80cbc4',tc(topGrupo[0])):'',
+    card('🔴',crit.length,'Claves críticas','#c0392b',`${sinStock.length} sin stock`),
+    card('🟡',bajo.length,'Inventario bajo','#b8860b','riesgo de faltante'),
+    card('📦',conBO.length,'Con back order','#1565c0','pedidos en tránsito'),
+    card('✅',porLevantar.length,'Por levantar','#2e7d32','directriz de pedido'),
+    revisar.length?card('⚠️',revisar.length,'Revisar c/gerencia','#c77700',''):'',
+    topMarca?card('🏷️',topMarca[1],'Marca más crítica','#7b1fa2',topMarca[0]):'',
+    topGrupo?card('📁',topGrupo[1],'Grupo más crítico','#00796b',tc(topGrupo[0])):'',
   ].filter(Boolean).join('');
 }
 function renderAll(){
@@ -1731,6 +1731,9 @@ async function guardarMotivoServidor(key,motivo,comentario){
 function buildPendingProposals(){
   const curMonth=curMonthKey();
   return GROUPED.filter(d=>{
+    // Respetar el filtro de comprador/marca activo (igual que las demás vistas)
+    if(activeComp&&(d.comprador||'')!==activeComp) return false;
+    if(activeMarca&&(d.marca||'')!==activeMarca) return false;
     if(!(d.asig_total>0)) return false;
     if(!d.fecha_pedido) return false;
     const mk=mKey(d.fecha_pedido);
