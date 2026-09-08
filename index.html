@@ -878,7 +878,7 @@ function computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif,mapaManual){
   const claveComp={};hoyRows.forEach(r=>{claveComp[String(r.clave).trim()]=r.comprador;});
 
   // rachas F/R por clave
-  const frSet={};detR.forEach(r=>{if(r.estatus==='FALTANTE'||r.estatus==='RIESGO'){(frSet[r.clave]=frSet[r.clave]||new Set()).add(r.fecha);}});
+  const frSet={};detR.forEach(r=>{if(r.estatus==='FALTANTE'){(frSet[r.clave]=frSet[r.clave]||new Set()).add(r.fecha);}});
   function racha(clave){let ini=null;for(let i=ufd.length-1;i>=0;i--){if(frSet[clave]&&frSet[clave].has(ufd[i]))ini=ufd[i];else break;}
     return ini?{dias:diasEntre(ini,uf)+1,desdeInicio:ini===primera}:null;}
 
