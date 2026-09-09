@@ -161,7 +161,8 @@
   <div class="tab" onclick="switchTab(2)"><span class="tab-icon">📦</span>Monitor de Inventario</div>
   <div class="tab" onclick="switchTab(3)"><span class="tab-icon">🔄</span>Estatus Back Orders</div>
   <div class="tab" onclick="switchTab(4)"><span class="tab-icon">🎯</span>Indicadores</div>
-  <div class="tab" onclick="switchTab(5)" id="tab-admin"><span class="tab-icon">⚙️</span>Admin</div>
+  <div class="tab" onclick="switchTab(5)"><span class="tab-icon">🔁</span>Incidencias</div>
+  <div class="tab" onclick="switchTab(6)" id="tab-admin"><span class="tab-icon">⚙️</span>Admin</div>
 </div>
 
 <div class="frames">
@@ -199,8 +200,20 @@
     <iframe id="fr-4" onload="window.hideLd&&window.hideLd(4)"></iframe>
   </div>
 
-  <!-- ════ ADMIN ════ -->
+  <!-- ════ INCIDENCIAS (Seguimiento a Devoluciones) ════ -->
   <div class="frame-wrap" id="fw-5">
+    <div id="inc-bar" style="display:flex;align-items:center;gap:12px;padding:8px 16px;background:#f8f9fd;border-bottom:1px solid #e2e6ed">
+      <span style="font-size:12px;font-weight:700;color:#1e3a5f">🔁 Seguimiento a Devoluciones (Incidencias)</span>
+      <span style="font-size:11px;color:#64748b">Si el tablero no carga aquí abajo, ábrelo en una ventana nueva →</span>
+      <a href="https://dashboard-reclamaciones.streamlit.app/" target="_blank" rel="noopener"
+         style="margin-left:auto;font-size:12px;font-weight:600;background:#1c4587;color:#fff;padding:6px 14px;border-radius:8px;text-decoration:none">↗ Abrir en ventana nueva</a>
+    </div>
+    <div class="loader" id="ld-5"><div class="spinner"></div><p>Cargando Incidencias…</p></div>
+    <iframe id="fr-5" style="height:calc(100% - 41px)" onload="window.hideLd&&window.hideLd(5)"></iframe>
+  </div>
+
+  <!-- ════ ADMIN ════ -->
+  <div class="frame-wrap" id="fw-6">
     <div class="admin-body">
       <div class="admin-card" id="adm-lock">
         <h2>🔒 Panel de administración</h2>
@@ -366,19 +379,20 @@ const SRCS=[
   'dash_faltantes.html',
   'dash_monitor.html',
   'dash_backorders.html',
-  'dash_otif.html'
+  'dash_otif.html',
+  'https://dashboard-reclamaciones.streamlit.app/?embed=true'
 ];
-const loadedTabs=[false,false,false,false];
-function loadTab(i){ // i = 1..4 (iframes)
+const loadedTabs=[false,false,false,false,false];
+function loadTab(i){ // i = 1..5 (iframes)
   const k=i-1;
-  if(i>=1&&i<=4&&!loadedTabs[k]){loadedTabs[k]=true;document.getElementById('fr-'+i).src=SRCS[k];}
+  if(i>=1&&i<=5&&!loadedTabs[k]){loadedTabs[k]=true;document.getElementById('fr-'+i).src=SRCS[k];}
 }
 function switchTab(i){
   document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('active',j===i));
   document.querySelectorAll('.frame-wrap').forEach((f,j)=>f.classList.toggle('active',j===i));
   loadTab(i);
   if(i===0){ cargarResumen(); ajustarBotonesResumen(); }
-  if(i===5&&esAdmin){document.getElementById('adm-lock').style.display='none';document.getElementById('adm-open').style.display='block';try{cargarDiasDisponibles();}catch(e){}}
+  if(i===6&&esAdmin){document.getElementById('adm-lock').style.display='none';document.getElementById('adm-open').style.display='block';try{cargarDiasDisponibles();}catch(e){}}
 }
 function hideLd(i){const l=document.getElementById('ld-'+i);if(l)l.classList.add('hidden');}
 window.hideLd=hideLd;
