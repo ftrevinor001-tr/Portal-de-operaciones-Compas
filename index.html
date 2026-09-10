@@ -459,6 +459,8 @@ async function cargarResumen(){
   RES.mesesSel=new Set(meses.length?[meses[meses.length-1]]:[]);
   document.getElementById('res-meses').innerHTML=meses.map(m=>`<span class="mes-chip${RES.mesesSel.has(m)?' on':''}" data-m="${m}" onclick="togMes(this)">${fmtMes(m)}</span>`).join(' ');
   renderResumen();
+  // Cargar incidencias (async, desde GitHub) y re-render cuando lleguen
+  cargarIncidencias().then(()=>{ try{renderResumen();}catch(e){} });
 }
 function fmtMes(m){const M=['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];const[y,mm]=m.split('-');return M[+mm]+' '+y.slice(2);}
 function togMes(el){const m=el.dataset.m;
@@ -467,6 +469,58 @@ function togMes(el){const m=el.dataset.m;
   renderResumen();
 }
 function alarmaDe(comp,tipo){return (RES.alarmas||[]).find(r=>r.comprador===comp&&r.tipo===tipo);}
+// ═══════════ INCIDENCIAS (Seguimiento a Devoluciones) ═══════════
+const INCIDENCIAS_URL='https://raw.githubusercontent.com/ftrevinor001-tr/dashboard-reclamaciones/main/datos.xlsx';
+// Normaliza nombre de comprador para cruzar con el del portal (LEONELA/SILVINO coinciden;
+// para otros se compara por prefijo/primer nombre).
+function normComp(s){return String(s==null?'':s).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();}
+function mismoComprador(incComp, portalComp){
+  const a=normComp(incComp), b=normComp(portalComp);
+  if(!a||!b)return false;
+  if(a===b)return true;
+  // match por primer nombre (el Excel de incidencias usa nombres cortos: FRANCISCO, VICTORIA…)
+  return b.startsWith(a+' ')||a.startsWith(b+' ')||b.split(' ')[0]===a.split(' ')[0];
+}
+async function cargarIncidencias(){
+  if(RES.incidencias)return RES.incidencias; // ya cargadas
+  try{
+    const resp=await fetch(INCIDENCIAS_URL,{cache:'no-store'});
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    const buf=await resp.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    const H=raw[0].map(h=>String(h).trim().toUpperCase());
+    const ci=n=>H.indexOf(n);
+    const cFolio=ci('FOLIO REPORTE'),cProv=ci('PROVEEDOR'),cImp=ci('IMPORTE (MXN)'),
+          cComp=ci('COMPRADOR'),cEtapa=ci('ETAPA ACTUAL'),cEst=ci('ESTATUS ACTUAL'),cMes=ci('MES DE DEVOLUCION');
+    // Convierte serial/fecha de Excel a 'YYYY-MM'
+    const aMes=v=>{
+      if(v==null||v==='')return '';
+      if(typeof v==='number'){const d=new Date(Math.round((v-25569)*86400000));return isNaN(d)?'':d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+      const s=String(v).trim();
+      let m=s.match(/^(\d{4})-(\d{2})/); if(m)return m[1]+'-'+m[2];
+      m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if(m)return m[3]+'-'+String(m[2]).padStart(2,'0');
+      const d=new Date(s); return isNaN(d)?'':d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    };
+    const items=raw.slice(1).filter(r=>r[cFolio]!=null&&String(r[cFolio]).trim()).map(r=>{
+      const etapa=String(r[cEtapa]||'').trim().toUpperCase();
+      return{
+        folio:String(r[cFolio]).trim(),
+        proveedor:String(r[cProv]||'').trim()||'(sin proveedor)',
+        importe:parseFloat(String(r[cImp]).replace(/[$,\s]/g,''))||0,
+        comprador:String(r[cComp]||'').trim(),
+        mes:aMes(r[cMes]),
+        etapa, estatus:String(r[cEst]||'').trim().toUpperCase(),
+        finalizada:etapa==='FINALIZADO'
+      };
+    });
+    RES.incidencias=items;
+    return items;
+  }catch(e){ console.warn('Incidencias no disponibles:',e.message); RES.incidencias=[]; RES.incidenciasError=e.message; return []; }
+}
+const fmtMXN=v=>'$'+(v||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
+
 function renderResumen(){
   if(!RES.alarmas)return;
   const comp=document.getElementById('res-comp').value;
@@ -480,6 +534,11 @@ function renderResumen(){
     if(t==='TARGET'&&a&&a.datos)n=(a.datos.pct!=null?a.datos.pct+'%':'—');
     kpis+=`<div class="kpi s-${T.sev}" onclick="document.getElementById('card-${t}')?.scrollIntoView({behavior:'smooth'})"><div class="n">${n}</div><div class="t">${T.icon} ${T.t}</div></div>`;
   });
+  // Tarjeta de incidencias activas del comprador (valor total, excluye finalizadas)
+  const _incsAct=(RES.incidencias||[]).filter(x=>!x.finalizada);
+  const _misIncs=comp==='GENERAL'?_incsAct:_incsAct.filter(x=>mismoComprador(x.comprador,comp));
+  const _totalInc=_misIncs.reduce((a,x)=>a+x.importe,0);
+  kpis+=`<div class="kpi s-alta" onclick="document.getElementById('card-INCIDENCIAS')?.scrollIntoView({behavior:'smooth'})"><div class="n" style="font-size:15px">${fmtMXN(_totalInc)}</div><div class="t">🔁 Incidencias activas${comp==='GENERAL'?'':' ('+_misIncs.length+')'}</div></div>`;
   // Gráfica de evolución de faltantes (meses seleccionados)
   let chartHtml='';
   if(RES.resumen&&RES.resumen.fechas){chartHtml=`<div class="res-card full" id="card-chart"><h3>📈 Evolución de faltantes · ${[...RES.mesesSel].sort().map(fmtMes).join(' + ')}</h3><div class="chartbox"><canvas id="res-chart"></canvas></div></div>`;}
@@ -507,11 +566,60 @@ function renderResumen(){
     }
     cards+=`<div class="res-card" id="card-${t}"><h3>${T.icon} ${T.t} <span class="badge b-${T.sev}">${d.total!=null?d.total:''}</span> <span style="margin-left:auto;font-size:10px;color:#94a3b8">${T.dash}</span></h3>${a.descripcion?`<p style="font-size:11px;color:#64748b;margin-bottom:8px">${a.descripcion}</p>`:''}${body}</div>`;
   });
+  // Bloque de incidencias: gráfica (todos, activas) + tabla (comprador, folios como columnas)
+  const incHtml=buildIncidenciasHTML(comp);
   document.getElementById('res-content').innerHTML=
     `<div class="kpi-grid">${kpis}</div>`+
     `<p style="max-width:1600px;margin:0 auto 12px;font-size:11px;color:#94a3b8">Al corte del ${uf?uf.split('-').reverse().join('/'):'último Excel cargado'} · las alarmas reflejan el estado actual; el filtro de meses aplica a la gráfica de evolución.</p>`+
+    `<div class="res-grid" style="margin-bottom:14px">${incHtml}</div>`+
     `<div class="res-grid">${chartHtml}${cards}</div>`;
   pintarChart(comp);
+  pintarChartIncidencias();
+}
+// Construye el HTML de la gráfica de incidencias por comprador y la tabla del comprador seleccionado
+function buildIncidenciasHTML(comp){
+  const incs=RES.incidencias||[];
+  if(RES.incidenciasError&&!incs.length){
+    return `<div class="res-card" id="card-INCIDENCIAS"><h3>🔁 Incidencias (Seguimiento a Devoluciones)</h3><p style="font-size:12px;color:#94a3b8">No se pudieron cargar las incidencias (${RES.incidenciasError}). Revisa la pestaña Incidencias.</p></div>`;
+  }
+  const activas=incs.filter(x=>!x.finalizada);
+  // Gráfica: total por comprador (activas), mayor a menor
+  const porComp={};
+  activas.forEach(x=>{const k=x.comprador||'(sin comprador)';porComp[k]=(porComp[k]||0)+x.importe;});
+  RES._incPorComp=Object.entries(porComp).sort((a,b)=>b[1]-a[1]);
+  const graf=`<div class="res-card" id="card-INCIDENCIAS"><h3>🔁 Valor de incidencias activas por comprador <span style="margin-left:auto;font-size:10px;color:#94a3b8">excluye finalizadas</span></h3><div style="height:${Math.max(220,RES._incPorComp.length*34)}px"><canvas id="inc-chart"></canvas></div></div>`;
+  // Tabla del comprador seleccionado: filas=proveedor, columnas=folio, celda=importe
+  let tabla='';
+  const misActivas=comp==='GENERAL'?activas:activas.filter(x=>mismoComprador(x.comprador,comp));
+  if(misActivas.length){
+    const meses=[...new Set(misActivas.map(x=>x.mes).filter(Boolean))].sort();
+    const provs=[...new Set(misActivas.map(x=>x.proveedor))].sort();
+    const cell={};misActivas.forEach(x=>{const k=x.proveedor+'||'+x.mes;cell[k]=(cell[k]||0)+x.importe;});
+    const totMes={};meses.forEach(m=>{totMes[m]=misActivas.filter(x=>x.mes===m).reduce((a,x)=>a+x.importe,0);});
+    const th=`<th style="text-align:left;position:sticky;left:0;background:#f8fafc;z-index:2">Proveedor</th>`+meses.map(m=>`<th class="num">${fmtMes(m)}</th>`).join('')+`<th class="num" style="background:#eef2ff">Total</th>`;
+    const tb=provs.map(p=>{
+      const totProv=meses.reduce((a,m)=>a+(cell[p+'||'+m]||0),0);
+      return `<tr><td style="position:sticky;left:0;background:#fff;font-weight:600;z-index:1">${p}</td>`+
+        meses.map(m=>{const v=cell[p+'||'+m];return `<td class="num">${v?fmtMXN(v):'—'}</td>`;}).join('')+
+        `<td class="num" style="background:#f5f7ff;font-weight:700">${fmtMXN(totProv)}</td></tr>`;
+    }).join('');
+    const totGen=misActivas.reduce((a,x)=>a+x.importe,0);
+    const foot=`<tr style="border-top:2px solid #1e3a5f"><td style="position:sticky;left:0;background:#eef2ff;font-weight:700;z-index:1">TOTAL</td>`+meses.map(m=>`<td class="num" style="background:#eef2ff;font-weight:700">${fmtMXN(totMes[m])}</td>`).join('')+`<td class="num" style="background:#dbe4f5;font-weight:800">${fmtMXN(totGen)}</td></tr>`;
+    tabla=`<div class="res-card" id="card-INC-TABLA"><h3>🔁 Incidencias activas por proveedor y mes${comp==='GENERAL'?'':' · '+comp}</h3><div class="alist" style="overflow-x:auto"><table style="table-layout:auto;width:auto;min-width:100%"><thead><tr>${th}</tr></thead><tbody>${tb}${foot}</tbody></table></div></div>`;
+  }else{
+    tabla=`<div class="res-card" id="card-INC-TABLA"><h3>🔁 Incidencias activas por proveedor y mes${comp==='GENERAL'?'':' · '+comp}</h3><p style="font-size:12px;color:#64748b">Sin incidencias activas para este comprador. ✅</p></div>`;
+  }
+  return graf+tabla;
+}
+function pintarChartIncidencias(){
+  const ctx=document.getElementById('inc-chart');if(!ctx||!RES._incPorComp)return;
+  if(RES.incChart)RES.incChart.destroy();
+  RES.incChart=new Chart(ctx,{type:'bar',
+    data:{labels:RES._incPorComp.map(e=>e[0]),datasets:[{label:'Valor incidencias activas',data:RES._incPorComp.map(e=>e[1]),backgroundColor:'#1c4587',borderRadius:4}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'  '+fmtMXN(c.parsed.x)}}},
+      scales:{x:{beginAtZero:true,ticks:{callback:v=>'$'+(v/1000).toFixed(0)+'k',font:{size:10}}},y:{ticks:{font:{size:10.5}}}}}
+  });
 }
 function pintarChart(comp){
   if(!RES.resumen||!RES.resumen.fechas)return;
