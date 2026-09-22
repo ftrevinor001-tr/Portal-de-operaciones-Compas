@@ -484,7 +484,8 @@ function mismoComprador(incComp, portalComp){
 async function cargarIncidencias(){
   if(RES.incidencias)return RES.incidencias; // ya cargadas
   try{
-    const resp=await fetch(INCIDENCIAS_URL,{cache:'no-store'});
+    // ?t= evita que el CDN de GitHub raw sirva una versión cacheada del archivo
+    const resp=await fetch(INCIDENCIAS_URL+'?t='+Date.now(),{cache:'no-store'});
     if(!resp.ok)throw new Error('HTTP '+resp.status);
     const buf=await resp.arrayBuffer();
     const wb=XLSX.read(buf,{type:'array'});
