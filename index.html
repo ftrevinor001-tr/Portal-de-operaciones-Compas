@@ -494,7 +494,7 @@ async function cargarIncidencias(){
     const H=raw[0].map(h=>String(h).trim().toUpperCase());
     const ci=n=>H.indexOf(n);
     const cFolio=ci('FOLIO REPORTE'),cProv=ci('PROVEEDOR'),cImp=ci('IMPORTE (MXN)'),
-          cComp=ci('COMPRADOR'),cEtapa=ci('ETAPA ACTUAL'),cEst=ci('ESTATUS ACTUAL'),cMes=ci('MES DE DEVOLUCION');
+          cComp=ci('COMPRADOR'),cEtapa=ci('ETAPA ACTUAL'),cEst=ci('ESTATUS ACTUAL'),cMes=ci('FECHA CORTE');
     // Convierte serial/fecha de Excel a 'YYYY-MM'
     const aMes=v=>{
       if(v==null||v==='')return '';
