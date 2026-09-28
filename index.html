@@ -811,12 +811,12 @@ function normMotivo(s){return String(s==null?'':s).toUpperCase().normalize('NFD'
 async function cargarMotivosAdmin(){
   const cont=document.getElementById('mot-tabla'); if(!cont)return;
   try{
-    let{data,error}=await sb.from('motivos_precision').select('motivo,etiqueta,area,orden').order('orden',{ascending:true});
+    let{data,error}=await sb.from('motivos_precision2').select('motivo,etiqueta,area,orden').order('orden',{ascending:true});
     if(error)throw error;
     if(!data||!data.length){
       // sembrar la primera vez
       const seed=MOTIVOS_SEED.map((m,i)=>({...m,orden:i}));
-      const ins=await sb.from('motivos_precision').insert(seed);
+      const ins=await sb.from('motivos_precision2').insert(seed);
       if(ins.error)throw ins.error;
       data=seed;
     }
@@ -871,12 +871,12 @@ async function guardarMotivo(){
   try{
     if(editandoDe){
       // Editar: si cambió el valor interno, actualiza la fila existente por su clave anterior
-      const{error}=await sb.from('motivos_precision').update({motivo:valorInterno,etiqueta,area}).eq('motivo',editandoDe);
+      const{error}=await sb.from('motivos_precision2').update({motivo:valorInterno,etiqueta,area}).eq('motivo',editandoDe);
       if(error)throw error;
     }else{
       // Agregar/actualizar por clave (upsert sobre motivo)
       const orden=MOTIVOS_ADMIN.length;
-      const{error}=await sb.from('motivos_precision').upsert({motivo:valorInterno,etiqueta,area,orden},{onConflict:'motivo'});
+      const{error}=await sb.from('motivos_precision2').upsert({motivo:valorInterno,etiqueta,area,orden},{onConflict:'motivo'});
       if(error)throw error;
     }
     limpiarMotForm();
@@ -887,7 +887,7 @@ async function guardarMotivo(){
 async function eliminarMotivo(mot){
   if(!confirm('¿Eliminar el motivo "'+mot+'"? Ya no aparecerá en el desplegable.\n\nLos registros históricos que ya lo tengan guardado seguirán mostrándolo.'))return;
   try{
-    const{error}=await sb.from('motivos_precision').delete().eq('motivo',mot);
+    const{error}=await sb.from('motivos_precision2').delete().eq('motivo',mot);
     if(error)throw error;
     await cargarMotivosAdmin();
   }catch(e){ alert('No se pudo eliminar: '+e.message); }
