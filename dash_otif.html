@@ -950,7 +950,7 @@ async function cargarMotivosDesdeBase(){
   try{
     const sb=window.sbGet?window.sbGet():(window.supabase&&window.supabase.createClient(window.SB_URL,window.SB_KEY));
     if(!sb)return;
-    const{data,error}=await sb.from('motivos_precision').select('motivo,etiqueta,area,orden').order('orden',{ascending:true});
+    const{data,error}=await sb.from('motivos_precision2').select('motivo,etiqueta,area,orden').order('orden',{ascending:true});
     if(error||!data||!data.length)return; // conserva el respaldo
     const resp={}, lbl={}, orden=[];
     data.forEach(m=>{const k=String(m.motivo||'').toUpperCase().trim();if(!k)return;resp[k]=m.area||'Sin clasificar';lbl[k]=m.etiqueta||k;orden.push(k);});

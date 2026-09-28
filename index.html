@@ -177,6 +177,7 @@
         <span id="res-meses"></span>
         <button class="abtn" style="margin-top:0" id="res-dl" onclick="descargarResumenExcel()">⬇ Descargar Excel</button>
         <button class="abtn" style="margin-top:0;background:#1c4587" id="res-refresh" onclick="actualizarTodo()">🔄 Actualizar</button>
+        <button class="abtn" style="margin-top:0;background:#229ED9;display:none" id="res-tg" onclick="openTg()">📲 Resumen Telegram</button>
         <button class="abtn" style="margin-top:0;background:#b8860b;display:none" id="res-upload" onclick="document.getElementById('fx').click()">📂 Cargar Excel (Admin)</button>
       </div>
       <div id="res-content"><div class="empty-res">Cargando resumen…</div></div>
@@ -455,6 +456,8 @@ async function actualizarTodo(){
 function ajustarBotonesResumen(){
   const up=document.getElementById('res-upload');
   if(up)up.style.display=(typeof esAdmin!=='undefined'&&esAdmin)?'':'none';
+  const tg=document.getElementById('res-tg');
+  if(tg)tg.style.display=(typeof esAdmin!=='undefined'&&esAdmin)?'':'none';
 }
 async function cargarResumen(){
   const cont=document.getElementById('res-content');
@@ -904,6 +907,7 @@ async function adminLogin(){
   document.getElementById('adm-open').style.display='block';
   try{ cargarDiasDisponibles(); }catch(e){}
   try{ cargarMotivosAdmin(); }catch(e){}
+  try{ ajustarBotonesResumen(); }catch(e){}
 }
 function log(msg){const p=document.getElementById('prog');p.style.display='block';p.textContent+=msg+'\n';p.scrollTop=p.scrollHeight;}
 function logClear(){const p=document.getElementById('prog');p.textContent='';p.style.display='block';}
@@ -1965,5 +1969,271 @@ async function reiniciarVisitas(){
 }
 init();
 </script>
+<!-- ══════════ RESUMEN PARA TELEGRAM ══════════ -->
+<style>
+#tg-ov{position:fixed;inset:0;background:rgba(15,23,42,.6);display:none;align-items:flex-start;justify-content:center;z-index:9999;overflow:auto;padding:24px 12px}
+#tg-ov.on{display:flex}
+#tg-box{background:#fff;border-radius:12px;max-width:940px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);color:#1a2035}
+#tg-box header{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid #e2e6ed;flex-wrap:wrap}
+#tg-box h2{font-size:15px;color:#1e3a5f}
+#tg-body{display:grid;grid-template-columns:270px 1fr;gap:16px;padding:16px 18px}
+@media(max-width:720px){#tg-body{grid-template-columns:1fr}}
+#tg-opts label{display:block;font-size:11px;font-weight:600;color:#475569;margin:10px 0 4px}
+#tg-opts input[type=text],#tg-opts input[type=time],#tg-opts input[type=number],#tg-opts select{width:100%;padding:5px 8px;border:1.5px solid #c9d4f0;border-radius:6px;font-size:12px;font-family:inherit}
+#tg-opts .chk{display:flex;align-items:center;gap:6px;font-weight:500;font-size:12px;margin:6px 0}
+#tg-opts .fechas{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+#tg-handles{max-height:200px;overflow:auto;border:1px solid #e2e6ed;border-radius:6px;padding:6px}
+#tg-handles div{display:flex;align-items:center;gap:6px;margin:3px 0}
+#tg-handles span{font-size:10.5px;flex:0 0 96px;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#tg-handles input{flex:1;padding:3px 6px!important;font-size:11px!important}
+#tg-txt{width:100%;min-height:460px;border:1.5px solid #c9d4f0;border-radius:8px;padding:10px 12px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;line-height:1.45;resize:vertical;color:#1a2035}
+#tg-foot{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+.tg-btn{padding:8px 16px;border:none;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.tg-x{background:#f0f4ff;border:1px solid #c9d4f0;color:#1e3a5f;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit}
+</style>
+
+<div id="tg-ov" onclick="if(event.target===this)closeTg()">
+  <div id="tg-box">
+    <header>
+      <h2>📲 Resumen para Telegram</h2>
+      <span id="tg-rng" style="background:#e8f0fe;color:#1e3a5f;border-radius:6px;padding:3px 9px;font-size:11px;font-weight:700"></span>
+      <span id="tg-st" style="font-size:11px;color:#6b7a99"></span>
+      <button class="tg-x" style="margin-left:auto" onclick="closeTg()">✕ Cerrar</button>
+    </header>
+    <div id="tg-body">
+      <div id="tg-opts">
+        <div class="fechas">
+          <div><label>📅 Día A (anterior)</label><select id="tg-a" onchange="tgCargar()"></select></div>
+          <div><label>📅 Día B (cierre)</label><select id="tg-b" onchange="tgCargar()"></select></div>
+        </div>
+        <label>⏰ Hora límite para fecha compromiso</label>
+        <input type="time" id="tg-hora" value="12:00" oninput="tgSave();genTg()">
+        <label>🔗 Link al portal</label>
+        <input type="text" id="tg-link" placeholder="https://..." oninput="tgSave();genTg()">
+        <label>⏳ Alertar claves con al menos N días en faltante</label>
+        <input type="number" id="tg-dias" min="2" value="7" oninput="tgSave();genTg()">
+        <label>Opciones</label>
+        <div class="chk"><input type="checkbox" id="tg-media" checked onchange="tgSave();genTg()"> Listar claves nuevas de MEDIA</div>
+        <div class="chk"><input type="checkbox" id="tg-lenta" onchange="tgSave();genTg()"> Listar claves nuevas de LENTA / otras</div>
+        <div class="chk"><input type="checkbox" id="tg-negritas" checked onchange="tgSave();genTg()"> Negritas (**texto**)</div>
+        <label>👤 Usuario de Telegram por comprador <span style="font-weight:400;color:#6b7a99">(opcional, ej. @leonela_c)</span></label>
+        <div id="tg-handles"></div>
+        <p style="font-size:10.5px;color:#6b7a99;margin-top:6px">Usuarios y opciones se guardan en este navegador.</p>
+      </div>
+      <div>
+        <textarea id="tg-txt" spellcheck="false">Cargando…</textarea>
+        <div id="tg-foot">
+          <button class="tg-btn" style="background:#229ED9;color:#fff" onclick="copyTg()">📋 Copiar resumen</button>
+          <span id="tg-msg" style="font-size:12px;color:#2e7d32;font-weight:600"></span>
+          <span id="tg-len" style="margin-left:auto;font-size:11px;color:#6b7a99"></span>
+        </div>
+        <p style="font-size:10.5px;color:#6b7a99;margin-top:6px">Puedes editar el texto antes de copiarlo. Los datos salen de la base del portal (detalle diario).</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── RESUMEN TELEGRAM (lee de Supabase: dias_cargados, detalle_diario, datasets.resumen) ──
+const TG_KEY='tgResumenCfg_v1';
+const TG_DIAS=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+const TG_MES=['','ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const TG_EXCL=['PRODUCCION'];
+let TG={fechas:[],totalByDay:{},nuevas:[],resInv:[],resDesc:[],faltB:[],dias:{},fA:null,fB:null,comps:[]};
+
+function tgLoad(){try{return JSON.parse(localStorage.getItem(TG_KEY)||'{}')||{};}catch(e){return{};}}
+function tgV(id){return document.getElementById(id)?.value||'';}
+function tgC(id){return !!document.getElementById(id)?.checked;}
+function tgHandles(){const h={};document.querySelectorAll('#tg-handles input').forEach(i=>{if(i.value.trim())h[i.dataset.c]=i.value.trim();});return h;}
+function tgSave(){
+  const cfg={hora:tgV('tg-hora'),link:tgV('tg-link'),dias:tgV('tg-dias'),media:tgC('tg-media'),lenta:tgC('tg-lenta'),negritas:tgC('tg-negritas'),handles:{...(tgLoad().handles||{}),...tgHandles()}};
+  document.querySelectorAll('#tg-handles input').forEach(i=>{if(!i.value.trim())delete cfg.handles[i.dataset.c];});
+  try{localStorage.setItem(TG_KEY,JSON.stringify(cfg));}catch(e){}
+}
+function tgFecha(f){const d=new Date(f+'T12:00:00');return `${TG_DIAS[d.getDay()]} ${d.getDate()}/${TG_MES[d.getMonth()+1]}`;}
+function tgDMY(f){return f?f.split('-').reverse().join('/'):'';}
+function tgNombre(w){return w.charAt(0)+w.slice(1).toLowerCase();}
+function tgCorto2(c){return c==='FRANCISCO JAVIER'?'Fco. Javier':tgNombre(String(c).split(' ')[0]);}
+function tgWho(c,h){const u=(h[c]||'').trim();if(!u)return tgCorto2(c);return u.startsWith('@')?u:'@'+u;}
+function tgRank(m){m=String(m||'').toUpperCase();if(m.includes('SAGRADO'))return 0;if(m.includes('ALTA'))return 1;if(m.includes('MEDIA'))return 2;if(m.includes('LENTA'))return 3;return 4;}
+function tgCorto(n,max){n=String(n||'').replace(/\s+/g,' ').trim();return n.length>max?n.slice(0,max-1).trim()+'…':n;}
+function tgEsFalt(r){return String(r.estatus||'').trim().toUpperCase()==='FALTANTE';}
+function tgComp(r){return String(r.comprador||'').trim().toUpperCase();}
+
+// Lee todas las páginas de una consulta de Supabase
+async function tgPaginar(build){
+  const PAGE=1000;let i=0,out=[];
+  while(true){
+    const q=build().range(i,i+PAGE-1);
+    const {data,error}=await (typeof conTimeout==='function'?conTimeout(q,20000,'leer detalle'):q);
+    if(error)throw new Error(error.message);
+    if(!data||!data.length)break;
+    out=out.concat(data);
+    if(data.length<PAGE)break;
+    i+=PAGE;
+  }
+  return out;
+}
+
+async function openTg(){
+  const cfg=tgLoad();
+  if(cfg.hora)document.getElementById('tg-hora').value=cfg.hora;
+  document.getElementById('tg-link').value=cfg.link||location.href.split('#')[0].split('?')[0];
+  if(cfg.dias)document.getElementById('tg-dias').value=cfg.dias;
+  if('media' in cfg)document.getElementById('tg-media').checked=cfg.media;
+  if('lenta' in cfg)document.getElementById('tg-lenta').checked=cfg.lenta;
+  if('negritas' in cfg)document.getElementById('tg-negritas').checked=cfg.negritas;
+  document.getElementById('tg-ov').classList.add('on');
+  document.getElementById('tg-msg').textContent='';
+  document.getElementById('tg-txt').value='Cargando fechas…';
+  try{
+    const [dd,rs]=await Promise.all([
+      sb.from('dias_cargados').select('fecha').order('fecha',{ascending:true}),
+      sb.from('datasets').select('payload').eq('clave','resumen').maybeSingle()
+    ]);
+    if(dd.error)throw new Error(dd.error.message);
+    TG.fechas=(dd.data||[]).map(x=>String(x.fecha).slice(0,10));
+    TG.totalByDay=(rs.data&&rs.data.payload&&rs.data.payload.totalByDay)||(RES&&RES.resumen&&RES.resumen.totalByDay)||{};
+    if(TG.fechas.length<2)throw new Error('La base necesita al menos 2 días cargados.');
+    const opts=[...TG.fechas].reverse().map(f=>`<option value="${f}">${tgDMY(f)}</option>`).join('');
+    const sa=document.getElementById('tg-a'),sbb=document.getElementById('tg-b');
+    sa.innerHTML=opts;sbb.innerHTML=opts;
+    sbb.value=TG.fechas[TG.fechas.length-1];sa.value=TG.fechas[TG.fechas.length-2];
+    await tgCargar();
+  }catch(e){document.getElementById('tg-txt').value='❌ No se pudo leer la base: '+e.message;}
+}
+function closeTg(){document.getElementById('tg-ov').classList.remove('on');}
+
+async function tgCargar(){
+  const fA=tgV('tg-a'),fB=tgV('tg-b'),st=document.getElementById('tg-st'),ta=document.getElementById('tg-txt');
+  if(!fA||!fB)return;
+  if(fA>=fB){ta.value='⚠️ El Día A debe ser anterior al Día B.';return;}
+  ta.value='Leyendo detalle del '+tgDMY(fA)+' y '+tgDMY(fB)+'…';st.textContent='⏳ leyendo base…';
+  try{
+    const cols='fecha,clave,nombre,marca,comprador,rotacion,estatus';
+    // Faltantes de los últimos ~60 días (para A, B y días en faltante)
+    const d0=new Date(fB+'T12:00:00');d0.setDate(d0.getDate()-60);
+    const desde=d0.toISOString().slice(0,10)<fA?d0.toISOString().slice(0,10):fA;
+    const falt=(await tgPaginar(()=>sb.from('detalle_diario').select(cols).ilike('estatus','faltante').gte('fecha',desde).lte('fecha',fB).order('fecha',{ascending:true})))
+      .filter(r=>!TG_EXCL.includes(tgComp(r)));
+    const porFecha={};falt.forEach(r=>{const f=String(r.fecha).slice(0,10);(porFecha[f]=porFecha[f]||new Map()).set(String(r.clave).trim(),r);});
+    const mA=porFecha[fA]||new Map(),mB=porFecha[fB]||new Map();
+    const nuevas=[...mB.entries()].filter(([k])=>!mA.has(k)).map(([,r])=>r);
+    const resueltas=[...mA.entries()].filter(([k])=>!mB.has(k)).map(([,r])=>r);
+    // ¿Las resueltas siguen existiendo en B (con inventario) o desaparecieron (reclasificadas/descontinuadas)?
+    const enB=new Set();const claves=resueltas.map(r=>String(r.clave).trim());
+    for(let i=0;i<claves.length;i+=200){
+      const {data,error}=await sb.from('detalle_diario').select('clave').eq('fecha',fB).in('clave',claves.slice(i,i+200));
+      if(error)throw new Error(error.message);
+      (data||[]).forEach(x=>enB.add(String(x.clave).trim()));
+    }
+    // Días calendario en faltante (racha continua hasta B)
+    const fechasHasta=TG.fechas.filter(f=>f>=desde&&f<=fB);
+    const dias={};
+    mB.forEach((r,cl)=>{
+      let i=fechasHasta.length-1;while(i>0&&porFecha[fechasHasta[i-1]]?.has(cl))i--;
+      const n=Math.round((new Date(fB+'T12:00:00')-new Date(fechasHasta[i]+'T12:00:00'))/864e5)+1;
+      dias[cl]=(i===0&&fechasHasta.length>1)?n+'+':n;
+    });
+    TG={...TG,fA,fB,nuevas,resInv:resueltas.filter(r=>enB.has(String(r.clave).trim())),resDesc:resueltas.filter(r=>!enB.has(String(r.clave).trim())),faltB:[...mB.values()],dias,countByDay:Object.fromEntries(Object.entries(porFecha).map(([f,m])=>[f,m.size]))};
+    // Lista de compradores para los @usuarios
+    const cfgH=tgLoad().handles||{};
+    const comps=[...new Set([...falt.map(tgComp),...Object.keys(cfgH)])].filter(Boolean).sort();
+    document.getElementById('tg-handles').innerHTML=comps.map(c=>`<div><span title="${c}">${tgCorto2(c)}</span><input type="text" data-c="${c}" value="${String(cfgH[c]||'').replace(/"/g,'&quot;')}" placeholder="@usuario" oninput="tgSave();genTg()"></div>`).join('');
+    st.textContent='';
+    genTg();
+  }catch(e){st.textContent='';ta.value='❌ Error leyendo la base: '+e.message+'\n\nSi dice algo de permisos o sesión, sal y vuelve a entrar como Admin.';}
+}
+
+function tgTotal(f){if(TG.totalByDay&&TG.totalByDay[f]!=null)return TG.totalByDay[f];return (TG.countByDay&&TG.countByDay[f])||0;}
+function tgDelta(a,b){const d=b-a;return d>0?`▲${d}`:d<0?`▼${Math.abs(d)}`:'= sin cambio';}
+
+function genTg(){
+  const {fA,fB,nuevas,resInv,resDesc,faltB,dias}=TG;
+  if(!fA||!fB)return;
+  const h=tgHandles();
+  const B=tgC('tg-negritas')?(s=>`**${s}**`):(s=>s);
+  const minDias=Math.max(2,parseInt(tgV('tg-dias'))||7);
+  const L=[];
+
+  // Encabezado y tendencia
+  const tB=tgTotal(fB),tA=tgTotal(fA);
+  const d7=new Date(fB+'T12:00:00');d7.setDate(d7.getDate()-7);const f7=d7.toISOString().slice(0,10);
+  const fechasTot=Object.keys(TG.totalByDay||{}).sort();
+  const fSem=[...(fechasTot.length?fechasTot:TG.fechas)].reverse().find(f=>f<=f7);
+  let tend=`vs ${tgDMY(fA).slice(0,5)}: ${tgDelta(tA,tB)}`;
+  if(fSem)tend+=` | vs hace 1 semana: ${tgDelta(tgTotal(fSem),tB)}`;
+  L.push(`📊 ${B('CIERRE '+tgFecha(fB).toUpperCase()+' — FALTANTES')}`);
+  L.push(`Total en faltante: ${B(String(tB))} (${tend})`);
+  const nRes=resInv.length+resDesc.length;
+  L.push(`🆕 Nuevos: ${nuevas.length}   ✅ Resueltos: ${nRes}`);
+
+  const grp=rows=>{const m={};rows.forEach(r=>{const c=tgComp(r);(m[c]=m[c]||[]).push(r);});return Object.entries(m).sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0]));};
+  const linea=r=>{const d=dias[String(r.clave).trim()];return `${r.clave} ${tgCorto(r.nombre,38)}${parseInt(d)>1?` (${d}d)`:''}`;};
+  const criticas=nuevas.filter(r=>tgRank(r.rotacion)<=1);
+  const media=nuevas.filter(r=>tgRank(r.rotacion)===2);
+  const otras=nuevas.filter(r=>tgRank(r.rotacion)>=3);
+
+  if(criticas.length){
+    L.push('');L.push(`🔴 ${B('ALTA / SAGRADOS — atender hoy')}`);
+    grp(criticas).forEach(([c,rs])=>rs.forEach(r=>L.push(`• ${tgWho(c,h)} – ${linea(r)}${tgRank(r.rotacion)===0?' [SAGRADO]':''}`)));
+  }
+  const bloque=(titulo,rows,listar)=>{
+    if(!rows.length)return;
+    L.push('');L.push(titulo);
+    grp(rows).forEach(([c,rs])=>{
+      if(listar){
+        if(rs.length===1)L.push(`• ${tgWho(c,h)} – ${linea(rs[0])}`);
+        else{L.push(`• ${tgWho(c,h)} (${rs.length}):`);rs.forEach(r=>L.push(`   – ${linea(r)}`));}
+      }else L.push(`• ${tgWho(c,h)}: ${rs.length} clave${rs.length>1?'s':''}`);
+    });
+  };
+  bloque(`🟡 ${B('MEDIA — nuevos')}`,media,tgC('tg-media'));
+  bloque(`⚪ ${B('LENTA / otras — nuevos')}`,otras,tgC('tg-lenta'));
+  if(!nuevas.length){L.push('');L.push('🎉 No hubo faltantes nuevos.');}
+
+  // ALTA/SAGRADOS que ya llevan muchos días en faltante
+  const nSet=new Set(nuevas.map(r=>String(r.clave).trim()));
+  const dd=r=>parseInt(dias[String(r.clave).trim()]||0);
+  const viejas=faltB.filter(r=>!nSet.has(String(r.clave).trim())&&tgRank(r.rotacion)<=1&&dd(r)>=minDias).sort((a,b)=>dd(b)-dd(a));
+  if(viejas.length){
+    L.push('');L.push(`⏳ ${B(`ALTA / SAGRADOS con ${minDias}+ días en faltante`)}`);
+    const top=viejas.slice(0,10);
+    top.forEach(r=>L.push(`• ${tgWho(tgComp(r),h)} – ${r.clave} ${tgCorto(r.nombre,34)} (${dias[String(r.clave).trim()]}d)`));
+    if(viejas.length>top.length)L.push(`   …y ${viejas.length-top.length} más (ver portal)`);
+  }
+
+  // Resueltos con reconocimiento
+  if(nRes){
+    const m={};[...resInv,...resDesc].forEach(r=>{const c=tgComp(r);m[c]=(m[c]||0)+1;});
+    L.push('');L.push(`✅ ${B('Resueltos:')} ${Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`${tgCorto2(c)} (${n})`).join(', ')}. ¡Gracias!`);
+    if(resDesc.length)L.push(`   (${resDesc.length} por reclasificación/descontinuación)`);
+  }
+
+  // Llamado a la acción
+  if(criticas.length||media.length||viejas.length){
+    const [hh,mm]=(tgV('tg-hora')||'12:00').split(':');const hN=+hh;
+    L.push('');L.push(`⏰ Favor de responder con ${B('fecha compromiso')} de sus claves antes de las ${((hN+11)%12)+1}:${mm} ${hN<12?'a.m.':'p.m.'}`);
+  }
+  const link=tgV('tg-link').trim();if(link)L.push(`🔗 Detalle: ${link}`);
+
+  const txt=L.join('\n');
+  document.getElementById('tg-txt').value=txt;
+  document.getElementById('tg-rng').textContent=`${tgDMY(fA)} → ${tgDMY(fB)}`;
+  const n=txt.length,el=document.getElementById('tg-len');
+  el.textContent=`${n.toLocaleString()} / 4,096 caracteres`+(n>4096?' — ⚠️ Telegram lo cortará, desmarca opciones':'');
+  el.style.color=n>4096?'#c0392b':'#6b7a99';
+}
+
+async function copyTg(){
+  const ta=document.getElementById('tg-txt'),msg=document.getElementById('tg-msg');
+  try{await navigator.clipboard.writeText(ta.value);}catch(e){ta.select();document.execCommand('copy');}
+  msg.textContent='✓ Copiado. Pégalo en el grupo de Compradores.';
+  setTimeout(()=>{msg.textContent='';},3500);
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('tg-ov')?.classList.contains('on'))closeTg();});
+</script>
+<!-- ══════════ /RESUMEN PARA TELEGRAM ══════════ -->
+
 </body>
 </html>
