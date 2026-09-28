@@ -927,7 +927,9 @@ let GP_C={};  // built dynamically from data groups
 const MES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 function curMonthKey(){ return mKey(new Date()); } // mes actual, usado como default en filtros de mes
 function nextMonthKey(){ const d=new Date(); d.setMonth(d.getMonth()+1); return mKey(d); } // mes siguiente
-const MOTIVO_RESP={
+// Motivos de precisión: se cargan desde Supabase (tabla motivos_precision, editable en Admin).
+// Estos valores son el RESPALDO si la base no responde.
+let MOTIVO_RESP={
   'ASIGNADO POR SURTIMIENTO':'Planeación',
   'ERROR DE CALCULO':'Portal de compras',
   'VENTAS ESPECIALES':'Ventas',
@@ -941,6 +943,20 @@ const MOTIVO_RESP={
   'OTRO':'Sin clasificar',
   'NO CUMPLE CANTIDAD MINIMA':'Proveedor',  // histórico: fuera del desplegable, se conserva su área para registros antiguos
 };
+// Orden y etiquetas del desplegable (respaldo; se sobrescriben desde Supabase)
+let MOTIVO_ORDEN=['ASIGNADO POR SURTIMIENTO','ERROR DE CALCULO','VENTAS ESPECIALES','NUEVOS PRODUCTOS','COMPRAS ESPECIALES','MONTO MINIMO','RENTABILIDAD','POR CUBICAJE','VARIACION DE PRECIO','DECISION DE GERENCIA','OTRO'];
+let MOTIVO_LBL={'ASIGNADO POR SURTIMIENTO':'Asignado por surtimiento','ERROR DE CALCULO':'Error de cálculo','VENTAS ESPECIALES':'Ventas especiales','NUEVOS PRODUCTOS':'Nuevos productos','COMPRAS ESPECIALES':'Compras especiales','MONTO MINIMO':'Monto mínimo','RENTABILIDAD':'Rentabilidad','POR CUBICAJE':'Por cubicaje','VARIACION DE PRECIO':'Variación de precio','DECISION DE GERENCIA':'Decisión de gerencia','OTRO':'Otro','NO CUMPLE CANTIDAD MINIMA':'No cumple cant. mínima'};
+async function cargarMotivosDesdeBase(){
+  try{
+    const sb=window.sbGet?window.sbGet():(window.supabase&&window.supabase.createClient(window.SB_URL,window.SB_KEY));
+    if(!sb)return;
+    const{data,error}=await sb.from('motivos_precision').select('motivo,etiqueta,area,orden').order('orden',{ascending:true});
+    if(error||!data||!data.length)return; // conserva el respaldo
+    const resp={}, lbl={}, orden=[];
+    data.forEach(m=>{const k=String(m.motivo||'').toUpperCase().trim();if(!k)return;resp[k]=m.area||'Sin clasificar';lbl[k]=m.etiqueta||k;orden.push(k);});
+    MOTIVO_RESP=resp; MOTIVO_LBL=lbl; MOTIVO_ORDEN=orden;
+  }catch(e){ console.warn('motivos_precision:',e.message); }
+}
 const TOLERANCIA_PCT=40;
 
 // ══════════════════════════════════════════════════════════════
@@ -1073,7 +1089,7 @@ function processWorkbook(wb, filename){
 }
 
 document.addEventListener('DOMContentLoaded', ()=>{
-  autoLoadFromRepo();
+  cargarMotivosDesdeBase().finally(()=>{ autoLoadFromRepo(); });
 });
 
 function loadFile(file){
@@ -1995,8 +2011,8 @@ function renderPrecisionTab(){
     }
     return `<button onclick="guardarComentarioPrec('${r.key}')" style="font-size:10px;padding:3px 9px;border:1px dashed var(--brd2);background:none;border-radius:6px;cursor:pointer;color:var(--tx2)">✏️ Agregar</button>`;
   };
-  const MOTIVO_OPTS=['','ASIGNADO POR SURTIMIENTO','ERROR DE CALCULO','VENTAS ESPECIALES','NUEVOS PRODUCTOS','COMPRAS ESPECIALES','MONTO MINIMO','RENTABILIDAD','POR CUBICAJE','VARIACION DE PRECIO','DECISION DE GERENCIA','OTRO'];
-  const motivoLbl={'':'— Seleccionar —','ASIGNADO POR SURTIMIENTO':'Asignado por surtimiento','ERROR DE CALCULO':'Error de cálculo','VENTAS ESPECIALES':'Ventas especiales','NUEVOS PRODUCTOS':'Nuevos productos','COMPRAS ESPECIALES':'Compras especiales','MONTO MINIMO':'Monto mínimo','RENTABILIDAD':'Rentabilidad','POR CUBICAJE':'Por cubicaje','VARIACION DE PRECIO':'Variación de precio','DECISION DE GERENCIA':'Decisión de gerencia','OTRO':'Otro','NO CUMPLE CANTIDAD MINIMA':'No cumple cant. mínima'};
+  const MOTIVO_OPTS=['',...MOTIVO_ORDEN];
+  const motivoLbl=Object.assign({'':'— Seleccionar —'},MOTIVO_LBL);
 
   document.getElementById('prec-tbody').innerHTML=rows.map(r=>{
     const isPend=r.status==='pendiente';

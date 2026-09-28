@@ -233,6 +233,26 @@
           <div class="prog" id="prog"></div>
         </div>
 
+        <div class="admin-card" id="card-motivos">
+          <h2>🏷️ Motivos de precisión (Pedidos propuestos)</h2>
+          <p class="desc">Administra los motivos que aparecen en el desplegable de la pestaña <b>Indicadores → Pedidos propuestos</b> y a qué <b>área/responsable</b> se asigna cada uno. Los cambios se guardan en la base y se aplican al recargar el dashboard OTIF.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">Motivo</label>
+              <input type="text" id="mot-nombre" placeholder="Ej. Cambio de proveedor" style="font-size:13px;padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:220px">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">Área / Responsable</label>
+              <input type="text" id="mot-area" list="mot-areas-list" placeholder="Ej. Compras" style="font-size:13px;padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:200px">
+              <datalist id="mot-areas-list"></datalist>
+            </div>
+            <button class="abtn" style="margin-top:0" onclick="guardarMotivo()" id="mot-btn">➕ Agregar / Actualizar</button>
+            <button class="abtn" style="margin-top:0;background:#adb5bd" onclick="limpiarMotForm()">✕ Limpiar</button>
+          </div>
+          <div class="gate-err" id="mot-err"></div>
+          <div id="mot-tabla" style="font-size:13px;color:#495057">Cargando motivos…</div>
+        </div>
+
         <div class="admin-card">
           <h2>📥 Descargar base de datos</h2>
           <p class="desc">Descarga el último Excel respaldado y los comentarios acumulados.</p>
@@ -392,7 +412,7 @@ function switchTab(i){
   document.querySelectorAll('.frame-wrap').forEach((f,j)=>f.classList.toggle('active',j===i));
   loadTab(i);
   if(i===0){ cargarResumen(); ajustarBotonesResumen(); }
-  if(i===6&&esAdmin){document.getElementById('adm-lock').style.display='none';document.getElementById('adm-open').style.display='block';try{cargarDiasDisponibles();}catch(e){}}
+  if(i===6&&esAdmin){document.getElementById('adm-lock').style.display='none';document.getElementById('adm-open').style.display='block';try{cargarDiasDisponibles();}catch(e){}try{cargarMotivosAdmin();}catch(e){}}
 }
 function hideLd(i){const l=document.getElementById('ld-'+i);if(l)l.classList.add('hidden');}
 window.hideLd=hideLd;
@@ -771,6 +791,108 @@ async function descargarResumenExcel(){
   btn.disabled=false;btn.textContent='⬇ Descargar Excel';
 }
 
+// ═══════════ MOTIVOS DE PRECISIÓN (Admin) ═══════════
+// Semilla: motivos iniciales por si la tabla de Supabase está vacía la primera vez
+const MOTIVOS_SEED=[
+  {motivo:'ASIGNADO POR SURTIMIENTO',etiqueta:'Asignado por surtimiento',area:'Planeación'},
+  {motivo:'ERROR DE CALCULO',etiqueta:'Error de cálculo',area:'Portal de compras'},
+  {motivo:'VENTAS ESPECIALES',etiqueta:'Ventas especiales',area:'Ventas'},
+  {motivo:'NUEVOS PRODUCTOS',etiqueta:'Nuevos productos',area:'Desarrollos'},
+  {motivo:'COMPRAS ESPECIALES',etiqueta:'Compras especiales',area:'Compras'},
+  {motivo:'MONTO MINIMO',etiqueta:'Monto mínimo',area:'Compras'},
+  {motivo:'RENTABILIDAD',etiqueta:'Rentabilidad',area:'Compras'},
+  {motivo:'POR CUBICAJE',etiqueta:'Por cubicaje',area:'Compras'},
+  {motivo:'VARIACION DE PRECIO',etiqueta:'Variación de precio',area:'Compras'},
+  {motivo:'DECISION DE GERENCIA',etiqueta:'Decisión de gerencia',area:'Gerencia'},
+  {motivo:'OTRO',etiqueta:'Otro',area:'Sin clasificar'}
+];
+let MOTIVOS_ADMIN=[];
+function normMotivo(s){return String(s==null?'':s).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();}
+async function cargarMotivosAdmin(){
+  const cont=document.getElementById('mot-tabla'); if(!cont)return;
+  try{
+    let{data,error}=await sb.from('motivos_precision').select('motivo,etiqueta,area,orden').order('orden',{ascending:true});
+    if(error)throw error;
+    if(!data||!data.length){
+      // sembrar la primera vez
+      const seed=MOTIVOS_SEED.map((m,i)=>({...m,orden:i}));
+      const ins=await sb.from('motivos_precision').insert(seed);
+      if(ins.error)throw ins.error;
+      data=seed;
+    }
+    MOTIVOS_ADMIN=data;
+    renderMotivosTabla();
+    renderAreasList();
+  }catch(e){
+    cont.innerHTML='<span style="color:#c0392b">No se pudieron cargar los motivos: '+e.message+'. Si dice que la tabla no existe, créala en Supabase (ver instrucciones).</span>';
+  }
+}
+function renderAreasList(){
+  const dl=document.getElementById('mot-areas-list'); if(!dl)return;
+  const areas=[...new Set(MOTIVOS_ADMIN.map(m=>m.area).filter(Boolean))].sort();
+  dl.innerHTML=areas.map(a=>`<option value="${a}">`).join('');
+}
+function renderMotivosTabla(){
+  const cont=document.getElementById('mot-tabla'); if(!cont)return;
+  if(!MOTIVOS_ADMIN.length){cont.innerHTML='<span style="color:#6b7a99">Sin motivos. Agrega el primero arriba.</span>';return;}
+  const filas=MOTIVOS_ADMIN.map(m=>`<tr>
+    <td style="padding:6px 10px;border-bottom:1px solid #eef">${m.etiqueta||m.motivo}</td>
+    <td style="padding:6px 10px;border-bottom:1px solid #eef;font-family:monospace;font-size:11px;color:#6b7a99">${m.motivo}</td>
+    <td style="padding:6px 10px;border-bottom:1px solid #eef">${m.area||'—'}</td>
+    <td style="padding:6px 10px;border-bottom:1px solid #eef;white-space:nowrap">
+      <button class="abtn" style="margin:0;padding:4px 10px;font-size:12px" onclick="editarMotivo('${m.motivo.replace(/'/g,"\\'")}')">✏️ Editar</button>
+      <button class="abtn" style="margin:0 0 0 6px;padding:4px 10px;font-size:12px;background:#c0392b" onclick="eliminarMotivo('${m.motivo.replace(/'/g,"\\'")}')">🗑 Eliminar</button>
+    </td></tr>`).join('');
+  cont.innerHTML=`<table style="width:100%;border-collapse:collapse;margin-top:6px"><thead><tr style="background:#f8f9fd">
+    <th style="text-align:left;padding:6px 10px;font-size:11px;color:#6b7a99;text-transform:uppercase">Motivo (etiqueta)</th>
+    <th style="text-align:left;padding:6px 10px;font-size:11px;color:#6b7a99;text-transform:uppercase">Valor interno</th>
+    <th style="text-align:left;padding:6px 10px;font-size:11px;color:#6b7a99;text-transform:uppercase">Área</th>
+    <th style="text-align:left;padding:6px 10px;font-size:11px;color:#6b7a99;text-transform:uppercase">Acciones</th>
+  </tr></thead><tbody>${filas}</tbody></table>`;
+}
+function limpiarMotForm(){document.getElementById('mot-nombre').value='';document.getElementById('mot-area').value='';document.getElementById('mot-err').textContent='';document.getElementById('mot-btn').dataset.edit='';}
+function editarMotivo(mot){
+  const m=MOTIVOS_ADMIN.find(x=>x.motivo===mot); if(!m)return;
+  document.getElementById('mot-nombre').value=m.etiqueta||m.motivo;
+  document.getElementById('mot-area').value=m.area||'';
+  document.getElementById('mot-btn').dataset.edit=mot; // recuerda que estamos editando este valor interno
+  document.getElementById('card-motivos').scrollIntoView({behavior:'smooth'});
+}
+async function guardarMotivo(){
+  const err=document.getElementById('mot-err'); err.textContent='';
+  const etiqueta=document.getElementById('mot-nombre').value.trim();
+  const area=document.getElementById('mot-area').value.trim();
+  if(!etiqueta){err.textContent='Escribe el nombre del motivo.';return;}
+  if(!area){err.textContent='Escribe el área/responsable.';return;}
+  const editandoDe=document.getElementById('mot-btn').dataset.edit||'';
+  const valorInterno=normMotivo(etiqueta);
+  if(!valorInterno){err.textContent='El motivo no es válido.';return;}
+  const btn=document.getElementById('mot-btn'); btn.disabled=true; const t0=btn.textContent; btn.textContent='Guardando…';
+  try{
+    if(editandoDe){
+      // Editar: si cambió el valor interno, actualiza la fila existente por su clave anterior
+      const{error}=await sb.from('motivos_precision').update({motivo:valorInterno,etiqueta,area}).eq('motivo',editandoDe);
+      if(error)throw error;
+    }else{
+      // Agregar/actualizar por clave (upsert sobre motivo)
+      const orden=MOTIVOS_ADMIN.length;
+      const{error}=await sb.from('motivos_precision').upsert({motivo:valorInterno,etiqueta,area,orden},{onConflict:'motivo'});
+      if(error)throw error;
+    }
+    limpiarMotForm();
+    await cargarMotivosAdmin();
+  }catch(e){ err.textContent='No se pudo guardar: '+e.message; }
+  btn.disabled=false; btn.textContent=t0;
+}
+async function eliminarMotivo(mot){
+  if(!confirm('¿Eliminar el motivo "'+mot+'"? Ya no aparecerá en el desplegable.\n\nLos registros históricos que ya lo tengan guardado seguirán mostrándolo.'))return;
+  try{
+    const{error}=await sb.from('motivos_precision').delete().eq('motivo',mot);
+    if(error)throw error;
+    await cargarMotivosAdmin();
+  }catch(e){ alert('No se pudo eliminar: '+e.message); }
+}
+
 // ═══════════ ADMIN ═══════════
 async function adminLogin(){
   const pw=document.getElementById('apw').value,err=document.getElementById('apw-err');
@@ -781,6 +903,7 @@ async function adminLogin(){
   document.getElementById('adm-lock').style.display='none';
   document.getElementById('adm-open').style.display='block';
   try{ cargarDiasDisponibles(); }catch(e){}
+  try{ cargarMotivosAdmin(); }catch(e){}
 }
 function log(msg){const p=document.getElementById('prog');p.style.display='block';p.textContent+=msg+'\n';p.scrollTop=p.scrollHeight;}
 function logClear(){const p=document.getElementById('prog');p.textContent='';p.style.display='block';}
