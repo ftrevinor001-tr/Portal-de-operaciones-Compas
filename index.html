@@ -2172,8 +2172,9 @@ function genTg2(){
   if(fSem)tend+=` | vs hace 1 semana: ${tgDelta(tgTotal(fSem),tB)}`;
   L.push(`📊 ${B('CIERRE '+tgFecha(fB).toUpperCase()+' — FALTANTES')}`);
   L.push(`Total en faltante: ${B(String(tB))} (${tend})`);
-  const nRes=resInv.length+resDesc.length;
-  L.push(`🆕 Nuevos: ${nuevas.length}   ✅ Resueltos: ${nRes}`);
+  // Resueltos = igual que "Resueltas c/Inventario" del Comparativo (faltante en A, sigue en B con otro estatus)
+  const nRes=resInv.length;
+  L.push(`🆕 Nuevos: ${nuevas.length}   ✅ Resueltos c/inventario: ${nRes}`);
 
   const grp=rows=>{const m={};rows.forEach(r=>{const c=tgComp(r);(m[c]=m[c]||[]).push(r);});return Object.entries(m).sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0]));};
   const linea=r=>{const d=dias[String(r.clave).trim()];return `${r.clave} ${tgCorto(r.nombre,38)}${parseInt(d)>1?` (${d}d)`:''}`;};
@@ -2212,9 +2213,11 @@ function genTg2(){
 
   // Resueltos con reconocimiento
   if(nRes){
-    const m={};[...resInv,...resDesc].forEach(r=>{const c=tgComp(r);m[c]=(m[c]||0)+1;});
+    const m={};resInv.forEach(r=>{const c=tgComp(r);m[c]=(m[c]||0)+1;});
     L.push('');L.push(`✅ ${B('Resueltos:')} ${Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`${tgCorto2(c)} (${n})`).join(', ')}. ¡Gracias!`);
-    if(resDesc.length)L.push(`   (${resDesc.length} por reclasificación/descontinuación)`);
+  }
+  if(resDesc.length){
+    L.push('');L.push(`🔄 Salieron de faltante por reclasificación/descontinuación: ${resDesc.length} clave${resDesc.length>1?'s':''}`);
   }
 
   // Llamado a la acción
