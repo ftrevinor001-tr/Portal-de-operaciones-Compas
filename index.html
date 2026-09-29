@@ -2069,8 +2069,8 @@ async function tgPaginar(build){
     if(error)throw new Error(error.message);
     if(!data||!data.length)break;
     out=out.concat(data);
-    if(data.length<PAGE)break;
-    i+=PAGE;
+    i+=data.length;   // avanza lo que realmente llegó (Supabase puede limitar a menos de 1000 por página)
+    if(i>200000)break;
   }
   return out;
 }
@@ -2114,8 +2114,12 @@ async function tgCargar(){
     // Faltantes de los últimos ~60 días (para A, B y días en faltante)
     const d0=new Date(fB+'T12:00:00');d0.setDate(d0.getDate()-60);
     const desde=d0.toISOString().slice(0,10)<fA?d0.toISOString().slice(0,10):fA;
-    const falt=(await tgPaginar(()=>sb.from('detalle_diario').select(cols).ilike('estatus','faltante').gte('fecha',desde).lte('fecha',fB).order('fecha',{ascending:true})))
-      .filter(r=>!TG_EXCL.includes(tgComp(r)));
+    // Día A y Día B se leen por separado, con orden estable (fecha+clave) para que la paginación no salte filas
+    const leerDia=f=>tgPaginar(()=>sb.from('detalle_diario').select(cols).eq('fecha',f).ilike('estatus','faltante').order('clave',{ascending:true}));
+    const [rowsA,rowsB]=await Promise.all([leerDia(fA),leerDia(fB)]);
+    // Historial para días en faltante (solo fecha+clave)
+    const hist=await tgPaginar(()=>sb.from('detalle_diario').select('fecha,clave,comprador').ilike('estatus','faltante').gte('fecha',desde).lt('fecha',fA).order('fecha',{ascending:true}).order('clave',{ascending:true}));
+    const falt=[...hist,...rowsA,...rowsB].filter(r=>!TG_EXCL.includes(tgComp(r)));
     const porFecha={};falt.forEach(r=>{const f=String(r.fecha).slice(0,10);(porFecha[f]=porFecha[f]||new Map()).set(String(r.clave).trim(),r);});
     const mA=porFecha[fA]||new Map(),mB=porFecha[fB]||new Map();
     const nuevas=[...mB.entries()].filter(([k])=>!mA.has(k)).map(([,r])=>r);
@@ -2140,7 +2144,7 @@ async function tgCargar(){
     const cfgH=tgLoad().handles||{};
     const comps=[...new Set([...falt.map(tgComp),...Object.keys(cfgH)])].filter(Boolean).sort();
     document.getElementById('tg-handles').innerHTML=comps.map(c=>`<div><span title="${c}">${tgCorto2(c)}</span><input type="text" data-c="${c}" value="${String(cfgH[c]||'').replace(/"/g,'&quot;')}" placeholder="@usuario" oninput="tgSave();genTg()"></div>`).join('');
-    st.textContent='';
+    st.textContent=`Faltantes leídos: ${tgDMY(fA).slice(0,5)} = ${mA.size} · ${tgDMY(fB).slice(0,5)} = ${mB.size}`;
     genTg();
   }catch(e){st.textContent='';ta.value='❌ Error leyendo la base: '+e.message+'\n\nSi dice algo de permisos o sesión, sal y vuelve a entrar como Admin.';}
 }
@@ -2149,6 +2153,9 @@ function tgTotal(f){if(TG.totalByDay&&TG.totalByDay[f]!=null)return TG.totalByDa
 function tgDelta(a,b){const d=b-a;return d>0?`▲${d}`:d<0?`▼${Math.abs(d)}`:'= sin cambio';}
 
 function genTg(){
+  try{genTg2();}catch(e){document.getElementById('tg-txt').value='❌ Error al armar el resumen: '+e.message;console.error(e);}
+}
+function genTg2(){
   const {fA,fB,nuevas,resInv,resDesc,faltB,dias}=TG;
   if(!fA||!fB)return;
   const h=tgHandles();
