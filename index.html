@@ -177,8 +177,6 @@
         <span id="res-meses"></span>
         <button class="abtn" style="margin-top:0" id="res-dl" onclick="descargarResumenExcel()">⬇ Descargar Excel</button>
         <button class="abtn" style="margin-top:0;background:#1c4587" id="res-refresh" onclick="actualizarTodo()">🔄 Actualizar</button>
-        <button class="abtn" style="margin-top:0;background:#6a4bb3;display:none" id="res-seg" onclick="openSeg()">📝 Seguimiento llegadas</button>
-        <button class="abtn" style="margin-top:0;background:#229ED9;display:none" id="res-tg" onclick="openTg()">📲 Resumen Telegram</button>
         <button class="abtn" style="margin-top:0;background:#b8860b;display:none" id="res-upload" onclick="document.getElementById('fx').click()">📂 Cargar Excel (Admin)</button>
       </div>
       <div id="res-content"><div class="empty-res">Cargando resumen…</div></div>
@@ -253,6 +251,36 @@
           </div>
           <div class="gate-err" id="mot-err"></div>
           <div id="mot-tabla" style="font-size:13px;color:#495057">Cargando motivos…</div>
+        </div>
+
+        <div class="admin-card" id="card-restr">
+          <h2>🚫 Claves restringidas (no cuentan al comprador)</h2>
+          <p class="desc">Marca claves cuyos faltantes <b>no deben contar</b> para el comprador por casos especiales (ventas atípicas, acuerdos con proveedor, desabastos), con autorización de gerencia. La clave <b>sigue apareciendo</b> en las tablas de detalle, pero se descuenta de las tarjetas, la Tabla Resumen y las gráficas. Puedes bloquear y desbloquear cuando se defina su condición.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">Clave</label>
+              <input type="text" id="restr-clave" placeholder="Ej. 49112" style="font-size:13px;padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:120px">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">Comprador</label>
+              <input type="text" id="restr-comprador" list="restr-comp-list" placeholder="Ej. LEONELA" style="font-size:13px;padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:170px">
+              <datalist id="restr-comp-list"></datalist>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">Motivo</label>
+              <select id="restr-motivo" style="font-size:13px;padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px">
+                <option>Ventas atípicas</option><option>Acuerdo con proveedor</option><option>Desabasto</option><option>Otro</option>
+              </select>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">Autorizó (Gerencia)</label>
+              <input type="text" id="restr-autorizo" placeholder="Nombre" style="font-size:13px;padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:150px">
+            </div>
+            <button class="abtn" style="margin-top:0" onclick="guardarRestriccion()" id="restr-btn">🚫 Restringir</button>
+            <button class="abtn" style="margin-top:0;background:#adb5bd" onclick="limpiarRestrForm()">✕ Limpiar</button>
+          </div>
+          <div class="gate-err" id="restr-err"></div>
+          <div id="restr-tabla" style="font-size:13px;color:#495057">Cargando restricciones…</div>
         </div>
 
         <div class="admin-card">
@@ -414,7 +442,7 @@ function switchTab(i){
   document.querySelectorAll('.frame-wrap').forEach((f,j)=>f.classList.toggle('active',j===i));
   loadTab(i);
   if(i===0){ cargarResumen(); ajustarBotonesResumen(); }
-  if(i===6&&esAdmin){document.getElementById('adm-lock').style.display='none';document.getElementById('adm-open').style.display='block';try{cargarDiasDisponibles();}catch(e){}try{cargarMotivosAdmin();}catch(e){}}
+  if(i===6&&esAdmin){document.getElementById('adm-lock').style.display='none';document.getElementById('adm-open').style.display='block';try{cargarDiasDisponibles();}catch(e){}try{cargarMotivosAdmin();}catch(e){}try{cargarRestriccionesAdmin();}catch(e){}}
 }
 function hideLd(i){const l=document.getElementById('ld-'+i);if(l)l.classList.add('hidden');}
 window.hideLd=hideLd;
@@ -457,10 +485,6 @@ async function actualizarTodo(){
 function ajustarBotonesResumen(){
   const up=document.getElementById('res-upload');
   if(up)up.style.display=(typeof esAdmin!=='undefined'&&esAdmin)?'':'none';
-  const tg=document.getElementById('res-tg');
-  if(tg)tg.style.display=(typeof esAdmin!=='undefined'&&esAdmin)?'':'none';
-  const sg=document.getElementById('res-seg');
-  if(sg)sg.style.display=(typeof esAdmin!=='undefined'&&esAdmin)?'':'none';
 }
 async function cargarResumen(){
   const cont=document.getElementById('res-content');
@@ -817,12 +841,12 @@ function normMotivo(s){return String(s==null?'':s).toUpperCase().normalize('NFD'
 async function cargarMotivosAdmin(){
   const cont=document.getElementById('mot-tabla'); if(!cont)return;
   try{
-    let{data,error}=await sb.from('motivos_precision2').select('motivo,etiqueta,area,orden').order('orden',{ascending:true});
+    let{data,error}=await sb.from('motivos_precision').select('motivo,etiqueta,area,orden').order('orden',{ascending:true});
     if(error)throw error;
     if(!data||!data.length){
       // sembrar la primera vez
       const seed=MOTIVOS_SEED.map((m,i)=>({...m,orden:i}));
-      const ins=await sb.from('motivos_precision2').insert(seed);
+      const ins=await sb.from('motivos_precision').insert(seed);
       if(ins.error)throw ins.error;
       data=seed;
     }
@@ -877,12 +901,12 @@ async function guardarMotivo(){
   try{
     if(editandoDe){
       // Editar: si cambió el valor interno, actualiza la fila existente por su clave anterior
-      const{error}=await sb.from('motivos_precision2').update({motivo:valorInterno,etiqueta,area}).eq('motivo',editandoDe);
+      const{error}=await sb.from('motivos_precision').update({motivo:valorInterno,etiqueta,area}).eq('motivo',editandoDe);
       if(error)throw error;
     }else{
       // Agregar/actualizar por clave (upsert sobre motivo)
       const orden=MOTIVOS_ADMIN.length;
-      const{error}=await sb.from('motivos_precision2').upsert({motivo:valorInterno,etiqueta,area,orden},{onConflict:'motivo'});
+      const{error}=await sb.from('motivos_precision').upsert({motivo:valorInterno,etiqueta,area,orden},{onConflict:'motivo'});
       if(error)throw error;
     }
     limpiarMotForm();
@@ -893,10 +917,93 @@ async function guardarMotivo(){
 async function eliminarMotivo(mot){
   if(!confirm('¿Eliminar el motivo "'+mot+'"? Ya no aparecerá en el desplegable.\n\nLos registros históricos que ya lo tengan guardado seguirán mostrándolo.'))return;
   try{
-    const{error}=await sb.from('motivos_precision2').delete().eq('motivo',mot);
+    const{error}=await sb.from('motivos_precision').delete().eq('motivo',mot);
     if(error)throw error;
     await cargarMotivosAdmin();
   }catch(e){ alert('No se pudo eliminar: '+e.message); }
+}
+
+// ═══════════ CLAVES RESTRINGIDAS (Admin) ═══════════
+let RESTR_ADMIN=[];
+function normCompR(s){return String(s==null?'':s).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();}
+async function cargarRestriccionesAdmin(){
+  const cont=document.getElementById('restr-tabla'); if(!cont)return;
+  try{
+    const{data,error}=await sb.from('claves_restringidas').select('id,clave,comprador,motivo,autorizo,autorizado_en,activa').order('creado_en',{ascending:false});
+    if(error)throw error;
+    RESTR_ADMIN=data||[];
+    renderRestrTabla();
+    renderRestrCompList();
+  }catch(e){
+    cont.innerHTML='<span style="color:#c0392b">No se pudieron cargar las restricciones: '+e.message+'. Si dice que la tabla no existe, créala en Supabase (archivo CREAR_TABLA_restringidas.sql).</span>';
+  }
+}
+function renderRestrCompList(){
+  const dl=document.getElementById('restr-comp-list'); if(!dl)return;
+  // compradores conocidos del resumen, si existen
+  let comps=[];
+  try{ comps=[...new Set((RES&&RES.alarmas?RES.alarmas.map(a=>a.comprador):[]).filter(Boolean))]; }catch(e){}
+  comps=[...new Set(comps.concat(RESTR_ADMIN.map(r=>r.comprador)))].filter(Boolean).sort();
+  dl.innerHTML=comps.map(c=>`<option value="${c}">`).join('');
+}
+function renderRestrTabla(){
+  const cont=document.getElementById('restr-tabla'); if(!cont)return;
+  if(!RESTR_ADMIN.length){cont.innerHTML='<span style="color:#6b7a99">Sin claves restringidas. Agrega la primera arriba.</span>';return;}
+  const fFecha=f=>{if(!f)return'—';const p=String(f).slice(0,10).split('-');return p.length>=3?`${p[2]}/${p[1]}/${p[0]}`:String(f);};
+  const filas=RESTR_ADMIN.map(r=>`<tr style="${r.activa?'':'opacity:.5'}">
+    <td style="padding:6px 10px;border-bottom:1px solid #eef;font-weight:600">${r.clave}</td>
+    <td style="padding:6px 10px;border-bottom:1px solid #eef">${r.comprador}</td>
+    <td style="padding:6px 10px;border-bottom:1px solid #eef">${r.motivo||'—'}</td>
+    <td style="padding:6px 10px;border-bottom:1px solid #eef">${r.autorizo||'—'}</td>
+    <td style="padding:6px 10px;border-bottom:1px solid #eef;font-size:11px;color:#6b7a99">${fFecha(r.autorizado_en)}</td>
+    <td style="padding:6px 10px;border-bottom:1px solid #eef">${r.activa?'<span style="background:#fdecea;color:#c0392b;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">🚫 Restringida</span>':'<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">✓ Activa (cuenta)</span>'}</td>
+    <td style="padding:6px 10px;border-bottom:1px solid #eef;white-space:nowrap">
+      <button class="abtn" style="margin:0;padding:4px 10px;font-size:12px;background:${r.activa?'#2e7d32':'#c0392b'}" onclick="toggleRestriccion(${r.id},${r.activa?'false':'true'})">${r.activa?'🔓 Desbloquear':'🚫 Restringir'}</button>
+      <button class="abtn" style="margin:0 0 0 6px;padding:4px 10px;font-size:12px;background:#6b7a99" onclick="eliminarRestriccion(${r.id})">🗑 Quitar</button>
+    </td></tr>`).join('');
+  cont.innerHTML=`<table style="width:100%;border-collapse:collapse;margin-top:6px"><thead><tr style="background:#f8f9fd">
+    <th style="text-align:left;padding:6px 10px;font-size:11px;color:#6b7a99;text-transform:uppercase">Clave</th>
+    <th style="text-align:left;padding:6px 10px;font-size:11px;color:#6b7a99;text-transform:uppercase">Comprador</th>
+    <th style="text-align:left;padding:6px 10px;font-size:11px;color:#6b7a99;text-transform:uppercase">Motivo</th>
+    <th style="text-align:left;padding:6px 10px;font-size:11px;color:#6b7a99;text-transform:uppercase">Autorizó</th>
+    <th style="text-align:left;padding:6px 10px;font-size:11px;color:#6b7a99;text-transform:uppercase">Fecha</th>
+    <th style="text-align:left;padding:6px 10px;font-size:11px;color:#6b7a99;text-transform:uppercase">Estado</th>
+    <th style="text-align:left;padding:6px 10px;font-size:11px;color:#6b7a99;text-transform:uppercase">Acciones</th>
+  </tr></thead><tbody>${filas}</tbody></table>`;
+}
+function limpiarRestrForm(){['restr-clave','restr-comprador','restr-autorizo'].forEach(id=>document.getElementById(id).value='');document.getElementById('restr-motivo').value='Ventas atípicas';document.getElementById('restr-err').textContent='';}
+async function guardarRestriccion(){
+  const err=document.getElementById('restr-err'); err.textContent='';
+  const clave=document.getElementById('restr-clave').value.trim();
+  const comprador=normCompR(document.getElementById('restr-comprador').value);
+  const motivo=document.getElementById('restr-motivo').value;
+  const autorizo=document.getElementById('restr-autorizo').value.trim();
+  if(!clave){err.textContent='Escribe la clave.';return;}
+  if(!comprador){err.textContent='Escribe el comprador.';return;}
+  if(!autorizo){err.textContent='Indica quién autorizó (gerencia).';return;}
+  const btn=document.getElementById('restr-btn'); btn.disabled=true; const t0=btn.textContent; btn.textContent='Guardando…';
+  try{
+    const{error}=await sb.from('claves_restringidas').upsert({clave,comprador,motivo,autorizo,activa:true},{onConflict:'clave,comprador'});
+    if(error)throw error;
+    limpiarRestrForm();
+    await cargarRestriccionesAdmin();
+  }catch(e){ err.textContent='No se pudo guardar: '+e.message; }
+  btn.disabled=false; btn.textContent=t0;
+}
+async function toggleRestriccion(id,activar){
+  try{
+    const{error}=await sb.from('claves_restringidas').update({activa:activar}).eq('id',id);
+    if(error)throw error;
+    await cargarRestriccionesAdmin();
+  }catch(e){ alert('No se pudo actualizar: '+e.message); }
+}
+async function eliminarRestriccion(id){
+  if(!confirm('¿Quitar esta restricción de la lista? (la clave volverá a contar normalmente)'))return;
+  try{
+    const{error}=await sb.from('claves_restringidas').delete().eq('id',id);
+    if(error)throw error;
+    await cargarRestriccionesAdmin();
+  }catch(e){ alert('No se pudo quitar: '+e.message); }
 }
 
 // ═══════════ ADMIN ═══════════
@@ -910,7 +1017,7 @@ async function adminLogin(){
   document.getElementById('adm-open').style.display='block';
   try{ cargarDiasDisponibles(); }catch(e){}
   try{ cargarMotivosAdmin(); }catch(e){}
-  try{ ajustarBotonesResumen(); }catch(e){}
+  try{ cargarRestriccionesAdmin(); }catch(e){}
 }
 function log(msg){const p=document.getElementById('prog');p.style.display='block';p.textContent+=msg+'\n';p.scrollTop=p.scrollHeight;}
 function logClear(){const p=document.getElementById('prog');p.textContent='';p.style.display='block';}
@@ -1122,7 +1229,9 @@ function resolverComprador(r,compsSet,mapaManual){
   return{comp:'SIN ASIGNAR',origen:'ninguno'};
 }
 function computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif,mapaManual){
-  const detR=payload.detR, ufd=payload.detF, uf=ufd[ufd.length-1], primera=ufd[0];
+  // Quitar las filas FALTANTE de claves restringidas (no cuentan al comprador)
+  const _restr=(window.RESTRINGIDAS_SET||new Set());
+  const detR=(_restr.size?payload.detR.filter(r=>!(String(r.estatus||'').toUpperCase()==='FALTANTE'&&_restr.has(String(r.clave).trim()+'||'+String(r.comprador).trim().toUpperCase()))):payload.detR), ufd=payload.detF, uf=ufd[ufd.length-1], primera=ufd[0];
   const mes=uf.slice(0,7);
   const hoyISO=uf;
   // referencia para "nuevos": el día inmediato anterior disponible
@@ -1618,6 +1727,11 @@ async function procesarExcel(file){
     const asgOC=await sb.from('oc_compradores').select('folio,comprador');
     const mapaManual={};if(!asgOC.error&&asgOC.data)asgOC.data.forEach(x=>{mapaManual[String(x.folio).trim()]=x.comprador;});
     log('   '+Object.keys(mapaManual).length+' asignaciones guardadas');
+    // Cargar claves restringidas activas para descontarlas de las alarmas
+    try{const rr=await sb.from('claves_restringidas').select('clave,comprador,activa').eq('activa',true);
+      if(!rr.error&&rr.data){window.RESTRINGIDAS_SET=new Set(rr.data.map(x=>String(x.clave).trim()+'||'+String(x.comprador).trim().toUpperCase()));
+        log('🚫 '+rr.data.length+' claves restringidas aplicadas.');}
+    }catch(e){}
     const res=computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif,mapaManual);
     const pend=window.__OCS_PEND||[];
     const canc=rowsOC.filter(r=>esCancelada(r)).length;
@@ -1972,534 +2086,5 @@ async function reiniciarVisitas(){
 }
 init();
 </script>
-<!-- ══════════ RESUMEN PARA TELEGRAM ══════════ -->
-<style>
-#tg-ov{position:fixed;inset:0;background:rgba(15,23,42,.6);display:none;align-items:flex-start;justify-content:center;z-index:9999;overflow:auto;padding:24px 12px}
-#tg-ov.on{display:flex}
-#tg-box{background:#fff;border-radius:12px;max-width:940px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);color:#1a2035}
-#tg-box header{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid #e2e6ed;flex-wrap:wrap}
-#tg-box h2{font-size:15px;color:#1e3a5f}
-#tg-body{display:grid;grid-template-columns:270px 1fr;gap:16px;padding:16px 18px}
-@media(max-width:720px){#tg-body{grid-template-columns:1fr}}
-#tg-opts label{display:block;font-size:11px;font-weight:600;color:#475569;margin:10px 0 4px}
-#tg-opts input[type=text],#tg-opts input[type=time],#tg-opts input[type=number],#tg-opts select{width:100%;padding:5px 8px;border:1.5px solid #c9d4f0;border-radius:6px;font-size:12px;font-family:inherit}
-#tg-opts .chk{display:flex;align-items:center;gap:6px;font-weight:500;font-size:12px;margin:6px 0}
-#tg-opts .fechas{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-#tg-handles{max-height:200px;overflow:auto;border:1px solid #e2e6ed;border-radius:6px;padding:6px}
-#tg-handles div{display:flex;align-items:center;gap:6px;margin:3px 0}
-#tg-handles span{font-size:10.5px;flex:0 0 96px;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#tg-handles input{flex:1;padding:3px 6px!important;font-size:11px!important}
-#tg-txt{width:100%;min-height:460px;border:1.5px solid #c9d4f0;border-radius:8px;padding:10px 12px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;line-height:1.45;resize:vertical;color:#1a2035}
-#tg-foot{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
-.tg-btn{padding:8px 16px;border:none;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
-.tg-x{background:#f0f4ff;border:1px solid #c9d4f0;color:#1e3a5f;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit}
-</style>
-
-<div id="tg-ov" onclick="if(event.target===this)closeTg()">
-  <div id="tg-box">
-    <header>
-      <h2>📲 Resumen para Telegram</h2>
-      <span id="tg-rng" style="background:#e8f0fe;color:#1e3a5f;border-radius:6px;padding:3px 9px;font-size:11px;font-weight:700"></span>
-      <span id="tg-st" style="font-size:11px;color:#6b7a99"></span>
-      <button class="tg-x" style="margin-left:auto" onclick="closeTg()">✕ Cerrar</button>
-    </header>
-    <div id="tg-body">
-      <div id="tg-opts">
-        <div class="fechas">
-          <div><label>📅 Día A (anterior)</label><select id="tg-a" onchange="tgCargar()"></select></div>
-          <div><label>📅 Día B (cierre)</label><select id="tg-b" onchange="tgCargar()"></select></div>
-        </div>
-        <label>⏰ Hora límite para fecha compromiso</label>
-        <input type="time" id="tg-hora" value="12:00" oninput="tgSave();genTg()">
-        <label>🔗 Link al portal</label>
-        <input type="text" id="tg-link" placeholder="https://..." oninput="tgSave();genTg()">
-        <label>⏳ Alertar claves con al menos N días en faltante</label>
-        <input type="number" id="tg-dias" min="2" value="7" oninput="tgSave();genTg()">
-        <label>Opciones</label>
-        <div class="chk"><input type="checkbox" id="tg-media" checked onchange="tgSave();genTg()"> Listar claves nuevas de MEDIA</div>
-        <div class="chk"><input type="checkbox" id="tg-lenta" onchange="tgSave();genTg()"> Listar claves nuevas de LENTA / otras</div>
-        <div class="chk"><input type="checkbox" id="tg-negritas" checked onchange="tgSave();genTg()"> Negritas (**texto**)</div>
-        <div class="chk"><input type="checkbox" id="tg-coment" checked onchange="tgSave();genTg()"> Incluir comentarios de seguimiento</div>
-        <label>🚚 Avisar llegadas que vencen en N días o menos</label>
-        <input type="number" id="tg-aviso" min="0" value="2" oninput="tgSave();genTg()">
-        <label>👤 Usuario de Telegram por comprador <span style="font-weight:400;color:#6b7a99">(opcional, ej. @leonela_c)</span></label>
-        <div id="tg-handles"></div>
-        <p style="font-size:10.5px;color:#6b7a99;margin-top:6px">Usuarios y opciones se guardan en este navegador.</p>
-      </div>
-      <div>
-        <textarea id="tg-txt" spellcheck="false">Cargando…</textarea>
-        <div id="tg-foot">
-          <button class="tg-btn" style="background:#229ED9;color:#fff" onclick="copyTg()">📋 Copiar resumen</button>
-          <span id="tg-msg" style="font-size:12px;color:#2e7d32;font-weight:600"></span>
-          <span id="tg-len" style="margin-left:auto;font-size:11px;color:#6b7a99"></span>
-        </div>
-        <p style="font-size:10.5px;color:#6b7a99;margin-top:6px">Puedes editar el texto antes de copiarlo. Los datos salen de la base del portal (detalle diario).</p>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
-// ── RESUMEN TELEGRAM (lee de Supabase: dias_cargados, detalle_diario, datasets.resumen) ──
-const TG_KEY='tgResumenCfg_v1';
-const TG_DIAS=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-const TG_MES=['','ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-const TG_EXCL=['PRODUCCION'];
-let TG={fechas:[],totalByDay:{},nuevas:[],resInv:[],resDesc:[],faltB:[],dias:{},fA:null,fB:null,comps:[]};
-
-function tgLoad(){try{return JSON.parse(localStorage.getItem(TG_KEY)||'{}')||{};}catch(e){return{};}}
-function tgV(id){return document.getElementById(id)?.value||'';}
-function tgC(id){return !!document.getElementById(id)?.checked;}
-function tgHandles(){const h={};document.querySelectorAll('#tg-handles input').forEach(i=>{if(i.value.trim())h[i.dataset.c]=i.value.trim();});return h;}
-function tgSave(){
-  const cfg={hora:tgV('tg-hora'),link:tgV('tg-link'),dias:tgV('tg-dias'),aviso:tgV('tg-aviso'),coment:tgC('tg-coment'),media:tgC('tg-media'),lenta:tgC('tg-lenta'),negritas:tgC('tg-negritas'),handles:{...(tgLoad().handles||{}),...tgHandles()}};
-  document.querySelectorAll('#tg-handles input').forEach(i=>{if(!i.value.trim())delete cfg.handles[i.dataset.c];});
-  try{localStorage.setItem(TG_KEY,JSON.stringify(cfg));}catch(e){}
-}
-function tgFecha(f){const d=new Date(f+'T12:00:00');return `${TG_DIAS[d.getDay()]} ${d.getDate()}/${TG_MES[d.getMonth()+1]}`;}
-function tgDMY(f){return f?f.split('-').reverse().join('/'):'';}
-function tgNombre(w){return w.charAt(0)+w.slice(1).toLowerCase();}
-function tgCorto2(c){return c==='FRANCISCO JAVIER'?'Fco. Javier':tgNombre(String(c).split(' ')[0]);}
-function tgWho(c,h){const u=(h[c]||'').trim();if(!u)return tgCorto2(c);return u.startsWith('@')?u:'@'+u;}
-function tgRank(m){m=String(m||'').toUpperCase();if(m.includes('SAGRADO'))return 0;if(m.includes('ALTA'))return 1;if(m.includes('MEDIA'))return 2;if(m.includes('LENTA'))return 3;return 4;}
-function tgCorto(n,max){n=String(n||'').replace(/\s+/g,' ').trim();return n.length>max?n.slice(0,max-1).trim()+'…':n;}
-function tgEsFalt(r){return String(r.estatus||'').trim().toUpperCase()==='FALTANTE';}
-function tgComp(r){return String(r.comprador||'').trim().toUpperCase();}
-
-// Lee todas las páginas de una consulta de Supabase
-async function tgPaginar(build){
-  const PAGE=1000;let i=0,out=[];
-  while(true){
-    const q=build().range(i,i+PAGE-1);
-    const {data,error}=await (typeof conTimeout==='function'?conTimeout(q,20000,'leer detalle'):q);
-    if(error)throw new Error(error.message);
-    if(!data||!data.length)break;
-    out=out.concat(data);
-    i+=data.length;   // avanza lo que realmente llegó (Supabase puede limitar a menos de 1000 por página)
-    if(i>200000)break;
-  }
-  return out;
-}
-
-async function openTg(){
-  const cfg=tgLoad();
-  if(cfg.hora)document.getElementById('tg-hora').value=cfg.hora;
-  document.getElementById('tg-link').value=cfg.link||location.href.split('#')[0].split('?')[0];
-  if(cfg.dias)document.getElementById('tg-dias').value=cfg.dias;
-  if('media' in cfg)document.getElementById('tg-media').checked=cfg.media;
-  if('lenta' in cfg)document.getElementById('tg-lenta').checked=cfg.lenta;
-  if('negritas' in cfg)document.getElementById('tg-negritas').checked=cfg.negritas;
-  if('coment' in cfg)document.getElementById('tg-coment').checked=cfg.coment;
-  if(cfg.aviso!=null&&cfg.aviso!=='')document.getElementById('tg-aviso').value=cfg.aviso;
-  document.getElementById('tg-ov').classList.add('on');
-  document.getElementById('tg-msg').textContent='';
-  document.getElementById('tg-txt').value='Cargando fechas…';
-  try{
-    TG.fechas=[];await tgFechas();
-    if(TG.fechas.length<2)throw new Error('La base necesita al menos 2 días cargados.');
-    const opts=[...TG.fechas].reverse().map(f=>`<option value="${f}">${tgDMY(f)}</option>`).join('');
-    const sa=document.getElementById('tg-a'),sbb=document.getElementById('tg-b');
-    sa.innerHTML=opts;sbb.innerHTML=opts;
-    sbb.value=TG.fechas[TG.fechas.length-1];sa.value=TG.fechas[TG.fechas.length-2];
-    await tgCargar();
-  }catch(e){document.getElementById('tg-txt').value='❌ No se pudo leer la base: '+e.message;}
-}
-function closeTg(){document.getElementById('tg-ov').classList.remove('on');}
-
-// Carga fechas disponibles y totales (una vez)
-async function tgFechas(){
-  if(TG.fechas&&TG.fechas.length)return;
-  const [dd,rs]=await Promise.all([
-    sb.from('dias_cargados').select('fecha').order('fecha',{ascending:true}),
-    sb.from('datasets').select('payload').eq('clave','resumen').maybeSingle()
-  ]);
-  if(dd.error)throw new Error(dd.error.message);
-  TG.fechas=(dd.data||[]).map(x=>String(x.fecha).slice(0,10));
-  TG.totalByDay=(rs.data&&rs.data.payload&&rs.data.payload.totalByDay)||(RES&&RES.resumen&&RES.resumen.totalByDay)||{};
-}
-
-// Lee faltantes de A y B + historial, calcula nuevas/resueltas y días en faltante
-async function tgDatos(fA,fB){
-  const cols='fecha,clave,nombre,marca,comprador,rotacion,estatus';
-  const d0=new Date(fB+'T12:00:00');d0.setDate(d0.getDate()-60);
-  const desde=d0.toISOString().slice(0,10)<fA?d0.toISOString().slice(0,10):fA;
-  // Día A y Día B por separado, con orden estable para que la paginación no salte filas
-  const leerDia=f=>tgPaginar(()=>sb.from('detalle_diario').select(cols).eq('fecha',f).ilike('estatus','faltante').order('clave',{ascending:true}));
-  const [rowsA,rowsB]=await Promise.all([leerDia(fA),leerDia(fB)]);
-  const hist=await tgPaginar(()=>sb.from('detalle_diario').select('fecha,clave,comprador').ilike('estatus','faltante').gte('fecha',desde).lt('fecha',fA).order('fecha',{ascending:true}).order('clave',{ascending:true}));
-  const falt=[...hist,...rowsA,...rowsB].filter(r=>!TG_EXCL.includes(tgComp(r)));
-  const porFecha={};falt.forEach(r=>{const f=String(r.fecha).slice(0,10);(porFecha[f]=porFecha[f]||new Map()).set(String(r.clave).trim(),r);});
-  const mA=porFecha[fA]||new Map(),mB=porFecha[fB]||new Map();
-  const nuevas=[...mB.entries()].filter(([k])=>!mA.has(k)).map(([,r])=>r);
-  const resueltas=[...mA.entries()].filter(([k])=>!mB.has(k)).map(([,r])=>r);
-  const enB=new Set();const claves=resueltas.map(r=>String(r.clave).trim());
-  for(let i=0;i<claves.length;i+=200){
-    const {data,error}=await sb.from('detalle_diario').select('clave').eq('fecha',fB).in('clave',claves.slice(i,i+200));
-    if(error)throw new Error(error.message);
-    (data||[]).forEach(x=>enB.add(String(x.clave).trim()));
-  }
-  // Días calendario en faltante (racha continua hasta B) y fecha en que empezó la racha
-  const fechasHasta=TG.fechas.filter(f=>f>=desde&&f<=fB);
-  const dias={},inicio={};
-  mB.forEach((r,cl)=>{
-    let i=fechasHasta.length-1;while(i>0&&porFecha[fechasHasta[i-1]]?.has(cl))i--;
-    const n=Math.round((new Date(fB+'T12:00:00')-new Date(fechasHasta[i]+'T12:00:00'))/864e5)+1;
-    const abierto=(i===0&&fechasHasta.length>1);
-    dias[cl]=abierto?n+'+':n;
-    inicio[cl]=abierto?null:fechasHasta[i];   // null = empezó antes del rango leído
-  });
-  return {fA,fB,nuevas,resInv:resueltas.filter(r=>enB.has(String(r.clave).trim())),resDesc:resueltas.filter(r=>!enB.has(String(r.clave).trim())),
-    faltB:[...mB.values()],dias,inicio,nA:mA.size,nB:mB.size,comps:[...new Set(falt.map(tgComp))].filter(Boolean),
-    countByDay:Object.fromEntries(Object.entries(porFecha).map(([f,m])=>[f,m.size]))};
-}
-
-async function tgCargar(){
-  const fA=tgV('tg-a'),fB=tgV('tg-b'),st=document.getElementById('tg-st'),ta=document.getElementById('tg-txt');
-  if(!fA||!fB)return;
-  if(fA>=fB){ta.value='⚠️ El Día A debe ser anterior al Día B.';return;}
-  ta.value='Leyendo detalle del '+tgDMY(fA)+' y '+tgDMY(fB)+'…';st.textContent='⏳ leyendo base…';
-  try{
-    const D=await tgDatos(fA,fB);
-    const S=await segLeer(D.faltB.map(r=>String(r.clave).trim()),D.inicio);
-    TG={...TG,...D,seg:S.actual,segErr:S.err};
-    const cfgH=tgLoad().handles||{};
-    const comps=[...new Set([...D.comps,...Object.keys(cfgH)])].filter(Boolean).sort();
-    document.getElementById('tg-handles').innerHTML=comps.map(c=>`<div><span title="${c}">${tgCorto2(c)}</span><input type="text" data-c="${c}" value="${String(cfgH[c]||'').replace(/"/g,'&quot;')}" placeholder="@usuario" oninput="tgSave();genTg()"></div>`).join('');
-    st.textContent=`Faltantes leídos: ${tgDMY(fA).slice(0,5)} = ${D.nA} · ${tgDMY(fB).slice(0,5)} = ${D.nB}`+(S.err?' · ⚠️ seguimiento: '+S.err:` · con fecha de llegada: ${Object.keys(S.actual).length}`);
-    genTg();
-  }catch(e){st.textContent='';ta.value='❌ Error leyendo la base: '+e.message+'\n\nSi dice algo de permisos o sesión, sal y vuelve a entrar como Admin.';}
-}
-
-function tgTotal(f){if(TG.totalByDay&&TG.totalByDay[f]!=null)return TG.totalByDay[f];return (TG.countByDay&&TG.countByDay[f])||0;}
-function tgDelta(a,b){const d=b-a;return d>0?`▲${d}`:d<0?`▼${Math.abs(d)}`:'= sin cambio';}
-
-function genTg(){
-  try{genTg2();}catch(e){document.getElementById('tg-txt').value='❌ Error al armar el resumen: '+e.message;console.error(e);}
-}
-function genTg2(){
-  const {fA,fB,nuevas,resInv,resDesc,faltB,dias}=TG;
-  if(!fA||!fB)return;
-  const h=tgHandles();
-  const B=tgC('tg-negritas')?(s=>`**${s}**`):(s=>s);
-  const minDias=Math.max(2,parseInt(tgV('tg-dias'))||7);
-  const L=[];
-
-  // Encabezado y tendencia
-  const tB=tgTotal(fB),tA=tgTotal(fA);
-  const d7=new Date(fB+'T12:00:00');d7.setDate(d7.getDate()-7);const f7=d7.toISOString().slice(0,10);
-  const fechasTot=Object.keys(TG.totalByDay||{}).sort();
-  const fSem=[...(fechasTot.length?fechasTot:TG.fechas)].reverse().find(f=>f<=f7);
-  let tend=`vs ${tgDMY(fA).slice(0,5)}: ${tgDelta(tA,tB)}`;
-  if(fSem)tend+=` | vs hace 1 semana: ${tgDelta(tgTotal(fSem),tB)}`;
-  L.push(`📊 ${B('CIERRE '+tgFecha(fB).toUpperCase()+' — FALTANTES')}`);
-  L.push(`Total en faltante: ${B(String(tB))} (${tend})`);
-  // Resueltos = igual que "Resueltas c/Inventario" del Comparativo (faltante en A, sigue en B con otro estatus)
-  const nRes=resInv.length;
-  L.push(`🆕 Nuevos: ${nuevas.length}   ✅ Resueltos c/inventario: ${nRes}`);
-
-  const grp=rows=>{const m={};rows.forEach(r=>{const c=tgComp(r);(m[c]=m[c]||[]).push(r);});return Object.entries(m).sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0]));};
-  const seg=TG.seg||{}, aviso=Math.max(0,parseInt(tgV('tg-aviso'))||0), conCom=tgC('tg-coment');
-  const est=cl=>segEstado(seg[cl],aviso);
-  // Texto de fecha de llegada para una clave (sinFecha=true: marca las que no tienen fecha)
-  const eta=(r,sinFecha)=>{const cl=String(r.clave).trim(),s=seg[cl],e=est(cl);
-    let t='';
-    if(e==='VENCIDA')t=` ⚠️ llegada vencida ${segFmt(s.fecha_llegada)}`;
-    else if(e==='PROXIMA')t=` 🚚 llega ${segFmt(s.fecha_llegada)}`;
-    else if(e==='EN_TIEMPO')t=` 📅 llega ${segFmt(s.fecha_llegada)}`;
-    else if(sinFecha)t=' ❓ sin fecha';
-    if(conCom&&s&&s.comentario)t+=` — "${tgCorto(s.comentario,45)}"`;
-    return t;};
-  const linea=r=>{const d=dias[String(r.clave).trim()];return `${r.clave} ${tgCorto(r.nombre,38)}${parseInt(d)>1?` (${d}d)`:''}${eta(r,false)}`;};
-  const criticas=nuevas.filter(r=>tgRank(r.rotacion)<=1);
-  const media=nuevas.filter(r=>tgRank(r.rotacion)===2);
-  const otras=nuevas.filter(r=>tgRank(r.rotacion)>=3);
-
-  if(criticas.length){
-    L.push('');L.push(`🔴 ${B('ALTA / SAGRADOS — atender hoy')}`);
-    grp(criticas).forEach(([c,rs])=>rs.forEach(r=>L.push(`• ${tgWho(c,h)} – ${linea(r)}${tgRank(r.rotacion)===0?' [SAGRADO]':''}`)));
-  }
-  // Fechas de llegada vencidas o próximas (cualquier rotación, claves que siguen en faltante)
-  const conEta=faltB.filter(r=>['VENCIDA','PROXIMA'].includes(est(String(r.clave).trim())));
-  const etaSet=new Set(conEta.map(r=>String(r.clave).trim()));
-  const fechaEta=r=>String(seg[String(r.clave).trim()].fecha_llegada);
-  const lineaEta=r=>{const cl=String(r.clave).trim(),s=seg[cl];return `${r.clave} ${tgCorto(r.nombre,34)} (${dias[cl]}d) → ${est(cl)==='VENCIDA'?'venció':'llega'} ${segFmt(s.fecha_llegada)}${conCom&&s.comentario?` — "${tgCorto(s.comentario,45)}"`:''}`;};
-  const venc=conEta.filter(r=>est(String(r.clave).trim())==='VENCIDA').sort((a,b)=>fechaEta(a).localeCompare(fechaEta(b)));
-  const prox=conEta.filter(r=>est(String(r.clave).trim())==='PROXIMA').sort((a,b)=>fechaEta(a).localeCompare(fechaEta(b)));
-  if(venc.length){
-    L.push('');L.push(`🚨 ${B('Fecha de llegada VENCIDA y siguen en faltante')}`);
-    venc.forEach(r=>L.push(`• ${tgWho(tgComp(r),h)} – ${lineaEta(r)}`));
-  }
-  if(prox.length){
-    L.push('');L.push(`🚚 ${B(aviso===0?'Llegan hoy':`Llegan en los próximos ${aviso} días`)}`);
-    prox.forEach(r=>L.push(`• ${tgWho(tgComp(r),h)} – ${lineaEta(r)}`));
-  }
-  const bloque=(titulo,rows,listar)=>{
-    if(!rows.length)return;
-    L.push('');L.push(titulo);
-    grp(rows).forEach(([c,rs])=>{
-      if(listar){
-        if(rs.length===1)L.push(`• ${tgWho(c,h)} – ${linea(rs[0])}`);
-        else{L.push(`• ${tgWho(c,h)} (${rs.length}):`);rs.forEach(r=>L.push(`   – ${linea(r)}`));}
-      }else L.push(`• ${tgWho(c,h)}: ${rs.length} clave${rs.length>1?'s':''}`);
-    });
-  };
-  bloque(`🟡 ${B('MEDIA — nuevos')}`,media,tgC('tg-media'));
-  bloque(`⚪ ${B('LENTA / otras — nuevos')}`,otras,tgC('tg-lenta'));
-  if(!nuevas.length){L.push('');L.push('🎉 No hubo faltantes nuevos.');}
-
-  // ALTA/SAGRADOS que ya llevan muchos días en faltante
-  const nSet=new Set(nuevas.map(r=>String(r.clave).trim()));
-  const dd=r=>parseInt(dias[String(r.clave).trim()]||0);
-  const viejas=faltB.filter(r=>!nSet.has(String(r.clave).trim())&&!etaSet.has(String(r.clave).trim())&&tgRank(r.rotacion)<=1&&dd(r)>=minDias).sort((a,b)=>dd(b)-dd(a));
-  if(viejas.length){
-    L.push('');L.push(`⏳ ${B(`ALTA / SAGRADOS con ${minDias}+ días en faltante`)}`);
-    const top=viejas.slice(0,10);
-    top.forEach(r=>L.push(`• ${tgWho(tgComp(r),h)} – ${r.clave} ${tgCorto(r.nombre,34)} (${dias[String(r.clave).trim()]}d)${eta(r,true)}`));
-    if(viejas.length>top.length)L.push(`   …y ${viejas.length-top.length} más (ver portal)`);
-  }
-
-  // Resueltos con reconocimiento
-  if(nRes){
-    const m={};resInv.forEach(r=>{const c=tgComp(r);m[c]=(m[c]||0)+1;});
-    L.push('');L.push(`✅ ${B('Resueltos:')} ${Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`${tgCorto2(c)} (${n})`).join(', ')}. ¡Gracias!`);
-  }
-  if(resDesc.length){
-    L.push('');L.push(`🔄 Salieron de faltante por reclasificación/descontinuación: ${resDesc.length} clave${resDesc.length>1?'s':''}`);
-  }
-
-  // Llamado a la acción
-  if(criticas.length||media.length||viejas.length||venc.length){
-    const [hh,mm]=(tgV('tg-hora')||'12:00').split(':');const hN=+hh;
-    const hr=`${((hN+11)%12)+1}:${mm} ${hN<12?'a.m.':'p.m.'}`;
-    L.push('');L.push(`⏰ Favor de responder con ${B('fecha compromiso')} de sus claves antes de las ${hr}`+(venc.length?`, y ${B('nueva fecha')} para las vencidas.`:''));
-  }
-  const link=tgV('tg-link').trim();if(link)L.push(`🔗 Detalle: ${link}`);
-
-  const txt=L.join('\n');
-  document.getElementById('tg-txt').value=txt;
-  document.getElementById('tg-rng').textContent=`${tgDMY(fA)} → ${tgDMY(fB)}`;
-  const n=txt.length,el=document.getElementById('tg-len');
-  el.textContent=`${n.toLocaleString()} / 4,096 caracteres`+(n>4096?' — ⚠️ Telegram lo cortará, desmarca opciones':'');
-  el.style.color=n>4096?'#c0392b':'#6b7a99';
-}
-
-async function copyTg(){
-  const ta=document.getElementById('tg-txt'),msg=document.getElementById('tg-msg');
-  try{await navigator.clipboard.writeText(ta.value);}catch(e){ta.select();document.execCommand('copy');}
-  msg.textContent='✓ Copiado. Pégalo en el grupo de Compradores.';
-  setTimeout(()=>{msg.textContent='';},3500);
-}
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('tg-ov')?.classList.contains('on'))closeTg();});
-</script>
-<!-- ══════════ /RESUMEN PARA TELEGRAM ══════════ -->
-
-<!-- ══════════ SEGUIMIENTO DE FALTANTES (fechas de llegada) ══════════ -->
-<style>
-#sg-ov{position:fixed;inset:0;background:rgba(15,23,42,.6);display:none;align-items:flex-start;justify-content:center;z-index:9998;overflow:auto;padding:20px 10px}
-#sg-ov.on{display:flex}
-#sg-box{background:#fff;border-radius:12px;max-width:1280px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);color:#1a2035}
-#sg-box header{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid #e2e6ed;flex-wrap:wrap}
-#sg-box h2{font-size:15px;color:#1e3a5f}
-#sg-flt{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:12px 18px;background:#f5f6fa;border-bottom:1px solid #e2e6ed}
-#sg-flt label{display:block;font-size:10.5px;font-weight:600;color:#475569;margin-bottom:3px}
-#sg-flt select,#sg-flt input{padding:5px 8px;border:1.5px solid #c9d4f0;border-radius:6px;font-size:12px;font-family:inherit}
-.sg-kpis{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
-.sg-k{border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid transparent}
-.sg-k.on{border-color:#1e3a5f}
-#sg-wrap{max-height:calc(100vh - 230px);overflow:auto;padding:0 18px 16px}
-#sg-tbl{width:100%;border-collapse:collapse;font-size:11.5px}
-#sg-tbl th{position:sticky;top:0;background:#fff;text-align:left;padding:8px 6px;font-size:10px;color:#475569;text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid #e2e6ed;z-index:1}
-#sg-tbl td{padding:5px 6px;border-bottom:1px solid #eef1f6;vertical-align:middle}
-#sg-tbl tr.sg-dirty td{background:#fffbea}
-#sg-tbl input[type=date]{padding:3px 5px;border:1.5px solid #c9d4f0;border-radius:5px;font-size:11.5px;font-family:inherit}
-#sg-tbl input[type=text]{width:100%;min-width:180px;padding:4px 6px;border:1.5px solid #c9d4f0;border-radius:5px;font-size:11.5px;font-family:inherit}
-.sg-chip{display:inline-block;border-radius:10px;padding:2px 8px;font-size:10px;font-weight:700;white-space:nowrap}
-.sg-VENCIDA{background:#fde2e0;color:#b42318}.sg-PROXIMA{background:#fff1d6;color:#9a5b00}.sg-EN_TIEMPO{background:#e3f2e6;color:#1f6f3a}.sg-SIN_FECHA{background:#eef1f6;color:#64748b}
-.sg-rot{font-size:10px;font-weight:700}
-.sg-save{background:#1c4587;color:#fff;border:none;border-radius:5px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
-.sg-save:disabled{background:#c9d4f0;cursor:default}
-.sg-hist{font-size:10px;color:#6b7a99;cursor:help;text-decoration:underline dotted}
-</style>
-
-<div id="sg-ov" onclick="if(event.target===this)closeSeg()">
-  <div id="sg-box">
-    <header>
-      <h2>📝 Seguimiento de faltantes — fechas de llegada</h2>
-      <span id="sg-st" style="font-size:11px;color:#6b7a99"></span>
-      <button class="tg-x" style="margin-left:auto" onclick="closeSeg()">✕ Cerrar</button>
-    </header>
-    <div id="sg-flt">
-      <div><label>👤 Comprador</label><select id="sg-comp" onchange="renderSeg()"><option value="">Todos</option></select></div>
-      <div><label>📂 Rotación</label><select id="sg-rot" onchange="renderSeg()"><option value="">Todas</option><option value="AS">Alta / Sagrados</option><option value="MEDIA">Media</option><option value="OTRAS">Lenta / otras</option></select></div>
-      <div><label>🔍 Buscar clave / nombre</label><input id="sg-q" type="text" placeholder="Ej: 47868" oninput="renderSeg()" style="width:180px"></div>
-      <div class="sg-kpis" id="sg-kpis"></div>
-      <button class="sg-save" style="background:#1e7a4a;padding:6px 12px;font-size:12px" onclick="segExcel()">⬇ Descargar Excel</button>
-    </div>
-    <div id="sg-wrap">
-      <table id="sg-tbl">
-        <thead><tr><th>Estado</th><th>Clave</th><th>Nombre</th><th>Comprador</th><th>Rot.</th><th>Días</th><th>Fecha llegada</th><th style="width:34%">Comentario</th><th></th></tr></thead>
-        <tbody id="sg-body"><tr><td colspan="9" style="padding:30px;text-align:center;color:#6b7a99">Cargando…</td></tr></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<script>
-// ── SEGUIMIENTO: tabla Supabase "seguimiento_faltantes" (un registro por captura; el más reciente es el vigente) ──
-const SEG_TABLA='seguimiento_faltantes';
-let SEG={rows:[],seg:{},hist:{},estado:'',fB:null,inicio:{}};
-
-function segHoy(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
-function segFmt(f){if(!f)return'';const[y,m,d]=String(f).slice(0,10).split('-');return `${+d}/${TG_MES[+m]}`;}
-// VENCIDA: la fecha ya pasó · PROXIMA: vence hoy o en los próximos N días · EN_TIEMPO: más adelante · SIN_FECHA
-function segEstado(s,aviso){
-  if(!s||!s.fecha_llegada)return'SIN_FECHA';
-  const hoy=new Date(segHoy()+'T12:00:00'),f=new Date(String(s.fecha_llegada).slice(0,10)+'T12:00:00');
-  const d=Math.round((f-hoy)/864e5);
-  if(d<0)return'VENCIDA';
-  if(d<=(aviso==null?2:aviso))return'PROXIMA';
-  return'EN_TIEMPO';
-}
-const SEG_LBL={VENCIDA:'⚠️ Vencida',PROXIMA:'🚚 Por llegar',EN_TIEMPO:'📅 En tiempo',SIN_FECHA:'❓ Sin fecha'};
-
-// Lee el seguimiento de una lista de claves. Solo toma capturas hechas DESDE que empezó el faltante actual
-// (si la clave se resolvió y volvió a caer, la fecha vieja ya no cuenta).
-async function segLeer(claves,inicio){
-  const actual={},hist={};
-  try{
-    for(let i=0;i<claves.length;i+=200){
-      const {data,error}=await sb.from(SEG_TABLA).select('id,clave,fecha_llegada,comentario,creado_por,creado_en').in('clave',claves.slice(i,i+200)).order('creado_en',{ascending:false});
-      if(error)throw new Error(error.message);
-      (data||[]).forEach(x=>{
-        const cl=String(x.clave).trim(),ini=inicio&&inicio[cl];
-        if(ini&&String(x.creado_en).slice(0,10)<ini)return;
-        (hist[cl]=hist[cl]||[]).push(x);
-        if(!actual[cl])actual[cl]=x;
-      });
-    }
-    return {actual,hist,err:null};
-  }catch(e){
-    const m=String(e.message||e);
-    return {actual:{},hist:{},err:/does not exist|relation|schema cache/i.test(m)?'falta crear la tabla '+SEG_TABLA+' en Supabase':m};
-  }
-}
-
-async function openSeg(){
-  document.getElementById('sg-ov').classList.add('on');
-  const st=document.getElementById('sg-st'),body=document.getElementById('sg-body');
-  body.innerHTML='<tr><td colspan="9" style="padding:30px;text-align:center;color:#6b7a99">⏳ Leyendo faltantes del último día cargado…</td></tr>';
-  try{
-    TG.fechas=[];await tgFechas();
-    if(TG.fechas.length<2)throw new Error('La base necesita al menos 2 días cargados.');
-    const fB=TG.fechas[TG.fechas.length-1],fA=TG.fechas[TG.fechas.length-2];
-    const D=await tgDatos(fA,fB);
-    const S=await segLeer(D.faltB.map(r=>String(r.clave).trim()),D.inicio);
-    SEG={...SEG,rows:D.faltB,dias:D.dias,inicio:D.inicio,seg:S.actual,hist:S.hist,fB,err:S.err};
-    const sc=document.getElementById('sg-comp'),prev=sc.value;
-    sc.innerHTML='<option value="">Todos</option>'+[...new Set(D.faltB.map(tgComp))].sort().map(c=>`<option value="${c}">${c}</option>`).join('');
-    sc.value=prev;
-    st.textContent=`Faltantes al ${tgDMY(fB)}: ${D.faltB.length} claves`;
-    if(S.err){st.innerHTML+=` · <b style="color:#b42318">⚠️ ${S.err}</b>`;}
-    renderSeg();
-  }catch(e){body.innerHTML=`<tr><td colspan="9" style="padding:30px;text-align:center;color:#b42318">❌ ${e.message}</td></tr>`;}
-}
-function closeSeg(){
-  if(document.querySelector('#sg-tbl tr.sg-dirty')&&!confirm('Tienes cambios sin guardar. ¿Cerrar de todos modos?'))return;
-  document.getElementById('sg-ov').classList.remove('on');
-}
-function segFiltro(e){SEG.estado=SEG.estado===e?'':e;renderSeg();}
-function segEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
-
-function renderSeg(){
-  const comp=tgV('sg-comp'),rot=tgV('sg-rot'),q=tgV('sg-q').toLowerCase().trim();
-  const est=r=>segEstado(SEG.seg[String(r.clave).trim()],2);
-  let rows=SEG.rows.filter(r=>{
-    if(comp&&tgComp(r)!==comp)return false;
-    const k=tgRank(r.rotacion);
-    if(rot==='AS'&&k>1)return false;if(rot==='MEDIA'&&k!==2)return false;if(rot==='OTRAS'&&k<3)return false;
-    if(q&&!(String(r.clave).toLowerCase().includes(q)||String(r.nombre||'').toLowerCase().includes(q)))return false;
-    return true;
-  });
-  // KPIs por estado (sobre el filtro actual, sin el filtro de estado)
-  const cnt={VENCIDA:0,PROXIMA:0,EN_TIEMPO:0,SIN_FECHA:0};rows.forEach(r=>cnt[est(r)]++);
-  document.getElementById('sg-kpis').innerHTML=Object.keys(cnt).map(e=>`<span class="sg-k sg-${e}${SEG.estado===e?' on':''}" onclick="segFiltro('${e}')">${SEG_LBL[e]}: ${cnt[e]}</span>`).join('');
-  if(SEG.estado)rows=rows.filter(r=>est(r)===SEG.estado);
-  SEG.vista=rows;
-  const ORD={VENCIDA:0,PROXIMA:1,SIN_FECHA:2,EN_TIEMPO:3};
-  const dd=r=>parseInt(SEG.dias[String(r.clave).trim()]||0);
-  rows.sort((a,b)=>ORD[est(a)]-ORD[est(b)]||tgRank(a.rotacion)-tgRank(b.rotacion)||dd(b)-dd(a));
-  const RC=['#7b68c8','#c0582a','#b8952a','#3a9688','#64748b'],RL=['SAGR','ALTA','MEDIA','LENTA','OTRA'];
-  const body=document.getElementById('sg-body');
-  if(!rows.length){body.innerHTML='<tr><td colspan="9" style="padding:30px;text-align:center;color:#6b7a99">Sin claves con este filtro</td></tr>';return;}
-  body.innerHTML=rows.map(r=>{
-    const cl=String(r.clave).trim(),s=SEG.seg[cl]||{},e=est(r),k=tgRank(r.rotacion),hs=SEG.hist[cl]||[];
-    const tip=hs.map(x=>`${String(x.creado_en).slice(0,10).split('-').reverse().join('/')}: ${x.fecha_llegada?'llega '+segFmt(x.fecha_llegada):'sin fecha'}${x.comentario?' — '+x.comentario:''}`).join('\n');
-    return `<tr data-c="${segEsc(cl)}" data-comp="${segEsc(tgComp(r))}" data-nom="${segEsc(r.nombre)}">
-      <td><span class="sg-chip sg-${e}">${SEG_LBL[e]}</span></td>
-      <td><b>${segEsc(cl)}</b></td>
-      <td>${segEsc(r.nombre)}</td>
-      <td>${segEsc(tgCorto2(tgComp(r)))}</td>
-      <td class="sg-rot" style="color:${RC[k]}">${RL[k]}</td>
-      <td>${segEsc(SEG.dias[cl]||'')}</td>
-      <td><input type="date" value="${s.fecha_llegada?String(s.fecha_llegada).slice(0,10):''}" oninput="segDirty(this)"></td>
-      <td><input type="text" value="${segEsc(s.comentario||'')}" placeholder="Ej: proveedor confirma embarque martes" oninput="segDirty(this)" onkeydown="if(event.key==='Enter')segGuardar(this)"></td>
-      <td style="white-space:nowrap"><button class="sg-save" disabled onclick="segGuardar(this)">💾 Guardar</button>${hs.length?` <span class="sg-hist" title="${segEsc(tip)}">${hs.length} reg.</span>`:''}</td>
-    </tr>`;
-  }).join('');
-}
-// Descarga a Excel lo que se ve en pantalla (respeta filtros) + hoja con el historial de capturas
-function segExcel(){
-  if(typeof XLSX==='undefined'||!XLSX.utils){alert('Librería de Excel no disponible. Recarga la página.');return;}
-  const rows=SEG.vista||[];
-  if(!rows.length){alert('No hay claves para exportar con este filtro.');return;}
-  const RL=['SAGRADOS','ALTA','MEDIA','LENTA','OTRA'];
-  const fx=f=>f?String(f).slice(0,10).split('-').reverse().join('/'):'';
-  const fh=t=>t?new Date(t).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
-  const hoy=new Date(segHoy()+'T12:00:00');
-  const datos=rows.map(r=>{
-    const cl=String(r.clave).trim(),s=SEG.seg[cl]||{},hs=SEG.hist[cl]||[];
-    const e=segEstado(s,2);
-    const dif=s.fecha_llegada?Math.round((new Date(String(s.fecha_llegada).slice(0,10)+'T12:00:00')-hoy)/864e5):'';
-    return {'Estado':SEG_LBL[e].replace(/^\S+\s/,''),'Clave':cl,'Nombre':String(r.nombre||'').replace(/\s+/g,' ').trim(),'Comprador':tgComp(r),
-      'Rotación':RL[tgRank(r.rotacion)],'Días en faltante':SEG.dias[cl]??'','Fecha llegada':fx(s.fecha_llegada),
-      'Días para llegar (neg = vencida)':dif,'Comentario':s.comentario||'','Capturado por':s.creado_por||'',
-      'Fecha de captura':fh(s.creado_en),'Veces capturada':hs.length};
-  });
-  const hist=[];
-  rows.forEach(r=>{const cl=String(r.clave).trim();(SEG.hist[cl]||[]).forEach(x=>hist.push({
-    'Clave':cl,'Nombre':String(r.nombre||'').replace(/\s+/g,' ').trim(),'Comprador':tgComp(r),'Fecha llegada':fx(x.fecha_llegada),
-    'Comentario':x.comentario||'','Capturado por':x.creado_por||'','Fecha de captura':fh(x.creado_en)}));});
-  const wb=XLSX.utils.book_new();
-  const ws=XLSX.utils.json_to_sheet(datos);
-  ws['!cols']=[{wch:12},{wch:9},{wch:48},{wch:18},{wch:10},{wch:10},{wch:12},{wch:12},{wch:50},{wch:14},{wch:18},{wch:10}];
-  ws['!autofilter']={ref:ws['!ref']};
-  XLSX.utils.book_append_sheet(wb,ws,'Seguimiento');
-  const wh=XLSX.utils.json_to_sheet(hist.length?hist:[{'Clave':'','Nombre':'Sin capturas'}]);
-  wh['!cols']=[{wch:9},{wch:48},{wch:18},{wch:12},{wch:50},{wch:14},{wch:18}];
-  XLSX.utils.book_append_sheet(wb,wh,'Historial capturas');
-  XLSX.writeFile(wb,`Seguimiento_faltantes_${(SEG.fB||segHoy())}.xlsx`);
-}
-function segDirty(el){const tr=el.closest('tr');tr.classList.add('sg-dirty');tr.querySelector('.sg-save').disabled=false;}
-
-async function segGuardar(el){
-  const tr=el.closest('tr'),btn=tr.querySelector('.sg-save');
-  if(btn.disabled)return;
-  const fecha=tr.querySelector('input[type=date]').value||null;
-  const com=tr.querySelector('input[type=text]').value.trim()||null;
-  if(!fecha&&!com){alert('Escribe una fecha de llegada o un comentario.');return;}
-  btn.disabled=true;btn.textContent='⏳';
-  const reg={clave:tr.dataset.c,comprador:tr.dataset.comp,nombre:tr.dataset.nom,fecha_llegada:fecha,comentario:com,creado_por:(typeof usuarioActual!=='undefined'&&usuarioActual)||'admin'};
-  const {data,error}=await sb.from(SEG_TABLA).insert(reg).select('id,clave,fecha_llegada,comentario,creado_por,creado_en').single();
-  if(error){btn.disabled=false;btn.textContent='💾 Guardar';alert('No se pudo guardar: '+error.message);return;}
-  const cl=tr.dataset.c;
-  SEG.seg[cl]=data;(SEG.hist[cl]=SEG.hist[cl]||[]).unshift(data);
-  // si el resumen de Telegram ya tenía datos cargados, actualizarlo también
-  if(TG.seg){TG.seg[cl]=data;}
-  tr.classList.remove('sg-dirty');btn.textContent='✓';
-  setTimeout(renderSeg,600);
-}
-</script>
-<!-- ══════════ /SEGUIMIENTO DE FALTANTES ══════════ -->
-
 </body>
 </html>

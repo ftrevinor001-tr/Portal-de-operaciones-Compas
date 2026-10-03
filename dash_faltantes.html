@@ -782,6 +782,7 @@ async function loadServer(){
     return;
   }
 
+  await cargarRestringidas();
   const isOpen=document.getElementById('dashboard').style.display!=='none';
   if(isOpen){
     const btns=document.querySelectorAll('.hbtn');
@@ -852,7 +853,7 @@ function loadExcel(inp){
       const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{raw:false,defval:''});
       const wsD=wb.Sheets['Detalle']||wb.Sheets[wb.SheetNames[1]];
       const rawD=wsD?XLSX.utils.sheet_to_json(wsD,{raw:false,defval:''}):[];
-      applyData(buildData(raw,rawD,file.name));
+      cargarRestringidas().finally(()=>{ applyData(buildData(raw,rawD,file.name)); });
     }catch(e){alert('Error al leer el Excel:\n'+e.message);}
   };
   r.onerror=()=>alert('No se pudo leer el archivo.');
@@ -860,7 +861,47 @@ function loadExcel(inp){
 }
 
 // ── APPLY DATA ────────────────────────────────────────────────────────────────
+// ── CLAVES RESTRINGIDAS (no cuentan al comprador) ──────────────────────────
+let RESTRINGIDAS=new Set(); // 'CLAVE||COMPRADOR' de restricciones activas
+async function cargarRestringidas(){
+  try{
+    const sb=window.__SB||(window.__SB=window.supabase.createClient(window.SB_URL,window.SB_KEY));
+    const{data,error}=await sb.from('claves_restringidas').select('clave,comprador,activa').eq('activa',true);
+    if(error||!data)return;
+    RESTRINGIDAS=new Set(data.map(r=>String(r.clave).trim()+'||'+String(r.comprador).trim().toUpperCase()));
+  }catch(e){ console.warn('restringidas:',e.message); }
+}
+// Reconstruye raw (Hoja1) y rawD (Detalle) desde detR, quitando los FALTANTE restringidos,
+// y re-ejecuta buildData para que el descuento se refleje en KPIs, Tabla Resumen y gráficas.
+function aplicarRestricciones(d){
+  if(!RESTRINGIDAS.size||!d.detR||!d.detR.length)return d;
+  const esRestr=r=>String(r.estatus||'').toUpperCase()==='FALTANTE'&&RESTRINGIDAS.has(String(r.clave).trim()+'||'+String(r.comprador).trim().toUpperCase());
+  // rawD = detR sin las filas FALTANTE restringidas, con los nombres de columna que espera buildData
+  const detLimpio=d.detR.filter(r=>!esRestr(r));
+  if(detLimpio.length===d.detR.length)return d; // nada que descontar
+  const rawD=detLimpio.map(r=>({
+    'Fecha':r.fecha,'Clave':r.clave,'Nombre':r.nombre,'Marca':r.marca,'Unidad':r.unidad,
+    'Clasificación':r.clasificacion,'Existencias':r.existencias,'GRUPO':r.grupo,'COMPRADOR':r.comprador,
+    'Clasificación por movimiento':r.clmov,'Tiempo de entrega':r.t_entrega,
+    'Objetivo_Meses de inventario':r.obj_meses,'Meses de inventario':r.meses_inv,
+    'Clasificacion_estatus de inventario':r.estatus,'Clasificacion_Punto de reorden':r.reorden,'Back Order':r.bo
+  }));
+  // raw (Hoja1) = conteo por fecha+comprador+rotación+estatus, reconstruido del detalle limpio
+  const ROT_OK=['SAGRADOS','ALTA ROTACIÓN','MEDIA ROTACIÓN','LENTA ROTACIÓN'];
+  const acc={};
+  detLimpio.forEach(r=>{
+    const c=String(r.comprador||'').trim().toUpperCase(); if(!c||c==='PRODUCCION')return;
+    const rot=String(r.clmov||'').trim().toUpperCase(); if(!ROT_OK.includes(rot))return;
+    const est=String(r.estatus||'').trim().toUpperCase(); if(!est)return;
+    const k=r.fecha+'||'+c+'||'+rot+'||'+est; acc[k]=(acc[k]||0)+1;
+  });
+  const raw=Object.keys(acc).map(k=>{const[f,c,rot,est]=k.split('||');return{'Fecha':f,'COMPRADOR':c,'Clasificacion':rot,'Clasificacion de mov':est,'Claves':acc[k]};});
+  try{ return buildData(raw,rawD,d.filename||'restringidas'); }
+  catch(e){ console.warn('aplicarRestricciones:',e.message); return d; }
+}
+
 function applyData(d){
+  d=aplicarRestricciones(d);
   if(!d||!d.fechas||!d.fechas.length){
     const errEl=document.getElementById('load-err');
     const fb=document.getElementById('load-fallback');
