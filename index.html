@@ -235,25 +235,6 @@
           <div class="prog" id="prog"></div>
         </div>
 
-        <div class="admin-card" id="card-motivos">
-          <h2>🏷️ Motivos de precisión (Pedidos propuestos)</h2>
-          <p class="desc">Administra los motivos que aparecen en el desplegable de la pestaña <b>Indicadores → Pedidos propuestos</b> y a qué <b>área/responsable</b> se asigna cada uno. Los cambios se guardan en la base y se aplican al recargar el dashboard OTIF.</p>
-          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
-            <div style="display:flex;flex-direction:column;gap:4px">
-              <label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">Motivo</label>
-              <input type="text" id="mot-nombre" placeholder="Ej. Cambio de proveedor" style="font-size:13px;padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:220px">
-            </div>
-            <div style="display:flex;flex-direction:column;gap:4px">
-              <label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">Área / Responsable</label>
-              <input type="text" id="mot-area" list="mot-areas-list" placeholder="Ej. Compras" style="font-size:13px;padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:200px">
-              <datalist id="mot-areas-list"></datalist>
-            </div>
-            <button class="abtn" style="margin-top:0" onclick="guardarMotivo()" id="mot-btn">➕ Agregar / Actualizar</button>
-            <button class="abtn" style="margin-top:0;background:#adb5bd" onclick="limpiarMotForm()">✕ Limpiar</button>
-          </div>
-          <div class="gate-err" id="mot-err"></div>
-          <div id="mot-tabla" style="font-size:13px;color:#495057">Cargando motivos…</div>
-        </div>
 
         <div class="admin-card" id="card-restr">
           <h2>🚫 Claves restringidas (no cuentan al comprador)</h2>
@@ -270,9 +251,10 @@
             </div>
             <div style="display:flex;flex-direction:column;gap:4px">
               <label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">Motivo</label>
-              <select id="restr-motivo" style="font-size:13px;padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px">
+              <select id="restr-motivo" style="font-size:13px;padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px" onchange="toggleMotivoOtro()">
                 <option>Ventas atípicas</option><option>Acuerdo con proveedor</option><option>Desabasto</option><option>Otro</option>
               </select>
+              <input type="text" id="restr-motivo-otro" placeholder="Especifica el motivo" style="display:none;font-size:13px;padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;margin-top:4px">
             </div>
             <div style="display:flex;flex-direction:column;gap:4px">
               <label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">Autorizó (Gerencia)</label>
@@ -349,6 +331,26 @@
           </div>
           <div style="position:relative;height:260px"><canvas id="met-chart"></canvas></div>
           <div id="mtx"></div>
+        </div>
+
+        <div class="admin-card" id="card-motivos">
+          <h2>🏷️ Motivos de precisión (Pedidos propuestos)</h2>
+          <p class="desc">Administra los motivos que aparecen en el desplegable de la pestaña <b>Indicadores → Pedidos propuestos</b> y a qué <b>área/responsable</b> se asigna cada uno. Los cambios se guardan en la base y se aplican al recargar el dashboard OTIF.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">Motivo</label>
+              <input type="text" id="mot-nombre" placeholder="Ej. Cambio de proveedor" style="font-size:13px;padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:220px">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <label style="font-size:11px;font-weight:700;color:#6b7a99;text-transform:uppercase">Área / Responsable</label>
+              <input type="text" id="mot-area" list="mot-areas-list" placeholder="Ej. Compras" style="font-size:13px;padding:7px 10px;border:1.5px solid #c9d4f0;border-radius:7px;min-width:200px">
+              <datalist id="mot-areas-list"></datalist>
+            </div>
+            <button class="abtn" style="margin-top:0" onclick="guardarMotivo()" id="mot-btn">➕ Agregar / Actualizar</button>
+            <button class="abtn" style="margin-top:0;background:#adb5bd" onclick="limpiarMotForm()">✕ Limpiar</button>
+          </div>
+          <div class="gate-err" id="mot-err"></div>
+          <div id="mot-tabla" style="font-size:13px;color:#495057">Cargando motivos…</div>
         </div>
       </div>
     </div>
@@ -956,17 +958,28 @@ function renderRestrTabla(){
   const cont=document.getElementById('restr-tabla'); if(!cont)return;
   if(!RESTR_ADMIN.length){cont.innerHTML='<span style="color:#6b7a99">Sin claves restringidas. Agrega la primera arriba.</span>';return;}
   const fFecha=f=>{if(!f)return'—';const p=String(f).slice(0,10).split('-');return p.length>=3?`${p[2]}/${p[1]}/${p[0]}`:String(f);};
-  const filas=RESTR_ADMIN.map(r=>`<tr style="${r.activa?'':'opacity:.5'}">
+  const filas=RESTR_ADMIN.map(r=>{
+    const exp=r.activa&&restrExpirada(r); // restringida pero ya pasaron 30 días → expirada
+    const estado = !r.activa
+      ? '<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">✓ Activa (cuenta)</span>'
+      : exp
+        ? '<span style="background:#eef2f8;color:#64748b;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">⏱ Expirada (ya cuenta)</span>'
+        : '<span style="background:#fdecea;color:#c0392b;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">🚫 Restringida</span>';
+    // Acciones: si expiró, se puede re-restringir (renueva fecha) o quitar; si activa restringida, desbloquear
+    const btnEstado = exp
+      ? `<button class="abtn" style="margin:0;padding:4px 10px;font-size:12px;background:#1c4587" onclick="renovarRestriccion(${r.id})">🔁 Renovar 30 días</button>`
+      : `<button class="abtn" style="margin:0;padding:4px 10px;font-size:12px;background:${r.activa?'#2e7d32':'#c0392b'}" onclick="toggleRestriccion(${r.id},${r.activa?'false':'true'})">${r.activa?'🔓 Desbloquear':'🚫 Restringir'}</button>`;
+    return `<tr style="${(r.activa&&!exp)?'':'opacity:.55'}">
     <td style="padding:6px 10px;border-bottom:1px solid #eef;font-weight:600">${r.clave}</td>
     <td style="padding:6px 10px;border-bottom:1px solid #eef">${r.comprador}</td>
     <td style="padding:6px 10px;border-bottom:1px solid #eef">${r.motivo||'—'}</td>
     <td style="padding:6px 10px;border-bottom:1px solid #eef">${r.autorizo||'—'}</td>
     <td style="padding:6px 10px;border-bottom:1px solid #eef;font-size:11px;color:#6b7a99">${fFecha(r.autorizado_en)}</td>
-    <td style="padding:6px 10px;border-bottom:1px solid #eef">${r.activa?'<span style="background:#fdecea;color:#c0392b;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">🚫 Restringida</span>':'<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">✓ Activa (cuenta)</span>'}</td>
+    <td style="padding:6px 10px;border-bottom:1px solid #eef">${estado}</td>
     <td style="padding:6px 10px;border-bottom:1px solid #eef;white-space:nowrap">
-      <button class="abtn" style="margin:0;padding:4px 10px;font-size:12px;background:${r.activa?'#2e7d32':'#c0392b'}" onclick="toggleRestriccion(${r.id},${r.activa?'false':'true'})">${r.activa?'🔓 Desbloquear':'🚫 Restringir'}</button>
+      ${btnEstado}
       <button class="abtn" style="margin:0 0 0 6px;padding:4px 10px;font-size:12px;background:#6b7a99" onclick="eliminarRestriccion(${r.id})">🗑 Quitar</button>
-    </td></tr>`).join('');
+    </td></tr>`;}).join('');
   cont.innerHTML=`<table style="width:100%;border-collapse:collapse;margin-top:6px"><thead><tr style="background:#f8f9fd">
     <th style="text-align:left;padding:6px 10px;font-size:11px;color:#6b7a99;text-transform:uppercase">Clave</th>
     <th style="text-align:left;padding:6px 10px;font-size:11px;color:#6b7a99;text-transform:uppercase">Comprador</th>
@@ -977,12 +990,36 @@ function renderRestrTabla(){
     <th style="text-align:left;padding:6px 10px;font-size:11px;color:#6b7a99;text-transform:uppercase">Acciones</th>
   </tr></thead><tbody>${filas}</tbody></table>`;
 }
-function limpiarRestrForm(){['restr-clave','restr-comprador','restr-autorizo'].forEach(id=>document.getElementById(id).value='');document.getElementById('restr-motivo').value='Ventas atípicas';document.getElementById('restr-err').textContent='';}
+function limpiarRestrForm(){['restr-clave','restr-comprador','restr-autorizo'].forEach(id=>document.getElementById(id).value='');document.getElementById('restr-motivo').value='Ventas atípicas';const o=document.getElementById('restr-motivo-otro');if(o){o.value='';o.style.display='none';}document.getElementById('restr-err').textContent='';}
+// Una restricción expira a los 30 días de su fecha de autorización (deja de descontar sola)
+function restrExpirada(r){
+  if(!r.autorizado_en)return false;
+  const base=new Date(String(r.autorizado_en).slice(0,10)+'T12:00:00');
+  if(isNaN(base))return false;
+  const dias=Math.floor((Date.now()-base.getTime())/864e5);
+  return dias>=30;
+}
+async function renovarRestriccion(id){
+  if(!confirm('¿Renovar la restricción por 30 días más desde hoy? (requiere autorización de gerencia)'))return;
+  try{
+    const hoy=new Date().toISOString().slice(0,10);
+    const{error}=await sb.from('claves_restringidas').update({autorizado_en:hoy,activa:true}).eq('id',id);
+    if(error)throw error;
+    await cargarRestriccionesAdmin();
+  }catch(e){ alert('No se pudo renovar: '+e.message); }
+}
+function toggleMotivoOtro(){
+  const sel=document.getElementById('restr-motivo'), inp=document.getElementById('restr-motivo-otro');
+  if(!sel||!inp)return;
+  inp.style.display=(sel.value==='Otro')?'block':'none';
+  if(sel.value==='Otro')inp.focus();
+}
 async function guardarRestriccion(){
   const err=document.getElementById('restr-err'); err.textContent='';
   const clave=document.getElementById('restr-clave').value.trim();
   const comprador=normCompR(document.getElementById('restr-comprador').value);
-  const motivo=document.getElementById('restr-motivo').value;
+  let motivo=document.getElementById('restr-motivo').value;
+  if(motivo==='Otro'){ const esp=document.getElementById('restr-motivo-otro').value.trim(); if(!esp){err.textContent='Escribe el motivo (elegiste "Otro").';return;} motivo=esp; }
   const autorizo=document.getElementById('restr-autorizo').value.trim();
   if(!clave){err.textContent='Escribe la clave.';return;}
   if(!comprador){err.textContent='Escribe el comprador.';return;}
@@ -1736,9 +1773,12 @@ async function procesarExcel(file){
     const mapaManual={};if(!asgOC.error&&asgOC.data)asgOC.data.forEach(x=>{mapaManual[String(x.folio).trim()]=x.comprador;});
     log('   '+Object.keys(mapaManual).length+' asignaciones guardadas');
     // Cargar claves restringidas activas para descontarlas de las alarmas
-    try{const rr=await sb.from('claves_restringidas').select('clave,comprador,activa').eq('activa',true);
-      if(!rr.error&&rr.data){window.RESTRINGIDAS_SET=new Set(rr.data.map(x=>String(x.clave).trim()+'||'+String(x.comprador).trim().toUpperCase()));
-        log('🚫 '+rr.data.length+' claves restringidas aplicadas.');}
+    try{const rr=await sb.from('claves_restringidas').select('clave,comprador,activa,autorizado_en').eq('activa',true);
+      if(!rr.error&&rr.data){
+        // Solo las vigentes: activas y con menos de 30 días desde la autorización
+        const vig=rr.data.filter(x=>{if(!x.autorizado_en)return true;const b=new Date(String(x.autorizado_en).slice(0,10)+'T12:00:00');return isNaN(b)?true:Math.floor((Date.now()-b.getTime())/864e5)<30;});
+        window.RESTRINGIDAS_SET=new Set(vig.map(x=>String(x.clave).trim()+'||'+String(x.comprador).trim().toUpperCase()));
+        log('🚫 '+vig.length+' claves restringidas vigentes aplicadas'+(rr.data.length>vig.length?` (${rr.data.length-vig.length} expiradas ya cuentan)`:'')+'.');}
     }catch(e){}
     const res=computarAlarmas(payload,rowsOC,rowsAsig,rowsOtif,mapaManual);
     const pend=window.__OCS_PEND||[];

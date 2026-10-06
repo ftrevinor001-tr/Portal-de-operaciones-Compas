@@ -866,9 +866,11 @@ let RESTRINGIDAS=new Set(); // 'CLAVE||COMPRADOR' de restricciones activas
 async function cargarRestringidas(){
   try{
     const sb=window.__SB||(window.__SB=window.supabase.createClient(window.SB_URL,window.SB_KEY));
-    const{data,error}=await sb.from('claves_restringidas').select('clave,comprador,activa').eq('activa',true);
+    const{data,error}=await sb.from('claves_restringidas').select('clave,comprador,activa,autorizado_en').eq('activa',true);
     if(error||!data)return;
-    RESTRINGIDAS=new Set(data.map(r=>String(r.clave).trim()+'||'+String(r.comprador).trim().toUpperCase()));
+    // Solo vigentes: activas y con menos de 30 días desde la autorización (a los 30 días expiran y vuelven a contar)
+    const vig=data.filter(r=>{if(!r.autorizado_en)return true;const b=new Date(String(r.autorizado_en).slice(0,10)+'T12:00:00');return isNaN(b)?true:Math.floor((Date.now()-b.getTime())/864e5)<30;});
+    RESTRINGIDAS=new Set(vig.map(r=>String(r.clave).trim()+'||'+String(r.comprador).trim().toUpperCase()));
   }catch(e){ console.warn('restringidas:',e.message); }
 }
 // Reconstruye raw (Hoja1) y rawD (Detalle) desde detR, quitando los FALTANTE restringidos,
