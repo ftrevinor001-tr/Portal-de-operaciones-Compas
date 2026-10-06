@@ -2440,23 +2440,21 @@ function genTgRiesgo(){
     const h=tgHandles();
     const B=tgC('tg-negritas')?(s=>`**${s}**`):(s=>s);
     const L=[];
-    const rsg=(riesgoB||[]);
-    L.push(`⚠️ ${B('CLAVES EN RIESGO — '+tgFecha(fB).toUpperCase())}`);
-    L.push(`Total en riesgo: ${B(String(rsg.length))}`+(rsg.length?` · 🆕 nuevas: ${rsg.filter(r=>r._nueva).length}`:''));
-    if(!rsg.length){L.push('');L.push('🎉 No hay claves en riesgo.');ta.value=L.join('\n');actualizarLen2(ta.value);return;}
-    // Agrupar por rotación: Sagrados, Alta, Media, Lenta, Otras
-    const grupos=[[0,'⭐ SAGRADOS'],[1,'🔴 ALTA ROTACIÓN'],[2,'🟡 MEDIA ROTACIÓN'],[3,'⚪ LENTA ROTACIÓN'],[4,'▫️ OTRAS']];
+    // Solo NUEVAS claves en riesgo (entraron en B, no estaban en A)
+    const rsg=(riesgoB||[]).filter(r=>r._nueva);
+    L.push(`⚠️ ${B('NUEVAS CLAVES EN RIESGO — '+tgFecha(fB).toUpperCase())}`);
+    L.push(`Total nuevas en riesgo: ${B(String(rsg.length))}`);
+    if(!rsg.length){L.push('');L.push('🎉 No hay nuevas claves en riesgo.');ta.value=L.join('\n');actualizarLen2(ta.value);return;}
     const linea=r=>{
-      const cl=String(r.clave).trim();
       const bo=r._bo>0?` · 📦 BO: ${r._bo.toLocaleString('es-MX')}`:'';
       const d=r._dias&&parseInt(r._dias)>1?` (${r._dias}d en riesgo)`:'';
-      const nv=r._nueva?' 🆕':'';
-      return `• ${r.clave} ${tgCorto(r.nombre,34)}${nv}${d}${bo}`;
+      return `   – ${r.clave} ${tgCorto(r.nombre,34)}${d}${bo}`;
     };
-    grupos.forEach(([rank,titulo])=>{
-      const items=rsg.filter(r=>tgRank(r.rotacion)===rank).sort((a,b)=>(parseInt(b._dias)||0)-(parseInt(a._dias)||0));
-      if(!items.length)return;
-      L.push('');L.push(`${B(titulo)} (${items.length})`);
+    // Agrupar por comprador (más claves primero)
+    const porComp={};rsg.forEach(r=>{const c=tgComp(r);(porComp[c]=porComp[c]||[]).push(r);});
+    Object.entries(porComp).sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0])).forEach(([c,items])=>{
+      items.sort((a,b)=>(parseInt(b._dias)||0)-(parseInt(a._dias)||0));
+      L.push('');L.push(`${B(tgWho(c,h))} (${items.length})`);
       items.forEach(r=>L.push(linea(r)));
     });
     const link=tgV('tg-link').trim();if(link){L.push('');L.push(`🔗 Detalle: ${link}`);}
