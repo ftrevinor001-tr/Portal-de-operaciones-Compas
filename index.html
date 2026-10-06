@@ -2156,6 +2156,15 @@ init();
           <span id="tg-len" style="margin-left:auto;font-size:11px;color:#6b7a99"></span>
         </div>
         <p style="font-size:10.5px;color:#6b7a99;margin-top:6px">Puedes editar el texto antes de copiarlo. Los datos salen de la base del portal (detalle diario).</p>
+        <div style="margin-top:16px;border-top:1px dashed #c9d4f0;padding-top:12px">
+          <div style="font-size:12px;font-weight:700;color:#1e3a5f;margin-bottom:6px">⚠️ Segundo mensaje — Claves en RIESGO (por clasificación)</div>
+          <textarea id="tg-txt2" spellcheck="false">Cargando…</textarea>
+          <div id="tg-foot">
+            <button class="tg-btn" style="background:#f39c12;color:#fff" onclick="copyTg2()">📋 Copiar mensaje de riesgo</button>
+            <span id="tg-msg2" style="font-size:12px;color:#2e7d32;font-weight:600"></span>
+            <span id="tg-len2" style="margin-left:auto;font-size:11px;color:#6b7a99"></span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -2243,11 +2252,26 @@ async function tgFechas(){
 // Lee faltantes de A y B + historial, calcula nuevas/resueltas y días en faltante
 async function tgDatos(fA,fB){
   const cols='fecha,clave,nombre,marca,comprador,rotacion,estatus';
+  const colsR='fecha,clave,nombre,marca,comprador,rotacion,estatus,back_order';
   const d0=new Date(fB+'T12:00:00');d0.setDate(d0.getDate()-60);
   const desde=d0.toISOString().slice(0,10)<fA?d0.toISOString().slice(0,10):fA;
   // Día A y Día B por separado, con orden estable para que la paginación no salte filas
   const leerDia=f=>tgPaginar(()=>sb.from('detalle_diario').select(cols).eq('fecha',f).ilike('estatus','faltante').order('clave',{ascending:true}));
-  const [rowsA,rowsB]=await Promise.all([leerDia(fA),leerDia(fB)]);
+  const leerRiesgo=f=>tgPaginar(()=>sb.from('detalle_diario').select(colsR).eq('fecha',f).ilike('estatus','riesgo').order('clave',{ascending:true}));
+  const [rowsA,rowsB,rsgA,rsgB,histR]=await Promise.all([
+    leerDia(fA),leerDia(fB),leerRiesgo(fA),leerRiesgo(fB),
+    tgPaginar(()=>sb.from('detalle_diario').select('fecha,clave,comprador').ilike('estatus','riesgo').gte('fecha',desde).lt('fecha',fB).order('fecha',{ascending:true}).order('clave',{ascending:true}))
+  ]);
+  // ── RIESGO: nuevas (en B y no en A) y días en racha de riesgo hasta B ──
+  const rsgBf=rsgB.filter(r=>!TG_EXCL.includes(tgComp(r)));
+  const setRsgA=new Set(rsgA.filter(r=>!TG_EXCL.includes(tgComp(r))).map(r=>String(r.clave).trim()));
+  const porFechaR={};[...histR,...rsgA,...rsgB].filter(r=>!TG_EXCL.includes(tgComp(r))).forEach(r=>{const f=String(r.fecha).slice(0,10);(porFechaR[f]=porFechaR[f]||new Set()).add(String(r.clave).trim());});
+  const fechasHastaR=TG.fechas.filter(f=>f>=desde&&f<=fB);
+  const diasRsg={};
+  rsgBf.forEach(r=>{const cl=String(r.clave).trim();let i=fechasHastaR.length-1;while(i>0&&porFechaR[fechasHastaR[i-1]]?.has(cl))i--;
+    const n=Math.round((new Date(fB+'T12:00:00')-new Date(fechasHastaR[i]+'T12:00:00'))/864e5)+1;
+    diasRsg[cl]=(i===0&&fechasHastaR.length>1)?n+'+':n;});
+  const riesgoB=rsgBf.map(r=>({...r,_nueva:!setRsgA.has(String(r.clave).trim()),_dias:diasRsg[String(r.clave).trim()],_bo:+r.back_order||0}));
   const hist=await tgPaginar(()=>sb.from('detalle_diario').select('fecha,clave,comprador').ilike('estatus','faltante').gte('fecha',desde).lt('fecha',fA).order('fecha',{ascending:true}).order('clave',{ascending:true}));
   const falt=[...hist,...rowsA,...rowsB].filter(r=>!TG_EXCL.includes(tgComp(r)));
   const porFecha={};falt.forEach(r=>{const f=String(r.fecha).slice(0,10);(porFecha[f]=porFecha[f]||new Map()).set(String(r.clave).trim(),r);});
@@ -2272,7 +2296,8 @@ async function tgDatos(fA,fB){
   });
   return {fA,fB,nuevas,resInv:resueltas.filter(r=>enB.has(String(r.clave).trim())),resDesc:resueltas.filter(r=>!enB.has(String(r.clave).trim())),
     faltB:[...mB.values()],dias,inicio,nA:mA.size,nB:mB.size,comps:[...new Set(falt.map(tgComp))].filter(Boolean),
-    countByDay:Object.fromEntries(Object.entries(porFecha).map(([f,m])=>[f,m.size]))};
+    countByDay:Object.fromEntries(Object.entries(porFecha).map(([f,m])=>[f,m.size])),
+    riesgoB};
 }
 
 async function tgCargar(){
@@ -2297,6 +2322,7 @@ function tgDelta(a,b){const d=b-a;return d>0?`▲${d}`:d<0?`▼${Math.abs(d)}`:'
 
 function genTg(){
   try{genTg2();}catch(e){document.getElementById('tg-txt').value='❌ Error al armar el resumen: '+e.message;console.error(e);}
+  try{genTgRiesgo();}catch(e){console.error(e);}
 }
 function genTg2(){
   const {fA,fB,nuevas,resInv,resDesc,faltB,dias}=TG;
@@ -2403,6 +2429,51 @@ function genTg2(){
   const n=txt.length,el=document.getElementById('tg-len');
   el.textContent=`${n.toLocaleString()} / 4,096 caracteres`+(n>4096?' — ⚠️ Telegram lo cortará, desmarca opciones':'');
   el.style.color=n>4096?'#c0392b':'#6b7a99';
+}
+
+// ── SEGUNDO MENSAJE: claves en RIESGO por clasificación ──
+function genTgRiesgo(){
+  try{
+    const {fB,riesgoB}=TG;
+    const ta=document.getElementById('tg-txt2'); if(!ta)return;
+    if(!fB){ta.value='';return;}
+    const h=tgHandles();
+    const B=tgC('tg-negritas')?(s=>`**${s}**`):(s=>s);
+    const L=[];
+    const rsg=(riesgoB||[]);
+    L.push(`⚠️ ${B('CLAVES EN RIESGO — '+tgFecha(fB).toUpperCase())}`);
+    L.push(`Total en riesgo: ${B(String(rsg.length))}`+(rsg.length?` · 🆕 nuevas: ${rsg.filter(r=>r._nueva).length}`:''));
+    if(!rsg.length){L.push('');L.push('🎉 No hay claves en riesgo.');ta.value=L.join('\n');actualizarLen2(ta.value);return;}
+    // Agrupar por rotación: Sagrados, Alta, Media, Lenta, Otras
+    const grupos=[[0,'⭐ SAGRADOS'],[1,'🔴 ALTA ROTACIÓN'],[2,'🟡 MEDIA ROTACIÓN'],[3,'⚪ LENTA ROTACIÓN'],[4,'▫️ OTRAS']];
+    const linea=r=>{
+      const cl=String(r.clave).trim();
+      const bo=r._bo>0?` · 📦 BO: ${r._bo.toLocaleString('es-MX')}`:'';
+      const d=r._dias&&parseInt(r._dias)>1?` (${r._dias}d en riesgo)`:'';
+      const nv=r._nueva?' 🆕':'';
+      return `• ${r.clave} ${tgCorto(r.nombre,34)}${nv}${d}${bo}`;
+    };
+    grupos.forEach(([rank,titulo])=>{
+      const items=rsg.filter(r=>tgRank(r.rotacion)===rank).sort((a,b)=>(parseInt(b._dias)||0)-(parseInt(a._dias)||0));
+      if(!items.length)return;
+      L.push('');L.push(`${B(titulo)} (${items.length})`);
+      items.forEach(r=>L.push(linea(r)));
+    });
+    const link=tgV('tg-link').trim();if(link){L.push('');L.push(`🔗 Detalle: ${link}`);}
+    ta.value=L.join('\n');
+    actualizarLen2(ta.value);
+  }catch(e){const ta=document.getElementById('tg-txt2');if(ta)ta.value='❌ Error al armar el mensaje de riesgo: '+e.message;console.error(e);}
+}
+function actualizarLen2(txt){
+  const el=document.getElementById('tg-len2');if(!el)return;
+  const n=txt.length;
+  el.textContent=`${n.toLocaleString()} / 4,096 caracteres`+(n>4096?' — ⚠️ Telegram lo cortará':'');
+  el.style.color=n>4096?'#c0392b':'#6b7a99';
+}
+async function copyTg2(){
+  const ta=document.getElementById('tg-txt2'),msg=document.getElementById('tg-msg2');
+  try{await navigator.clipboard.writeText(ta.value);}catch(e){ta.select();document.execCommand('copy');}
+  if(msg){msg.textContent='✓ Copiado';setTimeout(()=>msg.textContent='',2000);}
 }
 
 async function copyTg(){
