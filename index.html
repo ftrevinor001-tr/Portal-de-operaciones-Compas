@@ -2028,9 +2028,23 @@ const PALETA=['#1c4587','#c0582a','#4a7c59','#7b5aa6','#b8860b','#2a7d8c','#c039
 async function cargarMetricas(){
   const box=document.getElementById('mtx');box.innerHTML='<p style="color:#64748b;font-size:13px;margin-top:10px">Cargando…</p>';
   const desde=new Date(Date.now()-120*86400000).toISOString();
-  const{data,error}=await sb.from('ingresos').select('usuario,creado_en,ultimo_latido').gte('creado_en',desde).order('creado_en').limit(10000);
-  if(error){box.innerHTML='<p style="color:#c0392b">'+error.message+'</p>';return;}
-  MET.rows=data||[];
+  // Supabase limita cada respuesta a 1000 filas (sin importar .limit()). Paginamos
+  // en orden DESCENDENTE para traer SIEMPRE los días más recientes (incluido hoy)
+  // y recorremos todas las páginas hasta cubrir la ventana completa.
+  let todas=[],desdePag=0,pasoPag=1000,errPag=null;
+  for(let i=0;i<50;i++){
+    const{data:dpg,error:epg}=await sb.from('ingresos')
+      .select('usuario,creado_en,ultimo_latido')
+      .gte('creado_en',desde)
+      .order('creado_en',{ascending:false})
+      .range(desdePag,desdePag+pasoPag-1);
+    if(epg){errPag=epg;break;}
+    todas=todas.concat(dpg||[]);
+    if(!dpg||dpg.length<pasoPag)break;      // última página
+    desdePag+=pasoPag;
+  }
+  if(errPag){box.innerHTML='<p style="color:#c0392b">'+errPag.message+'</p>';return;}
+  MET.rows=todas;
   // tabla resumen (todos, incluye visitantes)
   const agg={};MET.rows.forEach(r=>{const u=r.usuario;agg[u]=agg[u]||{total:0,hrs:0,ultimo:r.creado_en};agg[u].total++;agg[u].hrs+=durH(r);if(r.creado_en>agg[u].ultimo)agg[u].ultimo=r.creado_en;});
 
