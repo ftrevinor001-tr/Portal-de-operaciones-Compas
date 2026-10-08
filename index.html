@@ -1881,8 +1881,11 @@ async function descargarRespaldo(){
 }
 async function descargarComentarios(){
   const err=document.getElementById('dl-err');err.style.display='none';
-  const{data,error}=await sb.from('comentarios').select('*').order('creado_en',{ascending:false}).limit(10000);
-  if(error){err.textContent=error.message;err.style.display='block';return;}
+  // Paginar: Supabase corta cada respuesta a 1000 filas; sin esto la descarga
+  // saldría incompleta en silencio cuando 'comentarios' pase de 1000 registros.
+  let data;
+  try{ data=await tgPaginar(()=>sb.from('comentarios').select('*').order('creado_en',{ascending:false})); }
+  catch(e){ err.textContent=e.message;err.style.display='block';return; }
   const rows=(data||[]).map(c=>({Fecha:c.creado_en,Usuario:c.usuario,Dashboard:c.dashboard,Referencia:c.referencia,Mes:c.mes,Comentario:c.comentario}));
   const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{Fecha:'',Usuario:'',Dashboard:'',Referencia:'',Mes:'',Comentario:'(sin comentarios aún)'}]);
   const wb2=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb2,ws,'Comentarios');

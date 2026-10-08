@@ -1722,8 +1722,18 @@ function loadMotivos(){ return new Map(); }   // se llenan al cargar desde el se
 async function cargarMotivosServidor(){
   try{
     const sb=window.sbGet();
-    const{data,error}=await sb.from('motivos_precision').select('clave_registro,motivo,comentario,usuario,actualizado_en');
-    if(error){console.warn('motivos:',error.message);return;}
+    // Paginar: Supabase devuelve máx. 1000 filas por consulta. Sin esto, al pasar
+    // de 1000 OCs con motivo, el dashboard dejaría de cargar motivos en silencio.
+    let data=[];
+    for(let i=0;i<50;i++){
+      const{data:dpg,error}=await sb.from('motivos_precision')
+        .select('clave_registro,motivo,comentario,usuario,actualizado_en')
+        .order('actualizado_en',{ascending:false})
+        .range(i*1000,i*1000+999);
+      if(error){console.warn('motivos:',error.message);return;}
+      data=data.concat(dpg||[]);
+      if(!dpg||dpg.length<1000)break;
+    }
     ocMotivos=new Map();MOT_COMENT=new Map();
     (data||[]).forEach(r=>{
       if(r.motivo)ocMotivos.set(r.clave_registro,r.motivo);
