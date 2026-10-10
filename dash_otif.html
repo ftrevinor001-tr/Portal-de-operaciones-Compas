@@ -783,6 +783,10 @@ tr.grp-end td{border-bottom:2px solid var(--gc-bar,#aaa)!important}
     <!-- Filters -->
     <div class="prec-filter-bar">
       <div class="prec-filter-group">
+        <span class="prec-filter-label">📁 Grupo <span style="font-weight:400;opacity:.7">(Ctrl+clic = varios)</span></span>
+        <select class="msel" id="prec-grupo-sel" multiple size="3" style="min-width:150px;font-size:11.5px" title="Ctrl/Cmd+clic para seleccionar varios grupos · sin selección = todos"></select>
+      </div>
+      <div class="prec-filter-group">
         <span class="prec-filter-label">🏭 Proveedor</span>
         <select class="msel" id="prec-prov-sel" style="min-width:150px"><option value="">Todos los proveedores</option></select>
       </div>
@@ -1711,7 +1715,7 @@ function renderTable(data){
 // PRECISIÓN DE PEDIDO — estado, persistencia y agregación por OC
 // ══════════════════════════════════════════════════════════════
 let precChart=null;
-let precProvFilter='', precResultFilter='', precMonthFilter=[curMonthKey()];
+let precProvFilter='', precResultFilter='', precMonthFilter=[curMonthKey()], precGrupoFilter=[];
 let precSortCol='', precSortDir=1;
 let precRespChart=null;
 let ocMotivos=loadMotivos();
@@ -1792,7 +1796,7 @@ function buildPendingProposals(){
       // Combina los proveedores de la clave (principal + secundarios) separados por "/"
       const provs=[d.prov,...(d.children||[]).map(c=>c.prov)].filter(Boolean);
       const provLabel=[...new Set(provs)].join('/');
-      return{oc:'—',clave:d.id,desc:d.desc,prov:provLabel,fechaPropuesta:d.fecha_pedido,foc:null,
+      return{oc:'—',clave:d.id,desc:d.desc,prov:provLabel,grupo:d.grupo||'',fechaPropuesta:d.fecha_pedido,foc:null,
         cantPropuesta:d.asig_total,real:null,hasProp:true,status,desv:null,motivo,key};
     });
 }
@@ -1813,7 +1817,7 @@ function buildPrecisionRows(){
     const motivo=ocMotivos.get(key)||d.motivo||'';
     // Mes propuesta = columna J "Fecha Req. Sig OC" (d.freq) de OTIF PEDIDOS
     const fechaPropuesta=d.freq instanceof Date&&!isNaN(d.freq)?d.freq:null;
-    return{oc:d.oc,clave:d.clave,desc:d.desc,prov:d.prov,fechaPropuesta,foc:d.foc,
+    return{oc:d.oc,clave:d.clave,desc:d.desc,prov:d.prov,grupo:d.grupo||'',fechaPropuesta,foc:d.foc,
       cantPropuesta:hasProp?d.cantPropuesta:null,real,hasProp,status,desv,motivo,key};
   });
   return [...buildPendingProposals(), ...otifRows];
@@ -1863,6 +1867,15 @@ function buildPrecMonthOptions(allRows){
   sel.innerHTML=keys.map(k=>`<option value="${k}"${precMonthFilter.includes(k)?' selected':''}>${mLabel(k)}</option>`).join('');
   sel.className='msel'+(precMonthFilter.length?' msel-active':'');
 }
+function buildPrecGrupoOptions(allRows){
+  const sel=document.getElementById('prec-grupo-sel');
+  if(!sel) return;
+  const grupos=[...new Set(allRows.map(r=>r.grupo).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  // descarta selecciones que ya no tengan datos disponibles (sin selección = todos)
+  precGrupoFilter=precGrupoFilter.filter(g=>grupos.includes(g));
+  sel.innerHTML=grupos.map(g=>`<option value="${g}"${precGrupoFilter.includes(g)?' selected':''}>${tc(g)}</option>`).join('');
+  sel.className='msel'+(precGrupoFilter.length?' msel-active':'');
+}
 function updateMotivo(key,val){
   if(val) ocMotivos.set(key,val); else ocMotivos.delete(key);
   renderPrecisionTab();
@@ -1908,6 +1921,8 @@ function renderPrecisionTab(){
   buildPrecProvOptions();
   let rows=buildPrecisionRows();
   buildPrecMonthOptions(rows);
+  buildPrecGrupoOptions(rows);
+  if(precGrupoFilter.length) rows=rows.filter(r=>precGrupoFilter.includes(r.grupo));
   if(precProvFilter) rows=rows.filter(r=>String(r.prov).split('/').includes(precProvFilter));
   if(precResultFilter) rows=rows.filter(r=>(r.status||'sin_dato')===precResultFilter);
   // Filtro por MES DE PROPUESTA = mes de la Fecha Req. Sig OC (fechaPropuesta),
@@ -2127,11 +2142,13 @@ function switchMainTab(tab){
       document.getElementById('prec-prov-sel').addEventListener('change',e=>{precProvFilter=e.target.value;renderPrecisionTab();});
       document.getElementById('prec-result-sel').addEventListener('change',e=>{precResultFilter=e.target.value;renderPrecisionTab();});
       document.getElementById('prec-month-sel').addEventListener('change',e=>{precMonthFilter=Array.from(e.target.selectedOptions).map(o=>o.value);renderPrecisionTab();});
+      document.getElementById('prec-grupo-sel').addEventListener('change',e=>{precGrupoFilter=Array.from(e.target.selectedOptions).map(o=>o.value);renderPrecisionTab();});
       document.getElementById('prec-clear-btn').addEventListener('click',()=>{
-        precProvFilter='';precResultFilter='';precMonthFilter=[curMonthKey()];
+        precProvFilter='';precResultFilter='';precMonthFilter=[curMonthKey()];precGrupoFilter=[];
         document.getElementById('prec-prov-sel').value='';
         document.getElementById('prec-result-sel').value='';
         Array.from(document.getElementById('prec-month-sel').options).forEach(o=>o.selected=false);
+        Array.from(document.getElementById('prec-grupo-sel').options).forEach(o=>o.selected=false);
         renderPrecisionTab();
       });
     }
